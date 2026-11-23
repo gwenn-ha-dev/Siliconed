@@ -54,6 +54,7 @@ extension RemoteControl {
         case .settings(let action): finish(c, try settings(action))
         case .bracket(let action): finish(c, try bracket(action))
         case .rack(let place): finish(c, rack(place))
+        case .zoom(let step): finish(c, zoom(step))
         case .snapshot(let file, let window, let appearance): try snapshot(file, window: window, appearance: appearance, cwd: cwd, c)
         }
     }
@@ -103,6 +104,17 @@ extension RemoteControl {
         case .top, .dit: app.rackScroll = (place, (app.rackScroll?.count ?? 0) + 1)
         }
         return ["ok": true, "rack": place.rawValue, "folded": RackColumnModel.shared.folded, "detached": RackColumnModel.shared.detached]
+    }
+
+    /// **`zoom in|out|fit`**: View › Zoom In, Zoom Out, Zoom to Fit (`AppState.zoom`). Where the menu item is greyed, nothing
+    /// changes and the answer says what is shown, as it stands.
+    func zoom(_ step: GestureOrder.ZoomStep) -> [String: Any] {
+        app.zoom(step)
+        if let g = app.shownSeries {
+            return ["ok": true, "grid": "g\(g)", "cell": Response.number(Double(app.exploreCellSide)), "fits": !app.canZoomToFit]
+        }
+        return ["ok": true, "image": app.selectedEntry.map { "i\($0.ordinal)" } ?? NSNull(), "zoom": Response.number(Double(app.zoom)),
+                "fits": app.zoom == 1]
     }
 
     // MARK: - A window, as a picture

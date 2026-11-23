@@ -93,6 +93,7 @@ final class RemoteControlSettingsHelpTests: XCTestCase {
             // The window's gestures that came to the command line last: each in the overview and on its page.
             for (topic, page, overview) in [("set", "set preview [on|off]", "set preview [on|off]"),
                                             ("rack", "rack top|dit|fold|unfold|detach|dock", "rack top|dit|fold|unfold|detach|dock"),
+                                            ("zoom", "zoom in|out|fit", "zoom in|out|fit"),
                                             ("remove", "remove g2", "remove g2"), ("again", "reuse <i7|g2|", "reuse <i7|g2|"),
                                             ("uninstall", "uninstall downloads|legacy [--yes]", "|downloads|legacy [--yes]")] {
                 XCTAssertTrue(pages.pages[topic]?.contains(page) == true, "\(topic): \(page)")

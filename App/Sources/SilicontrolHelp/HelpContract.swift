@@ -67,6 +67,7 @@ extension RemoteControlHelp {
       bracket KNOB · bracket close             a knob's ± clicked: its bubble open (seed, detail, solver, start, loras, lora NAME)
       rack top|dit|fold|unfold|detach|dock     the chain's column scrolled to its head or to the DiT's settings, hidden (⌥⌘R), shown,
                                                in a window of its own (Detach the Chain), back in the main one (Dock the Chain)
+      zoom in|out|fit                          View › Zoom In, Zoom Out, Zoom to Fit (⌘+ ⌘− ⌘0): the image, or a series' cells
       snapshot FILE.png [--window W] [--appearance light|dark]
                                                a window drawn by the app into a PNG (no screen capture, works over ssh)
       remove i7 [i8 …] · remove g2             Remove from History, an image or a series · undo [--redo]: ⌘Z, ⇧⌘Z
@@ -159,6 +160,7 @@ extension RemoteControlHelp {
       bracket RÉGLAGE · bracket close          un clic sur le ± d'un réglage : sa bulle ouverte (seed, detail, solver, start, loras, lora NOM)
       rack top|dit|fold|unfold|detach|dock     la colonne de la chaîne défilée jusqu'à sa tête ou aux réglages du DiT, masquée (⌥⌘R), affichée,
                                                dans une fenêtre à elle (Détacher la chaîne), rendue à la fenêtre (Ancrer la chaîne)
+      zoom in|out|fit                          Présentation › Zoom avant, Zoom arrière, Taille ajustée (⌘+ ⌘− ⌘0) : l'image, ou les cases d'une série
       snapshot FICHIER.png [--window F] [--appearance light|dark]
                                                une fenêtre dessinée par l'app dans un PNG (sans capture d'écran, marche en ssh)
       remove i7 [i8 …] · remove g2             Retirer de l'historique, une image ou une série · undo [--redo] : ⌘Z, ⇧⌘Z

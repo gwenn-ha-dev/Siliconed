@@ -99,25 +99,17 @@ private struct AppCommands: Commands {
             }
                 .keyboardShortcut("r", modifiers: [.command, .option])
             Divider()
-            // On a series' grid, the cells' size; otherwise the image's zoom.
-            Button("Zoom In") {
-                if app.shownSeries != nil { app.exploreCellSide = AppState.clampedCellSide(app.exploreCellSide * 1.25) }
-                else { app.zoom = min(app.zoom * 1.5, app.zoomLimit) }
-            }
+            // On a series' grid, the cells' size; otherwise the image's zoom (`AppState+Zoom.swift`, also `silicontrol zoom`).
+            Button("Zoom In") { app.zoom(.zoomIn) }
                 .keyboardShortcut("+")
-                .disabled(app.selectedImage == nil && app.shownSeries == nil)
-            Button("Zoom Out") {
-                if app.shownSeries != nil { app.exploreCellSide = AppState.clampedCellSide(app.exploreCellSide / 1.25) }
-                else { app.zoom = max(app.zoom / 1.5, 1) }
-            }
+                .disabled(!app.canZoomIn)
+            Button("Zoom Out") { app.zoom(.zoomOut) }
                 .keyboardShortcut("-")
-                .disabled(app.zoom == 1 && app.shownSeries == nil)
+                .disabled(!app.canZoomOut)
             // On a series' grid, the cells back to the size that fills the canvas, following the window again.
-            Button("Zoom to Fit") {
-                if app.shownSeries != nil { app.fitSeries() } else { app.zoom = 1 }
-            }
+            Button("Zoom to Fit") { app.zoom(.fit) }
                 .keyboardShortcut("0")
-                .disabled(app.shownSeries != nil ? app.seriesFillsWindow : app.zoom == 1)
+                .disabled(!app.canZoomToFit)
             Divider()
         }
         CommandMenu("Render") {

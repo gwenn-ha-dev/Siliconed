@@ -95,6 +95,8 @@ package enum GestureOrder: Equatable, Sendable {
     /// `rack top|dit|fold|unfold|detach|dock`: the rack's column folded away or unfolded, or scrolled to its head, or to the DiT's settings
     /// (the chain then pinned in small at the top), or put in a window of its own and back into the main one.
     case rack(RackPlace)
+    /// `zoom in|out|fit`: View › Zoom In, Zoom Out, Zoom to Fit (⌘+ ⌘− ⌘0), on what the canvas shows — a series' cells, or the image.
+    case zoom(ZoomStep)
     /// `snapshot FILE.png [--window WORD|N] [--appearance light|dark]`: one of the app's windows, drawn by the app into a PNG.
     case snapshot(file: String, window: String?, appearance: SnapshotAppearance?)
 
@@ -186,6 +188,7 @@ package enum GestureOrder: Equatable, Sendable {
     }
     package enum BracketAction: Equatable, Sendable { case open(BracketKnob), close }
     package enum RackPlace: String, Equatable, Sendable { case top, dit, fold, unfold, detach, dock }
+    package enum ZoomStep: String, Equatable, Sendable { case zoomIn = "in", zoomOut = "out", fit }
     package enum SnapshotAppearance: String, Equatable, Sendable { case light, dark }
 
     /// What `settings` opens: a pane, or Settings › Prompt Lab on one instruction — the model and the gesture its two menus show,

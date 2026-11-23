@@ -365,6 +365,31 @@ extension RemoteControlHelp {
         ÉCHECS : usage (une place qui ne se lit pas).
         """),
 
+        "zoom": Page(en: """
+        silicontrol zoom in|out|fit
+
+        View › Zoom In, Zoom Out, Zoom to Fit (⌘+ ⌘− ⌘0), on what the canvas shows. On a series' grid: its cells larger or
+        smaller, or back to the size that fills the canvas, following the window again. Otherwise the chosen image: zoomed
+        by 1.5 up to its pixels' limit, back towards fitted, or fitted. Where the menu item is greyed (nothing shown, the image
+        already fitted, the cells already filling the canvas), nothing changes and the answer says what is shown.
+
+        Answer: {"ok": true, "image": "i7", "zoom": 1.5, "fits": false}
+                {"ok": true, "grid": "g2", "cell": 275, "fits": false}   (a series shown; cell: a cell's side, in points)
+        FAILURES: usage (a step that does not read).
+        """, fr: """
+        silicontrol zoom in|out|fit
+
+        Présentation › Zoom avant, Zoom arrière, Taille ajustée (⌘+ ⌘− ⌘0), sur ce que montre le canevas. Sur la grille d'une
+        série : ses cases plus grandes ou plus petites, ou revenues à la taille qui remplit le canevas, qui suit de nouveau la
+        fenêtre. Sinon l'image choisie : agrandie de 1,5 jusqu'à la limite de ses pixels, ramenée vers l'ajustée, ou ajustée.
+        Là où l'article du menu est grisé (rien d'affiché, l'image déjà ajustée, les cases remplissant déjà le canevas), rien ne
+        change et la réponse dit ce qui est affiché.
+
+        Réponse : {"ok": true, "image": "i7", "zoom": 1.5, "fits": false}
+                  {"ok": true, "grid": "g2", "cell": 275, "fits": false}   (une série affichée ; cell : le côté d'une case, en points)
+        ÉCHECS : usage (un pas qui ne se lit pas).
+        """),
+
         "snapshot": Page(en: """
         silicontrol snapshot <file.png> [--window WORD|N] [--appearance light|dark]
 

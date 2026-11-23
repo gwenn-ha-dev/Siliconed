@@ -4,7 +4,7 @@ import Measurement
 
 extension GestureOrder {
     package static let verbs: Set<String> = ["remove", "undo", "again", "reuse", "crop", "sheet", "uninstall",
-                                             "macs", "compute", "library", "start-image", "lab", "settings", "bracket", "rack", "snapshot"]
+                                             "macs", "compute", "library", "start-image", "lab", "settings", "bracket", "rack", "zoom", "snapshot"]
 
     package static func usage(_ command: String) -> String {
         switch command {
@@ -22,6 +22,7 @@ extension GestureOrder {
         case "settings": "settings [general|macs|lab|advanced] · settings lab [rewrite|describe] [--for ID]"
         case "bracket": "bracket seed|detail|solver|start|loras · bracket lora <name> · bracket close"
         case "rack": "rack top|dit|fold|unfold|detach|dock"
+        case "zoom": "zoom in|out|fit"
         case "snapshot": "snapshot <file.png> [--window WORD|N] [--appearance light|dark]"
         default: "library [move DIR|home|open DIR|local] [--yes]"
         }
@@ -179,6 +180,9 @@ extension GestureOrder {
         case "rack":
             guard words.count == 1 else { return .failure(.usage(line)) }
             return RackPlace(rawValue: words[0].lowercased()).map { .success(.rack($0)) } ?? .failure(.badValue("place", words[0]))
+        case "zoom":
+            guard words.count == 1 else { return .failure(.usage(line)) }
+            return ZoomStep(rawValue: words[0].lowercased()).map { .success(.zoom($0)) } ?? .failure(.badValue("step", words[0]))
         case "snapshot":
             guard let file = one() else { return .failure(.usage(line)) }
             var appearance: SnapshotAppearance?

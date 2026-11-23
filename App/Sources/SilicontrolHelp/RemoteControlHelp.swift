@@ -28,7 +28,7 @@ package enum RemoteControlHelp {
     /// The topics in reading order (`help all` follows it).
     static let order = ["contract", "open", "models", "install", "import", "add", "grid", "edit", "wait", "status", "follow",
                         "cancel", "clear", "set", "compiled", "history", "save", "vary", "enlarge", "crop", "again", "remove", "undo", "sheet", "rewrite", "describe",
-                        "instructions", "settings", "start-image", "lab", "bracket", "rack", "snapshot", "subjects", "uninstall", "macs", "library", "measure", "errors", "recipes"]
+                        "instructions", "settings", "start-image", "lab", "bracket", "rack", "zoom", "snapshot", "subjects", "uninstall", "macs", "library", "measure", "errors", "recipes"]
     static let aliases = ["examples": "recipes", "reuse": "again", "compute": "macs"]
 
     /// French when the user puts it before English. Not `Bundle.main.preferredLocalizations`: the app's

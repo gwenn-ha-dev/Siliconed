@@ -98,6 +98,14 @@ final class RemoteGesturesTests: XCTestCase {
         XCTAssertEqual(parse("rack", ["Dock"]), .rack(.dock))
         XCTAssertEqual(GestureOrder.parse("rack", ["vae"]), .failure(.badValue("place", "vae")))
         XCTAssertEqual(GestureOrder.parse("rack", []), .failure(.usage(GestureOrder.usage("rack"))))
+        // View › Zoom In, Zoom Out, Zoom to Fit.
+        XCTAssertEqual(parse("zoom", ["in"]), .zoom(.zoomIn))
+        XCTAssertEqual(parse("zoom", ["Out"]), .zoom(.zoomOut))
+        XCTAssertEqual(parse("zoom", ["fit"]), .zoom(.fit))
+        XCTAssertEqual(GestureOrder.parse("zoom", ["100"]), .failure(.badValue("step", "100")))
+        for arguments in [[], ["in", "in"]] {
+            XCTAssertEqual(GestureOrder.parse("zoom", arguments), .failure(.usage(GestureOrder.usage("zoom"))), "\(arguments)")
+        }
         XCTAssertTrue(GestureOrder.verbs.isSuperset(of: ["bracket", "rack"]))
     }
 
