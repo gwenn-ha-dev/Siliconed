@@ -345,3 +345,15 @@ import Testing
         #expect(a.kin != b.kin && a.ratio(over: b) == nil)
     }
 }
+
+/// **A block never run on this Mac starts at the share its blocks kept** (`Block.startRows`): their median share of their
+/// shareable rows, of its own; half on a Mac that kept none; a key not the engine's read as none.
+@Test func aNewBlockStartsAtTheShareThisMacKept() {
+    var mac = ThisMac()
+    #expect(Block.startRows(mac, shareable: 4096) == 2048)
+    mac.flight = ["block a of 4096 rows": 1024, "block b of 6144 rows": 1536, "block c of 4096 rows": 512, "other": 4000]
+    #expect(Block.startRows(mac, shareable: 4096) == 1024)
+    #expect(Block.startRows(mac, shareable: 16384) == 4096)
+    #expect(Block.shareableRows("block 1030f43e05ddb547 of 4056 rows") == 4056)
+    #expect(Block.shareableRows("pace 1030f43e05ddb547 of 4056 rows") == nil)
+}

@@ -58,7 +58,7 @@ extension Block {
             }
         case .inFlight:
             let total = shareable / unit
-            if total > 1 { units = min(max((measured.flight?[key] ?? total / 2 * unit) / unit, 1), total - 1) }
+            if total > 1 { units = min(max((measured.flight?[key] ?? startRows(measured, shareable: shareable)) / unit, 1), total - 1) }
         }
         let total = shareable / unit
 
@@ -204,6 +204,27 @@ extension Block {
         }
         if let first = paces.firstIndex(where: { $0 == nil }) { return first }
         return paces.indices.min { paces[$0]! < paces[$1]! }!
+    }
+
+    /// **The ANE's rows a block never run on this Mac starts at**: the share of their shareable rows the blocks this Mac
+    /// ran kept (`ThisMac.flight`), their median, of its own shareable rows, rounded; none kept, half. The share a block
+    /// settles on is the two units’ rates on this Mac more than its model’s: on the M5 Pro 21 of 27 blocks kept a quarter,
+    /// 1/16 to 1/3 the others; the M1 Pro 2560 rows of 4096. Half cost a block's first two cycles on the M5 Pro its ANE at 6.5 s beside a GPU done
+    /// in 2.8, 7.9 s a cycle against 4.8 at a quarter (a transformer of 13 billion weights at 4096 rows, 23/11/2026).
+    static func startRows(_ measured: ThisMac, shareable: Int) -> Int {
+        let kept = (measured.flight ?? [:]).compactMap { key, rows -> Double? in
+            guard let of = shareableRows(key), of > 0 else { return nil }
+            return Double(rows) / Double(of)
+        }.sorted()
+        guard !kept.isEmpty else { return shareable / 2 }
+        return Int((kept[kept.count / 2] * Double(shareable)).rounded())
+    }
+
+    /// The shareable rows a block's key names (`key`).
+    static func shareableRows(_ key: String) -> Int? {
+        let words = key.split(separator: " ")
+        guard words.count == 5, words[0] == "block", words[2] == "of", words[4] == "rows" else { return nil }
+        return Int(words[3])
     }
 
     /// **The block's key**: the hash of its ANE's steps at 64 rows — what they compute, not their unit — and the rows
