@@ -216,6 +216,7 @@ final class RemoteControl {
             var e = json(t)
             e["stage"] = app.stage.map(Self.stageName) ?? NSNull()
             e["compiling"] = app.compilingCoreAI
+            e["calibrating"] = app.measurements.calibrating
             // In a train (`AppState.train`) the engine counts the call's images; a job says its own.
             e["batch_image"] = min(app.batchImage, t.seeds.count - 1) + 1
             e["step"] = app.currentStep

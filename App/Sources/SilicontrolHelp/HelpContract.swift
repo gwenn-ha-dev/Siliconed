@@ -351,7 +351,7 @@ extension RemoteControlHelp {
 
         Answer:
           {"ok": true,
-           "running": {"job": "t3", "stage": "denoising", "compiling": false, "batch_image": 1, "step": 4,
+           "running": {"job": "t3", "stage": "denoising", "compiling": false, "calibrating": false, "batch_image": 1, "step": 4,
                        "steps_total": 8, "fraction": 0.52, "remaining_s": 21.3, "model": "z-image",
                        "prompt": "…", "seeds": [42], …} | null,
            "queue": [{"job": "t4", "estimate_s": 45.2, …}, …],
@@ -377,6 +377,8 @@ extension RemoteControlHelp {
         stage              : text, image (encoding a reference), denoising, decoding.
         compiling          : true while Core AI compiles a function its cache does not hold (a model's first render, a new
                              size): what the render waits for then is paid once, and remaining_s does not count it.
+        calibrating        : true while the engine looks for this Mac's Neural Engine share (a model's first render here);
+                             the Chain inspector shows each step's share and seconds.
         steps_total        : the model's evaluations, not the requested steps.
         remaining_s        : null until the app has a measurement for this render.
         remaining_complete : false if a waiting job has no estimate (queue_remaining_s is a minimum).
@@ -396,7 +398,7 @@ extension RemoteControlHelp {
 
         Réponse :
           {"ok": true,
-           "running": {"job": "t3", "stage": "denoising", "compiling": false, "batch_image": 1, "step": 4,
+           "running": {"job": "t3", "stage": "denoising", "compiling": false, "calibrating": false, "batch_image": 1, "step": 4,
                        "steps_total": 8, "fraction": 0.52, "remaining_s": 21.3, "model": "z-image",
                        "prompt": "…", "seeds": [42], …} | null,
            "queue": [{"job": "t4", "estimate_s": 45.2, …}, …],
@@ -422,6 +424,8 @@ extension RemoteControlHelp {
         stage              : text, image (encodage d'une référence), denoising, decoding.
         compiling          : true tant que Core AI compile une fonction que son cache n'a pas (le premier rendu d'un
                              modèle, une taille neuve) : ce que le rendu attend alors se paie une fois, remaining_s ne le compte pas.
+        calibrating        : true tant que le moteur cherche la part du Neural Engine de ce Mac (le premier rendu d'un
+                             modèle ici) ; l'inspecteur Chaîne montre la part et les secondes de chaque pas.
         steps_total        : les évaluations du modèle, pas les pas demandés.
         remaining_s        : null tant que l'app n'a pas de mesure pour ce rendu.
         remaining_complete : false si un travail en attente n'a pas d'estimation (queue_remaining_s est un minimum).

@@ -55,7 +55,7 @@ struct ChainInspector: View {
                 ProgressView(value: app.fraction).tint(Palette.live)
                 StatLine("elapsed", Figures.duration(now.timeIntervalSince(begin)))
                 let remaining = app.compilingCoreAI ? nil : app.remaining(at: now)
-                StatLine("remaining", app.compilingCoreAI ? String(localized: "Preparing for this Mac, once…")
+                StatLine("remaining", app.compilingCoreAI ? String(localized: "Core AI compilation…")
                                       : remaining.map { "≈ " + Figures.duration($0) } ?? String(localized: "after the first step"))
                 StatLine("expected end", remaining.map { Figures.hour(now.addingTimeInterval($0)) } ?? "—")
                 if app.batchSize > 1 {
@@ -89,7 +89,10 @@ struct ChainInspector: View {
                 StageLine(title: title(stage), what: what(stage), time: time(stage), held: compiled(stage),
                           units: m.held.first { $0.stage == stage }?.neuralEngine.flatMap { $0 > 0 ? $0 : nil },
                           highlighted: focus.stage == stage) {
-                    if stage == .denoising { bars }
+                    if stage == .denoising {
+                        bars
+                        calibration
+                    }
                 }
                 .id(stage)
             }
@@ -135,7 +138,7 @@ struct ChainInspector: View {
     private func time(_ stage: Engine.Stage) -> String {
         guard m.job != nil else { return "—" }
         // A function Core AI's cache does not hold: what the stage waits for, said rather than a count that stands still.
-        if app.inProgress, m.compiling(stage) { return String(localized: "Preparing for this Mac, once…") }
+        if app.inProgress, m.compiling(stage) { return String(localized: "Core AI compilation…") }
         switch stage {
         case .text:
             if let tokens = m.tokens, let t = m.tokenizer, let e = m.encoder {
@@ -159,8 +162,8 @@ struct ChainInspector: View {
         guard let h = m.held.first(where: { $0.stage == stage }) else {
             return stage == .text && m.textCached ? String(localized: "read from the session’s cache") : nil
         }
-        if app.inProgress, m.compiling(stage) { return String(localized: "Preparing for this Mac, once…") }
-        return h.compilation > 0 ? String(localized: "Prepared for this Mac in \(Figures.seconds(h.compilation))") : nil
+        if app.inProgress, m.compiling(stage) { return String(localized: "Core AI compilation…") }
+        return h.compilation > 0 ? String(localized: "Core AI compilation: \(Figures.seconds(h.compilation))") : nil
     }
 
     /// The DiT's steps as bars: each one's duration, the first re-reading the map, a slow one showing.
@@ -174,6 +177,22 @@ struct ChainInspector: View {
             Bars(durations: durations, plannedCount: m.planned, mean: m.speed?.full)
                 .frame(height: 38)
                 .padding(.top, 2)
+        }
+    }
+
+    /// **The Neural Engine's share looked for**, in a model's first render on this Mac (`Engine.Calibration`): each cycle —
+    /// a DiT evaluation — at the share it ran, its seconds, the Neural Engine's calls and the GPU's; the cycles of the unit's
+    /// trial marked; then the share kept for the renders after. Shown only in the render that looked for it.
+    @ViewBuilder private var calibration: some View {
+        if let c = m.held.first(where: { $0.stage == .denoising })?.calibration {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(c.looking ? "Finding this Mac’s Neural Engine share…" : "Neural Engine share found for this Mac")
+                    .font(.caption).foregroundStyle(c.looking ? Palette.live : Palette.secondary)
+                ForEach(Array(c.cycles.enumerated()), id: \.offset) { n, cycle in
+                    CalibrationCycle(index: n + 1, cycle: cycle)
+                }
+            }
+            .padding(.top, 4)
         }
     }
 
@@ -314,6 +333,42 @@ private struct StatLine: View {
 /// **Who computed, GPU and Neural Engine**: the share of the arithmetic of the products by weights each unit ran — the
 /// engine's own count (`Ledger`), product by product, not an estimate. A bar split at the share, both figures under it;
 /// the Neural Engine's part in what runs, the GPU's neutral.
+/// **One cycle of the Neural Engine's share looked for** (`ChainInspector.calibration`): its number, its share as a bar,
+/// the share, its seconds; under it the Neural Engine's calls and the GPU's, the two the engine balances.
+private struct CalibrationCycle: View {
+    let index: Int
+    let cycle: Engine.Calibration.Cycle
+
+    var body: some View {
+        let share = cycle.shareable > 0 ? Double(cycle.rows) / Double(cycle.shareable) : 0
+        VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: 6) {
+                Text(verbatim: "\(index)").monospacedDigit().foregroundStyle(Palette.secondary).frame(width: 16, alignment: .trailing)
+                GeometryReader { g in
+                    HStack(spacing: share == 0 || share == 1 ? 0 : 1.5) {
+                        Rectangle().fill(Color.secondary.opacity(0.45)).frame(width: g.size.width * (1 - share))
+                        Rectangle().fill(Palette.live)
+                    }
+                }
+                .frame(width: 90, height: 5)
+                .clipShape(Capsule())
+                Text("ANE \(Figures.percent(Int((share * 100).rounded())))").monospacedDigit()
+                Spacer(minLength: 4)
+                if cycle.trying { Text("trial").foregroundStyle(Palette.secondary) }
+                Text(Figures.seconds(cycle.seconds)).monospacedDigit()
+            }
+            if let ane = cycle.neuralEngine, let gpu = cycle.gpu {
+                HStack(spacing: 8) {
+                    Text("ANE \(Figures.seconds(ane))")
+                    Text("GPU \(Figures.seconds(gpu))")
+                }
+                .monospacedDigit().foregroundStyle(Palette.secondary).padding(.leading, 22)
+            }
+        }
+        .font(.caption2)
+    }
+}
+
 struct UnitShare: View {
     let neuralEngine: Double
 

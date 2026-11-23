@@ -85,7 +85,7 @@ extension Block {
             var moved: Double?
             if case .inFlight = share, units > 0 { moved = try await rebalance() }
             cycled(until: at)
-            begun = (at, units * unit, moved, climbed)
+            begun = (at, units * unit, unit, trial != nil, moved, climbed)
         }
         let t0 = DispatchTime.now().uptimeNanoseconds
         let weights = try stage.acquire(group)

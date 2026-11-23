@@ -66,9 +66,10 @@ public final class Block: @unchecked Sendable {
     var trial: UnitTrial?
     /// The buffers a GPU call has read or written (`encode`).
     var seen = Set<ObjectIdentifier>()
-    /// The cycle under way, told once done (`Stages.Event.cycle`): its start, the ANE's rows over it, what its start loaded;
+    /// The cycle under way, told once done (`Stages.Event.cycle`): its start, the ANE's rows over it and their unit, whether
+    /// the unit was under trial, what its start loaded;
     /// the calls of the cycle before, summed once timed (`rebalance`).
-    var begun: (at: UInt64, rows: Int, moved: Double?, climbed: Double?)?
+    var begun: (at: UInt64, rows: Int, unit: Int, trying: Bool, moved: Double?, climbed: Double?)?
     var lastCalls: Stages.Calls?
     /// What the loop waited for the ring's weights, in seconds; what building and naming the functions took at open.
     public internal(set) var waited = 0.0

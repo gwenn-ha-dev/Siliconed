@@ -344,7 +344,7 @@ struct DiTBox: View {
                 Spacer()
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     if app.compilingCoreAI {
-                        Text("Preparing for this Mac, once…").foregroundStyle(Palette.secondary)
+                        Text("Core AI compilation…").foregroundStyle(Palette.secondary)
                     } else if let r = app.remaining(at: context.date) {
                         Text("\(Figures.duration(r)) left").monospacedDigit().foregroundStyle(Palette.secondary)
                     }

@@ -157,8 +157,9 @@ extension Block {
         defer { lastCalls = nil }
         guard let b = begun else { return }
         begun = nil
-        Stages.tell(.cycle(Stages.Cycle(block: declaration.name, unit: unit, rows: b.rows, shareable: total * unit,
-                                        seconds: Double(end &- b.at) * 1e-9, moved: b.moved, climbed: b.climbed, calls: lastCalls)))
+        Stages.tell(.cycle(Stages.Cycle(block: declaration.name, unit: b.unit, rows: b.rows, shareable: shareable / b.unit * b.unit,
+                                        trying: b.trying, seconds: Double(end &- b.at) * 1e-9, moved: b.moved, climbed: b.climbed,
+                                        calls: lastCalls)))
     }
 
     /// **A cycle's shared passes with `a` rows the ANE's, predicted from their calls at `a0`**, as `run` orders them: each

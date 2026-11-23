@@ -66,6 +66,9 @@ struct Measures {
     }
     func compiling(at now: Date = Date()) -> Bool { held.contains { compiling($0.stage, at: now) } }
 
+    /// The Neural Engine's share looked for in this render, still under way.
+    var calibrating: Bool { held.contains { $0.calibration?.looking == true } }
+
     init() {}
 
     /// What the other Mac measured for this Mac's render, dated here: `begin` is `elapsed` ago.

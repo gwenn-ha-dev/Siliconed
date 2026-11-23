@@ -138,7 +138,7 @@ struct ProgressIndicator: View {
                     Spacer(minLength: 12)
                     TimelineView(.periodic(from: .now, by: 1)) { context in
                         if app.compilingCoreAI {
-                            Text("Preparing for this Mac, once…").font(.callout).foregroundStyle(Palette.secondary)
+                            Text("Core AI compilation…").font(.callout).foregroundStyle(Palette.secondary)
                         } else if let r = app.remaining(at: context.date) {
                             Text("\(Figures.duration(r)) left")
                                 .font(.callout).monospacedDigit().foregroundStyle(Palette.secondary)

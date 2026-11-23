@@ -26,12 +26,13 @@ public enum Stages {
     }
 
     /// **A cycle of a block, as it ran**: the ANE's rows over it at its unit (0: the GPU alone) of the rows it could
-    /// take; its seconds from its first group to the next cycle's first (the last cycle's, to the block's close); what
+    /// take, whether the unit was under trial (`UnitTrial`: a block's first cycles on this Mac); its seconds from its first group to the next cycle's first (the last cycle's, to the block's close); what
     /// its start loaded, in seconds — the GPU's functions of a share moved (`moved`), of taller calls (`climbed`); nil,
     /// nothing; its calls' seconds, where they were timed (a share in flight, every cycle but the last).
     public struct Cycle: Sendable, Equatable {
         public let block: String
         public let unit, rows, shareable: Int
+        public let trying: Bool
         public let seconds: Double
         public let moved, climbed: Double?
         public let calls: Calls?
