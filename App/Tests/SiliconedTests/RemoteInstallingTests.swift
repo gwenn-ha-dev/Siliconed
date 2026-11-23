@@ -10,10 +10,10 @@ final class RemoteInstallingTests: XCTestCase {
     }
 
     private var library: RemoteLibrary {
-        let plan = RemotePlan(variant: .standard, needed: 20_000_000_000, fits: false, others: [.compact], releasable: 10_000_000_000,
+        let plan = RemotePlan(variant: .standard, needed: 20_000_000_000, toDownload: 20_000_000_000, fits: false, others: [.compact], releasable: 10_000_000_000,
                               fitsReplacing: true)
         let part = RemoteLibrary.Part(family: .zImage, installed: [.compact], variant: .compact, bytes: 10_700_000_000, accepted: true,
-                                      plans: [plan, RemotePlan(variant: .compact, needed: 0, fits: true, others: [], releasable: 0, fitsReplacing: false)])
+                                      plans: [plan, RemotePlan(variant: .compact, needed: 0, toDownload: 0, fits: true, others: [], releasable: 0, fitsReplacing: false)])
         return RemoteLibrary(parts: [part, RemoteLibrary.Part(family: .anima, installed: [], variant: nil, bytes: 0, accepted: false, plans: [])],
                              imported: [.init(id: "z-image/my_checkpoint", name: "my checkpoint", family: .zImage, bytes: 6)],
                              loras: [.init(lora, bytes: 7)],

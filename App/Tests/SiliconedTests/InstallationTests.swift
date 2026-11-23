@@ -93,7 +93,7 @@ final class InstallationTests: XCTestCase {
         let installer = Installer(library: library)
         let files = Family.anima.files(.compact), total = files.reduce(0) { $0 + $1.bytes }
         var plan = installer.plan(.anima, .compact)
-        XCTAssertEqual([plan.files.count, plan.bytes, plan.resumed, plan.needed], [files.count, total, 0, total])
+        XCTAssertEqual([plan.files.count, plan.bytes, plan.resumed, plan.onDisk, plan.needed], [files.count, total, 0, 0, total])
 
         try lay(library.map(files[0].place), bytes: files[0].bytes)
         try lay(library.map(files[1].place), bytes: files[1].bytes - 1)
@@ -106,13 +106,16 @@ final class InstallationTests: XCTestCase {
         let handle = try XCTUnwrap(FileHandle(forWritingAtPath: partial))
         try handle.write(contentsOf: Data(repeating: 7, count: 3 << 20))
         try handle.close()
+        // Without a ledger no chunk is known whole: its room is taken, nothing of it is kept.
         plan = installer.plan(.anima, .compact)
-        XCTAssertGreaterThanOrEqual(plan.resumed, 3 << 20)
-        XCTAssertLessThan(plan.resumed, 8 << 20)
-        XCTAssertEqual(plan.needed, plan.bytes - plan.resumed)
+        XCTAssertGreaterThanOrEqual(plan.onDisk, 3 << 20)
+        XCTAssertLessThan(plan.onDisk, 8 << 20)
+        XCTAssertEqual(plan.resumed, 0)
+        XCTAssertEqual(plan.needed, plan.bytes - plan.onDisk)
+        XCTAssertEqual(plan.toDownload, plan.bytes)
 
-        XCTAssertTrue(Installer.Plan(family: .anima, variant: .compact, files: files, bytes: 100, resumed: 40, free: 60).fits)
-        XCTAssertFalse(Installer.Plan(family: .anima, variant: .compact, files: files, bytes: 100, resumed: 40, free: 59).fits)
+        XCTAssertTrue(Installer.Plan(family: .anima, variant: .compact, files: files, bytes: 100, resumed: 20, onDisk: 40, free: 60).fits)
+        XCTAssertFalse(Installer.Plan(family: .anima, variant: .compact, files: files, bytes: 100, resumed: 20, onDisk: 40, free: 59).fits)
     }
 
     /// Nothing is downloaded for a model whose license was not accepted — refused before the first request.
@@ -184,7 +187,7 @@ final class InstallationTests: XCTestCase {
         XCTAssertEqual(installer.plan(.anima, .compact).others, [])
 
         func room(_ free: Int) -> Installer.Plan {
-            var p = Installer.Plan(family: .anima, variant: .standard, files: plan.files, bytes: 100, resumed: 0, free: free)
+            var p = Installer.Plan(family: .anima, variant: .standard, files: plan.files, bytes: 100, resumed: 0, onDisk: 0, free: free)
             p.others = [.compact]; p.releasable = 30
             return p
         }
@@ -284,6 +287,27 @@ final class InstallationTests: XCTestCase {
             }
             XCTAssertFalse(FileManager.default.fileExists(atPath: Downloader.ledger(destination)), "nothing of the other's touched")
         }
+    }
+
+    /// What a resumption keeps is what its ledger says is whole: the chunks cut short come again, though their bytes take
+    /// room already; a file that comes in one request keeps nothing.
+    func testAResumptionKeepsOnlyItsWholeChunks() throws {
+        let r = Repository("a/b", String(repeating: "0", count: 40))
+        let sha = String(repeating: "a", count: 64)
+        let size = Downloader.chunkedFrom + 1
+        let file = PublishedFile(r, "x.safetensors", at: "x.safetensors", bytes: size, sha256: sha)
+        let destination = library.map("x.safetensors")
+        try lay(Downloader.partial(destination), bytes: size)
+        XCTAssertEqual(Downloader.resumable(file, at: destination), 0, "no ledger")
+        let all = Downloader.chunks(size: size)
+        try Downloader.ledgerText(size: size, digest: sha, done: [0, 2]).write(toFile: Downloader.ledger(destination), atomically: true, encoding: .utf8)
+        XCTAssertEqual(Downloader.resumable(file, at: destination), all[0].count + all[2].count)
+        // A ledger of another file resumes nothing, as `downloadInChunks` reads it.
+        let other = PublishedFile(r, "x.safetensors", at: "x.safetensors", bytes: size, sha256: String(repeating: "b", count: 64))
+        XCTAssertEqual(Downloader.resumable(other, at: destination), 0)
+        let small = PublishedFile(r, "y.json", at: "y.json", bytes: 1000, sha256: sha)
+        try lay(Downloader.partial(library.map("y.json")), bytes: 1000)
+        XCTAssertEqual(Downloader.resumable(small, at: library.map("y.json")), 0)
     }
 
     /// A resumption rewrites its ledger whole before appending: a last line a crash cut is not glued to the next

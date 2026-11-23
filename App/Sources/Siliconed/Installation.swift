@@ -63,15 +63,20 @@ package struct Installer {
         package let files: [PublishedFile]
         /// The bytes of `files`.
         package let bytes: Int
-        /// The bytes of `files` an interrupted download already wrote (`.partiel`).
+        /// The bytes of `files` a resumption keeps: the chunks an interrupted download wrote whole (`Downloader.resumable`).
         package let resumed: Int
+        /// The room its `.partiel` files already take — the chunks cut short included, rewritten in place: what the volume
+        /// does not have to give again. At least `resumed`, by up to `Downloader.parallelChunks` chunks a file.
+        package let onDisk: Int
         package let free: Int?
         /// The family's other versions whole on disk, and the bytes their removal would give back: their files that
         /// this version does not read.
         package var others: [Variant] = []
         package var releasable = 0
+        /// The bytes still to download.
+        package var toDownload: Int { bytes - resumed }
         /// The bytes the volume still has to take.
-        package var needed: Int { bytes - resumed }
+        package var needed: Int { bytes - onDisk }
         package var fits: Bool { free.map { needed <= $0 } ?? true }
         /// **The volume takes this version only in place of the others**: what an app offers when the room is short
         /// (`install(_:variant:replacing:)`). Until the installation is done the family then renders nothing.
@@ -87,9 +92,10 @@ package struct Installer {
 
     package func plan(_ f: Family, _ v: Variant) -> Plan {
         let files = missing(f, v)
-        let resumed = files.reduce(0) { $0 + min($1.bytes, Library.reclaimable(Downloader.partial(path($1)))) }
+        let resumed = files.reduce(0) { $0 + Downloader.resumable($1, at: path($1)) }
+        let onDisk = files.reduce(0) { $0 + min($1.bytes, Library.reclaimable(Downloader.partial(path($1)))) }
         var plan = Plan(family: f, variant: v, files: files, bytes: files.reduce(0) { $0 + $1.bytes }, resumed: resumed,
-                        free: library.freeSpace())
+                        onDisk: max(resumed, onDisk), free: library.freeSpace())
         plan.others = f.variants.filter { $0 != v && isInstalled(f, $0) }
         // A linked file gives back nothing of this volume: its link goes, its target stays.
         plan.releasable = releasable(f, for: v).reduce(0) { sum, file in

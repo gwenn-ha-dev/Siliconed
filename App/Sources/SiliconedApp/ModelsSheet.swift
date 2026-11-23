@@ -274,7 +274,7 @@ struct ModelManagement: View {
         // What the installation will do, read from the disk now (`Installer.plan`): what is left to download,
         // and whether the disk takes it only in place of the family's other version.
         let plan = app.installPlan(p.family, variant: offer.variant)
-        let bytes = plan?.needed ?? p.family.installedSize(offer.variant)
+        let bytes = plan?.toDownload ?? p.family.installedSize(offer.variant)
         let choice = Binding(get: { app.installOffer?.variant ?? offer.variant }, set: { app.installOffer?.variant = $0 })
         return VStack(alignment: .leading, spacing: 12) {
             if p.family.variants.count > 1 {

@@ -56,6 +56,16 @@ extension Downloader {
         return done
     }
 
+    /// **What a resumption keeps of an interrupted download of `file` to `destination`**: the chunks its ledger says are
+    /// whole, read as `downloadInChunks` reads them. A chunk being written when it stopped comes again whole — up to
+    /// `parallelChunks` of them, though their bytes are on disk —, and a file that comes in one request resumes nothing.
+    package static func resumable(_ file: PublishedFile, at destination: String) -> Int {
+        guard file.bytes > chunkedFrom, case .sha256(let sha) = file.digest, Library.fileSize(partial(destination)) == file.bytes,
+              let text = try? String(contentsOfFile: ledger(destination), encoding: .utf8) else { return 0 }
+        let all = chunks(size: file.bytes)
+        return resumedChunks(ledger: text, size: file.bytes, digest: sha).reduce(0) { $0 + all[$1].count }
+    }
+
     /// **A large file in chunks of 64 MB, 8 at a time, each over a connection of its own.** One long request does not
     /// hold: measured on the Hub's CDN, a single connection had fallen to 2–3 MB/s after half an hour, then
     /// stopped for over 60 s (the request's timeout: 3.75 GB of 4.41 lost), while a fresh connection to the same file

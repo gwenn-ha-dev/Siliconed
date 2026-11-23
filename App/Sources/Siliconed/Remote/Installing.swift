@@ -114,6 +114,8 @@ package struct RemotePlan: Codable, Equatable, Sendable {
     package var variant: Variant
     /// The bytes the volume still has to take (`Installer.Plan.needed`); 0: the version is whole.
     package var needed: Int
+    /// The bytes still to download (`Installer.Plan.toDownload`): what the sheet announces.
+    package var toDownload: Int
     package var fits: Bool
     /// The family's other versions on disk, what their removal gives back, and whether this version fits only in
     /// their place (`Installer.Plan.fitsReplacing`).
@@ -121,13 +123,13 @@ package struct RemotePlan: Codable, Equatable, Sendable {
     package var releasable: Int
     package var fitsReplacing: Bool
 
-    package init(variant: Variant, needed: Int, fits: Bool, others: [Variant], releasable: Int, fitsReplacing: Bool) {
-        self.variant = variant; self.needed = needed; self.fits = fits
+    package init(variant: Variant, needed: Int, toDownload: Int, fits: Bool, others: [Variant], releasable: Int, fitsReplacing: Bool) {
+        self.variant = variant; self.needed = needed; self.toDownload = toDownload; self.fits = fits
         self.others = others; self.releasable = releasable; self.fitsReplacing = fitsReplacing
     }
 
     package init(_ p: Installer.Plan) {
-        variant = p.variant; needed = p.needed; fits = p.fits
+        variant = p.variant; needed = p.needed; toDownload = p.toDownload; fits = p.fits
         others = p.others; releasable = p.releasable; fitsReplacing = p.fitsReplacing
     }
 }

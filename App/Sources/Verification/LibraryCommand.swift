@@ -109,7 +109,7 @@ package enum LibraryCommand {
                     }
                     let plan = installer.plan(family, v)
                     if !plan.files.isEmpty {
-                        print("\(plan.files.count) file\(plan.files.count == 1 ? "" : "s"), \(gigabytes(plan.needed)) to download"
+                        print("\(plan.files.count) file\(plan.files.count == 1 ? "" : "s"), \(gigabytes(plan.toDownload)) to download"
                               + (plan.resumed > 0 ? " (\(gigabytes(plan.resumed)) already there)" : "")
                               + (plan.free.map { " · \(gigabytes($0)) free" } ?? ""))
                     }
