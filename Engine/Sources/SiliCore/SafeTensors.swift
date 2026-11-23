@@ -161,6 +161,24 @@ public final class SafeTensors: @unchecked Sendable {
         }
     }
 
+    /// **A narrow tensor's codes as they lie** (`Tensor.Stored`: an F16's 2 bytes each, an F8's 1) into `into`, what
+    /// `Weights.narrow` looks up in their table rather than widening each to an f32.
+    public func readCodes(_ t: Tensor, into: UnsafeMutableRawPointer) throws {
+        precondition(t.stored != .asListed, "\(t.dtype) \(t.shape): stored as listed, no codes")
+        try readStored(t, from: 0, count: (t.end - t.start) / 4 * t.stored.width, into: into)
+    }
+
+    /// **What each code of a narrow tensor reads as, through `rounded`**: the f32 `read` widens it to (an F8's code
+    /// times its scale, an F16's value exactly), then `rounded` — indexed by the code: 256 entries for an F8, 65 536 for
+    /// an F16.
+    public static func codeTable(_ stored: Tensor.Stored, _ rounded: (Float) -> UInt16) -> [UInt16] {
+        switch stored {
+        case .asListed: preconditionFailure("stored as listed, no codes")
+        case .f16: (0..<65536).map { rounded(Float(Float16(bitPattern: UInt16($0)))) }
+        case .f8(let scale): e4m3.map { rounded($0 * scale) }
+        }
+    }
+
     /// The 256 values of float8 e4m3fn (1 sign, 4 exponent bits biased by 7, 3 mantissa bits; no infinity, S.1111.111 NaN),
     /// each exact in an f32.
     static let e4m3: [Float] = (0..<256).map { b in

@@ -135,11 +135,13 @@ public enum Weights {
                 for (key, t) in parts {
                     let out = t.shape[0], size = int8 ? 1 : 2
                     if !int8 && t.dtype == "F32" {
-                        // A fine-tune's f32s (or f16s, `SafeTensors`) rounded to bf16 once, each part's after the one before.
-                        try file.read(t, into: staging)
-                        let from = staging.assumingMemoryBound(to: Float.self)
+                        // A fine-tune's f32s (or f16s, f8s: `narrow`) rounded to bf16 once, each part's after the one before.
                         let into = (to + column * inn * size).bindMemory(to: UInt16.self, capacity: out * inn)
-                        for i in 0..<(out * inn) { into[i] = BFloat16Bits.rounded(from[i]) }
+                        if try !narrow(t, of: file, transposed: false, into: into, staging: staging, BFloat16Bits.rounded) {
+                            try file.read(t, into: staging)
+                            let from = staging.assumingMemoryBound(to: Float.self)
+                            for i in 0..<(out * inn) { into[i] = BFloat16Bits.rounded(from[i]) }
+                        }
                     } else if !int8 || count == 1 {
                         // The file's rows as they lie, each part's after the one before.
                         try file.read(t, into: to + column * inn * size)
@@ -201,6 +203,7 @@ public enum Weights {
                 let t = try file.real(e.key)
                 let (out, inn) = (t.shape[0], t.shape[1])
                 let to = place(e.name, [inn, out]).assumingMemoryBound(to: UInt16.self)
+                if try narrow(t, of: file, transposed: true, into: to, staging: staging, BFloat16Bits.rounded) { continue }
                 try file.read(t, into: staging)
                 if t.dtype == "BF16" {
                     let from = UnsafePointer(staging.assumingMemoryBound(to: UInt16.self))
@@ -219,6 +222,8 @@ public enum Weights {
                 let t = try file.real(e.key)
                 let (out, inn) = (t.shape[0], t.shape[1])
                 let to = place(e.name, [inn, out])
+                if e.recipe == .halfTransposed,
+                   try narrow(t, of: file, transposed: true, into: to.assumingMemoryBound(to: UInt16.self), staging: staging, { Float16($0).bitPattern }) { continue }
                 try file.read(t, into: staging)
                 if t.dtype == "F32" {
                     let from = UnsafePointer(staging.assumingMemoryBound(to: Float.self))

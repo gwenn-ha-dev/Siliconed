@@ -13,9 +13,10 @@ extension SafeTensors {
         guard t.dtype == "F32" else { try read(t, into: into); return n }
         let pages = staging == nil ? Pages(bytes: n * 4) : nil
         try withExtendedLifetime(pages) {
-            let through = staging ?? pages!.base
+            let through = staging ?? pages!.base, to = into.bindMemory(to: UInt16.self, capacity: n)
+            if try Weights.narrow(t, of: self, transposed: false, into: to, staging: through, BFloat16Bits.rounded) { return }
             try read(t, into: through)
-            let from = through.assumingMemoryBound(to: Float.self), to = into.bindMemory(to: UInt16.self, capacity: n)
+            let from = through.assumingMemoryBound(to: Float.self)
             for i in 0..<n { to[i] = BFloat16Bits.rounded(from[i]) }
         }
         return n

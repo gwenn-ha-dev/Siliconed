@@ -3,6 +3,49 @@ import Foundation
 /// **The CPU's passes over a weight as it is read**: bf16 widened, f32 rounded to f16, `[out, in]` transposed by
 /// tiles on every core.
 extension Weights {
+    /// **A narrow tensor (F16, F8: `SafeTensors.Tensor.Stored`) into 16-bit values, on every core**: its codes read as
+    /// they lie into `staging`, transposed there as codes where `transposed` (`[out, in]` into `[in, out]`, by tiles of
+    /// 16 bytes or 8 halves), then each looked up in its table (`SafeTensors.codeTable`) into `into` — to the bit what the
+    /// f32 path gives (`SafeTensors.read`, then `rounded`), which widened each code on one core and transposed on one core:
+    /// a transformer of 13 billion weights in fp8 « scaled » beside the ANE, read through the ring at a block's first cycles (nothing kept yet), took 38
+    /// to 40 s a cycle where its bf16 took 7.9; read this way 7.8, the same outputs to the bit, its first 8 cycles 212 →
+    /// 45 s (23/11/2026, the M5 Pro). The staging holds the tensor's f32s (`staging`): its codes and their transpose fit
+    /// in it twice over. False: `t` is not narrow, nothing read.
+    static func narrow(_ t: SafeTensors.Tensor, of file: SafeTensors, transposed: Bool, into to: UnsafeMutablePointer<UInt16>,
+                       staging: UnsafeMutableRawPointer, _ rounded: (Float) -> UInt16) throws -> Bool {
+        guard t.stored != .asListed else { return false }
+        let n = t.shape.reduce(1, *), w = t.stored.width
+        try file.readCodes(t, into: staging)
+        var codes = UnsafeRawPointer(staging)
+        if transposed {
+            precondition(t.shape.count == 2, "\(t.shape): not a matrix to transpose")
+            let (out, inn) = (t.shape[0], t.shape[1]), there = staging + n * w
+            if w == 1 {
+                let (f, d) = (UnsafePointer(staging.assumingMemoryBound(to: Int8.self)), there.assumingMemoryBound(to: Int8.self))
+                if out % 16 == 0 && inn % 16 == 0 { transposedTiles(f, out, inn, into: d) } else { transposedRows(f, out, inn, into: d) }
+            } else {
+                let (f, d) = (UnsafePointer(staging.assumingMemoryBound(to: UInt16.self)), there.assumingMemoryBound(to: UInt16.self))
+                if out % 8 == 0 && inn % 8 == 0 { transposedHalves(f, out, inn, into: d, rounding: false) } else { transposedRows(f, out, inn, into: d) }
+            }
+            codes = UnsafeRawPointer(there)
+        }
+        let table = SafeTensors.codeTable(t.stored, rounded), chunk = 1 << 20
+        table.withUnsafeBufferPointer { values in
+            nonisolated(unsafe) let (v, c, o) = (values.baseAddress!, codes, to)
+            DispatchQueue.concurrentPerform(iterations: (n + chunk - 1) / chunk) { k in
+                let range = k * chunk..<min((k + 1) * chunk, n)
+                if w == 1 {
+                    let b = c.assumingMemoryBound(to: UInt8.self)
+                    for i in range { o[i] = v[Int(b[i])] }
+                } else {
+                    let b = c.assumingMemoryBound(to: UInt16.self)
+                    for i in range { o[i] = v[Int(b[i])] }
+                }
+            }
+        }
+        return true
+    }
+
     /// `count` bf16 widened to f32 (exact), each through `convert` (to f16: rounded to nearest once).
     static func bf16<B>(_ from: UnsafeRawPointer, _ count: Int, into to: UnsafeMutablePointer<B>, _ convert: (Float) -> B) {
         let b = from.assumingMemoryBound(to: UInt16.self)

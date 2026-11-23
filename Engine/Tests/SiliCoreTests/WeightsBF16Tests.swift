@@ -97,3 +97,38 @@ private func bytes<T>(_ values: [T]) -> [UInt8] { values.withUnsafeBytes { Array
     func e4m3(_ b: UInt8) -> Float { b == 0 ? 0 : (1 + Float(b & 7) / 8) * Float(sign: .plus, exponent: Int(b >> 3) - 7, significand: 1) }
     for i in 0..<(out * inn) { #expect(p[i] == BFloat16Bits.rounded(e4m3(w[i]) * 0.01)) }
 }
+
+/// **A narrow tensor read by its codes** (`Weights.narrow`): each recipe that rounds a fine-tune's f32s to 16 bits gives,
+/// from an F8's or an F16's codes transposed and looked up on every core, the bits of the f32 path — the codes widened
+/// (`SafeTensors.read`), then rounded and transposed one by one —, every F8 code and NaNs included, at tiles' shapes and
+/// at others.
+@Test(.enabled(if: metal != nil)) func aNarrowTensorReadsByItsCodesAsTheF32PathWould() throws {
+    for (out, inn) in [(48, 80), (16, 32), (5, 7)] {
+        let n = out * inn
+        var state: UInt64 = 0x9E37_79B9_7F4A_7C15
+        let halves = (0..<n).map { _ -> UInt16 in state = state &* 6364136223846793005 &+ 1442695040888963407; return UInt16(truncatingIfNeeded: state >> 40) }
+        let f8 = (0..<n).map { UInt8(truncatingIfNeeded: $0 * 101 + $0 / 256) }
+        let path = try safetensors("narrow-\(out)x\(inn).safetensors", [
+            ("a.weight", "F8_E4M3", [out, inn], f8), ("a.weight_scale", "F32", [], bytes([Float(0.37)])),
+            ("b.weight", "F16", [out, inn], bytes(halves)),
+        ])
+        let file = try SafeTensors(path)
+        for key in ["a", "b"] {
+            let t = try file.real(key + ".weight")
+            var wide = [Float](repeating: 0, count: n)
+            try wide.withUnsafeMutableBytes { try file.read(t, into: $0.baseAddress!) }
+            let entries: [Weights.Entry] = [("ht", key + ".weight", .halfTransposed), ("bt", key + ".weight", .bfloatTransposed),
+                                            ("p", key, .product(joined: [])), ("b16", key + ".weight", .bfloat16(joined: []))]
+            let arena = try Arena(metal!, bytes: try Weights.size(entries, in: file))
+            let placed = try Weights.load(entries, from: file, into: arena)
+            func values(_ name: String) -> [UInt16] {
+                Array(UnsafeBufferPointer(start: arena.pointer(placed[name]!.offset).assumingMemoryBound(to: UInt16.self), count: n))
+            }
+            let transposed = (0..<n).map { j in wide[(j % out) * inn + j / out] }
+            #expect(values("ht") == transposed.map { Float16($0).bitPattern }, "\(key) [\(out), \(inn)] halfTransposed")
+            #expect(values("bt") == transposed.map(BFloat16Bits.rounded), "\(key) [\(out), \(inn)] bfloatTransposed")
+            #expect(values("p") == wide.map(BFloat16Bits.rounded), "\(key) [\(out), \(inn)] product")
+            #expect(values("b16") == wide.map(BFloat16Bits.rounded), "\(key) [\(out), \(inn)] bfloat16")
+        }
+    }
+}
