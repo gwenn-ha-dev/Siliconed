@@ -112,7 +112,7 @@ extension RemoteControlHelp {
         (--image on a model that does not start from an image, or a strength that leaves no step), subject (a named subject the prompt cites, help
         subjects), queue_full (64 waiting, or not enough room for every alternative), busy (an
         installation is running: no render until it is done), library_absent (the library's disk is not connected), write;
-        on a Mac followed also link, remote (--image) and refused (help errors).
+        on a Mac followed also link and refused (help errors).
         """, fr: """
         silicontrol add [options] "<prompt>" [512|1024|WxH|P:Q@1K|2K] [seed]
 
@@ -225,7 +225,7 @@ extension RemoteControlHelp {
         (--image sur un modèle qui ne part pas d'une image, ou une force qui ne laisse aucun pas), subject (un sujet nommé que le prompt cite,
         help subjects), queue_full (64 en attente, ou pas assez de place pour toutes les
         alternatives), busy (une installation tourne : pas de rendu avant qu'elle soit finie), library_absent (le disque de la
-        bibliothèque n'est pas branché), write ; sur un Mac suivi aussi link, remote (--image) et refused (help errors).
+        bibliothèque n'est pas branché), write ; sur un Mac suivi aussi link et refused (help errors).
         """),
 
         "grid": Page(en: """

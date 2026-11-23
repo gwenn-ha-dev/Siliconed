@@ -16,7 +16,7 @@ struct ReferenceImage: Identifiable, @unchecked Sendable {
     /// `subject`: a named subject's picture, cropped to its frame (`Subjects.swift`) — `nil` if its
     /// bytes did not decode, which fails the render naming it. `bytes`: a file's bytes sent by another
     /// Mac (`MirrorServer`), decoded as the file was there. `remote`: an image that stays on the other
-    /// Mac, named only (a mirrored history image's edit images) — nothing to show or decode here.
+    /// Mac, named only (a mirrored history image's edit images and starting image) — nothing to show or decode here.
     enum Source { case file(URL), image(CGImage), subject(CGImage?, name: String), bytes(Data), remote(RemoteReference.Origin) }
     /// Given only to a subject the prompt cites (`AppState.references`): the same id at every reading, for the rack's rows.
     var id = UUID()
@@ -73,6 +73,13 @@ struct ReferenceImage: Identifiable, @unchecked Sendable {
         case .bytes(let data): CGImageSourceCreateWithData(data as CFData, nil)
         case .image, .subject, .remote: nil
         }
+    }
+
+    /// **An image that stays on the other Mac** (a mirrored history image's edit images and starting image): named, its
+    /// bytes never here — what « Variations » and « Redo » send back by name.
+    static func remote(_ r: RemoteReference) -> ReferenceImage {
+        ReferenceImage(source: .remote(r.origin), vignette: NSImage(systemSymbolName: "photo", accessibilityDescription: nil) ?? NSImage(),
+                       name: r.name, width: r.width, height: r.height)
     }
 
     /// **A file as the render reads it** — the file itself (`ImageRGB(contentsOf:)`, upright), its vignette and size; `nil` if

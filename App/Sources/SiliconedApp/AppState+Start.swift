@@ -23,11 +23,11 @@ extension AppState {
     /// **The strength a starting image comes with**: the rack's family's (`StartImage.defaultStrength`).
     var defaultStartStrength: Double { StartImage.defaultStrength(for: card?.family) }
 
-    /// Whether the rack's model starts from an image: its chain takes one (`Chain.acceptsStartImage`). Never in a mirror: the
-    /// other Mac's traits do not say it, and its jobs carry no starting image.
+    /// Whether the rack's model starts from an image: its chain takes one (`Chain.acceptsStartImage`) — in a mirror, as the other
+    /// Mac published it (`RemoteTraits.startsFromImage`), the image then sent with the job (`RemoteJob.start`).
     var startsFromImage: Bool {
-        guard mirror == nil, let chain else { return false }
-        return chain.acceptsStartImage
+        if mirror != nil { return traits?.startsFromImage ?? false }
+        return chain?.acceptsStartImage ?? false
     }
 
     /// The starting image the next render reads: the one carried, where the model starts from one.
@@ -55,9 +55,10 @@ extension AppState {
         return (max(0, left), all)
     }
 
-    /// Why « Generate » waits on the starting image: a strength that leaves no step — the image would come back as it is.
+    /// Why « Generate » waits on the starting image: a strength that leaves no step — the image would come back as it is. The
+    /// rule `silicontrol add` judges by, read without the chain: a mirror has none here.
     var startBlocker: String? {
-        guard let r = startRedraws, r.redrawn == 0 else { return nil }
+        guard usedStart != nil, steps >= 1, Strength.startStep(steps: steps, strength: startStrength) >= steps else { return nil }
         return String(localized: "At this strength the image would come back unchanged: raise it.")
     }
 

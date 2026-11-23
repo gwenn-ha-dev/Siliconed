@@ -45,7 +45,8 @@ package struct RemoteLoRA: Codable, Equatable, Sendable {
     package init(path: String, strength: Double) { self.path = path; self.strength = strength }
 }
 
-/// **An edit's image**, in a `render`: the lender decodes it to the pixels the borrower would have rendered.
+/// **An edit's image, or a starting image** (img2img), in a `render`: the lender decodes it to the pixels the borrower
+/// would have rendered.
 package struct RemoteReference: Codable, Equatable, Sendable {
     package enum Origin: Codable, Equatable, Sendable {
         /// An image of the lender's history, by its `i` ordinal: no byte crosses.
@@ -57,6 +58,9 @@ package struct RemoteReference: Codable, Equatable, Sendable {
         /// The `index`-th edit image a history image was rendered with (« Variations » of an edit): it
         /// stays on the lender, the borrower only names it.
         case ofImage(Int, index: Int)
+        /// The starting image a history image was rendered from (« Variations » and « Redo » of an img2img): it stays on
+        /// the lender too.
+        case startOf(Int)
     }
     package var origin: Origin
     package var name: String
@@ -67,7 +71,7 @@ package struct RemoteReference: Codable, Equatable, Sendable {
 
     package var blob: UInt32? {
         switch origin {
-        case .history, .ofImage: nil
+        case .history, .ofImage, .startOf: nil
         case .file(let b), .image(let b): b
         }
     }
@@ -135,11 +139,18 @@ package struct RemoteJob: Codable, Equatable, Sendable {
     /// pictures, sent as `.image` blobs after the edit's own. `nil`: the job cites nobody.
     package var modelPrompt: String?
     package var subjectImages: Int?
+    /// **img2img**: the image the render starts from, and its strength (`RenderSettings.strength`). The lender reads the
+    /// start only with a strength, as this Mac's queue does (`AppState.execute`); a strength alone is what a series' cell or
+    /// a history image published back says of itself.
+    package var start: RemoteReference?
+    package var strength: Double?
 
     package init(ordinal: Int, model: String, modelName: String, prompt: String, width: Int, height: Int, steps: Int,
                  defaultSteps: Int?, loras: [RemoteLoRA], seeds: [UInt64], detail: Detail, solver: Solver,
                  previews: Bool, references: [RemoteReference] = [],
-                 variations: [Variation] = [], modelPrompt: String? = nil, subjectImages: Int? = nil) {
+                 variations: [Variation] = [], modelPrompt: String? = nil, subjectImages: Int? = nil,
+                 start: RemoteReference? = nil, strength: Double? = nil) {
+        self.start = start; self.strength = strength
         self.references = references; self.variations = variations
         self.modelPrompt = modelPrompt; self.subjectImages = subjectImages
         self.ordinal = ordinal; self.model = model; self.modelName = modelName; self.prompt = prompt
@@ -147,6 +158,9 @@ package struct RemoteJob: Codable, Equatable, Sendable {
         self.loras = loras; self.seeds = seeds; self.detail = detail; self.solver = solver
         self.previews = previews
     }
+
+    /// Every image the request carries, the start last: what the lender waits for before judging it.
+    package var images: [RemoteReference] { references + (start.map { [$0] } ?? []) }
 }
 
 /// The queue and the render under way.
@@ -208,6 +222,8 @@ package struct RemoteEntry: Codable, Equatable, Sendable {
 package struct RemoteTraits: Codable, Equatable, Sendable {
     package var maxReferences: Int
     package var readsImages: Bool
+    /// Whether its chain starts from an image (`Chain.acceptsStartImage`): the rack's starting image, img2img.
+    package var startsFromImage: Bool
     package var acceptsDetail: Bool
     /// The step counts the denoiser has a schedule for, among 1…50.
     package var steps: [Int]
@@ -215,10 +231,11 @@ package struct RemoteTraits: Codable, Equatable, Sendable {
     package var text: String?, encoding: String?, decoding: String?
     /// How this model's weights are stored on the lending Mac (`WeightFormats`): the rack's labels.
     package var weights: WeightFormats
-    package init(maxReferences: Int, readsImages: Bool, acceptsDetail: Bool, steps: [Int],
+    package init(maxReferences: Int, readsImages: Bool, startsFromImage: Bool, acceptsDetail: Bool, steps: [Int],
                  text: String?, encoding: String?, decoding: String?, weights: WeightFormats) {
         self.weights = weights
-        self.maxReferences = maxReferences; self.readsImages = readsImages; self.acceptsDetail = acceptsDetail
+        self.maxReferences = maxReferences; self.readsImages = readsImages; self.startsFromImage = startsFromImage
+        self.acceptsDetail = acceptsDetail
         self.steps = steps; self.text = text; self.encoding = encoding; self.decoding = decoding
     }
 }

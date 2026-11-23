@@ -92,12 +92,14 @@ final class MirrorLink {
         sender(.quote(q))
     }
 
-    /// The job, its images sent first. A file that can no longer be read refuses it here. `format: false`:
-    /// the lender derives an edit's format from image 1. `answered`: the lender's word, when it comes.
+    /// The job, its images sent first — its starting image too, when it has a strength (`AppState.execute`'s rule). A file
+    /// that can no longer be read refuses it here. `format: false`: the lender derives an edit's format from image 1.
+    /// `answered`: the lender's word, when it comes.
     func render(_ job: Job, format: Bool = true, answered: ((RemoteAnswer) -> Void)? = nil) throws(EngineError) {
         if let down { answered?(.refused(.text(down))); return }
         var r = MirrorProjection.remote(job)
         r.references = try remote(job.references)
+        r.start = try remoteStart(job.start, strength: job.settings.strength)
         if !format { r.width = 0; r.height = 0 }
         r.ordinal = nextRequest
         nextRequest += 1
@@ -109,11 +111,13 @@ final class MirrorLink {
     /// A series, or a grid: the cells are made there (`enqueueGrid`), each judged as a render is, and the series
     /// published back (`series`), which opens on the canvas once published — the window's series and `silicontrol grid`'s
     /// alike, as on this Mac. `answered` (`silicontrol grid`): the other Mac's word on the grid, its cell jobs numbered.
-    func explore(_ grid: RenderGrid, settings: RenderSettings, references: [ReferenceImage], previews: Bool = true,
-                 answered: ((RemoteAnswer) -> Void)? = nil) throws(EngineError) {
+    /// `start`: the image every cell starts from, at `settings.strength` or a start strength axis's.
+    func explore(_ grid: RenderGrid, settings: RenderSettings, references: [ReferenceImage], start: ReferenceImage? = nil,
+                 previews: Bool = true, answered: ((RemoteAnswer) -> Void)? = nil) throws(EngineError) {
         if let down { answered?(.refused(.text(down))); return }
         var job = MirrorProjection.remote(settings, ordinal: 0, seeds: [], previews: previews, defaultSteps: nil)
         job.references = try remote(references)
+        job.start = try remoteStart(start, strength: settings.strength)
         var request: Int?
         if let answered {
             request = nextRequest
@@ -135,9 +139,17 @@ final class MirrorLink {
     }
 
     private func remote(_ references: [ReferenceImage]) throws(EngineError) -> [RemoteReference] {
-        try references.map { ref throws(EngineError) in
-            RemoteReference(origin: try origin(ref), name: ref.name, width: ref.width, height: ref.height)
-        }
+        try references.map { ref throws(EngineError) in try remote(ref) }
+    }
+
+    private func remote(_ ref: ReferenceImage) throws(EngineError) -> RemoteReference {
+        RemoteReference(origin: try origin(ref), name: ref.name, width: ref.width, height: ref.height)
+    }
+
+    /// The starting image as it crosses: only with a strength, the one the job renders at — its bytes are not sent otherwise.
+    private func remoteStart(_ image: ReferenceImage?, strength: Double?) throws(EngineError) -> RemoteReference? {
+        guard strength != nil, let image else { return nil }
+        return try remote(image)
     }
 
     private func origin(_ ref: ReferenceImage) throws(EngineError) -> RemoteReference.Origin {
@@ -169,7 +181,8 @@ enum MirrorProjection {
                   width: s.format.width, height: s.format.height, steps: s.steps, defaultSteps: defaultSteps,
                   loras: s.loras.map { RemoteLoRA(path: $0.path, strength: $0.strength) }, seeds: seeds,
                   detail: s.detail, solver: s.solver, previews: previews,
-                  variations: s.variations, modelPrompt: s.modelPrompt, subjectImages: s.subjectImages > 0 ? s.subjectImages : nil)
+                  variations: s.variations, modelPrompt: s.modelPrompt, subjectImages: s.subjectImages > 0 ? s.subjectImages : nil,
+                  strength: s.strength)
     }
 
     static func settings(_ r: RemoteJob) -> RenderSettings {
@@ -181,12 +194,16 @@ enum MirrorProjection {
         s.modelPrompt = r.modelPrompt
         s.subjectImages = r.subjectImages ?? 0
         s.references = r.references.count
+        s.strength = r.strength
         return s
     }
 
+    /// A job of the other Mac's: its starting image named, which stays there (`ReferenceImage.remote`).
     static func job(_ r: RemoteJob, ordinal: Int, plan: DenoisingPlan? = nil) -> Job {
-        Job(ordinal: ordinal, settings: settings(r), seeds: r.seeds, references: [], previews: r.previews,
-            defaultSteps: r.defaultSteps, plan: plan)
+        var j = Job(ordinal: ordinal, settings: settings(r), seeds: r.seeds, references: [], previews: r.previews,
+                    defaultSteps: r.defaultSteps, plan: plan)
+        j.start = r.start.map(ReferenceImage.remote)
+        return j
     }
 
     static let stageStates: [StageState: String] = [.idle: "idle", .active: "active", .done: "done", .failed: "failed"]

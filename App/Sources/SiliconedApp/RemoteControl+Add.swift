@@ -69,6 +69,42 @@ extension RemoteControl {
             .standardizedFileURL.path
     }
 
+    /// **The starting image `add` and `grid` read** (`--image`, img2img), on this Mac or on the one the window computes on: a
+    /// model whose chain starts from one, never beside `--ref` — one or the other. With no format typed, the model's
+    /// recommended format nearest its proportions, as the rack takes one.
+    func startRequest(_ d: inout AddOrder, startsFromImage: Bool, edits: Bool, name: String, formats: [RecommendedFormat],
+                      cwd: String) throws -> ReferenceImage? {
+        if d.strength != nil, d.image == nil {
+            throw Refusal("usage", String(localized: "--strength goes with --image"), help: "silicontrol help add")
+        }
+        guard let word = d.image else { return nil }
+        guard startsFromImage else {
+            throw Refusal("img2img", String(localized: "\(name) doesn’t start from an image (--image)"),
+                          help: edits ? String(localized: "--ref <image> to edit it (help edit)")
+                                      : String(localized: "models that do have \"start_image\": true in \"silicontrol models\""))
+        }
+        guard d.references.isEmpty else {
+            throw Refusal("usage", String(localized: "--image and --ref don’t go together"), help: "silicontrol help add")
+        }
+        let start = try startImage(word, cwd: cwd)
+        if d.format == nil,
+           let f = StartImage.recommendedFormat(width: start.width, height: start.height, among: formats, current: app.format) {
+            d.format = (f.width, f.height)
+        }
+        return start
+    }
+
+    /// The strength a start renders at — `--strength`, or its family's —; one that leaves no step is refused, as the rack waits.
+    func startStrength(_ d: AddOrder, start: ReferenceImage?, family: Family?, steps: Int) throws -> Double? {
+        guard start != nil else { return nil }
+        let strength = StartImage.snapped(d.strength ?? StartImage.defaultStrength(for: family))
+        if Strength.startStep(steps: steps, strength: strength) >= steps {
+            throw Refusal("img2img", String(localized: "At this strength the image would come back unchanged: raise it."),
+                          help: "--strength 0.65")
+        }
+        return strength
+    }
+
     /// `add`, and `grid` (`grid: true`): the same request, checked the same way; a grid queues one
     /// job per cell (`AppState.enqueueGrid`) instead of one per alternative.
     func add(_ arguments: [String], cwd: String, _ c: Connection, grid: Bool = false) throws {
@@ -98,30 +134,9 @@ extension RemoteControl {
             throw Refusal("prompt", p.title, help: p.suggestion)
         }
 
-        // The starting image (img2img): a model whose chain starts from one, never with references — one or the other.
-        var start: ReferenceImage?
-        if d.strength != nil, d.image == nil {
-            throw Refusal("usage", String(localized: "--strength goes with --image"), help: "silicontrol help add")
-        }
-        if let word = d.image {
-            guard model.chain.acceptsStartImage else {
-                let name = card?.name ?? model.name
-                throw Refusal("img2img", String(localized: "\(name) doesn’t start from an image (--image)"),
-                              help: model.chain.denoising.maxReferences > 0
-                                  ? String(localized: "--ref <image> to edit it (help edit)")
-                                  : String(localized: "models that do have \"start_image\": true in \"silicontrol models\""))
-            }
-            guard d.references.isEmpty else {
-                throw Refusal("usage", String(localized: "--image and --ref don’t go together"), help: "silicontrol help add")
-            }
-            start = try startImage(word, cwd: cwd)
-            if d.format == nil, let start {
-                let fitting = card?.formats ?? ModelCard.recommendedFormats
-                if let f = StartImage.recommendedFormat(width: start.width, height: start.height, among: fitting, current: app.format) {
-                    d.format = (f.width, f.height)
-                }
-            }
-        }
+        let start = try startRequest(&d, startsFromImage: model.chain.acceptsStartImage,
+                                     edits: model.chain.denoising.maxReferences > 0, name: card?.name ?? model.name,
+                                     formats: card?.formats ?? ModelCard.recommendedFormats, cwd: cwd)
 
         // The references, in order: files, or images of the history (`i7`). The first is image 1,
         // the one edited: with no format typed, the output takes the denoiser's (`editFormat`) —
@@ -190,12 +205,8 @@ extension RemoteControl {
         // else an accepted request cannot fail on.
         try checkSteps(steps, scheduled: model.chain.denoising.scheduledSteps, defaultSteps: defaultSteps)
         let f = model.chain.denoising.space.factor
-        let strength = start == nil ? nil : StartImage.snapped(d.strength ?? StartImage.defaultStrength(for: card?.family))
+        let strength = try startStrength(d, start: start, family: card?.family, steps: steps)
         let first = strength.map { min(steps, Strength.startStep(steps: steps, strength: $0)) } ?? 0
-        if strength != nil, first >= steps {
-            throw Refusal("img2img", String(localized: "At this strength the image would come back unchanged: raise it."),
-                          help: "--strength 0.65")
-        }
         let plan = model.chain.denoising.plan(height: height / f, width: width / f, steps: steps, start: first)
         // One seed for the whole series, drawn once: the alternatives are compared at the same seeds.
         let firstNumber = d.seed ?? Request.drawnSeed()

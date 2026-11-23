@@ -43,6 +43,30 @@ package enum ModelImport {
         family.filter { shape($0.key) != $0.value }.keys.sorted()
     }
 
+    /// **A model deeper than its family, at the same width**: a stack the family reads (`blocks.0` … `blocks.27`) that the
+    /// file carries further (`blocks.28` …). Every tensor the family reads is there at its shape, so the family would take
+    /// it, and render on its first layers only: a wrong image (Fn-Moment Anima V5, 23/11/2026: 40 blocks where Anima reads
+    /// 28). Refused, said as coming, until a model's depth is read from its file. Tensors the family has no name for (a checkpoint's VAE and
+    /// text encoder beside the DiT) are not depth. The first such stack: what the family reads of it, what the file holds.
+    static func deeper(_ family: [String: [Int]], shape: (String) -> [Int]?) -> (reads: Int, holds: Int)? {
+        // Each indexed name split at its first index: the stack before it, what follows; the family's count of each.
+        var stacks: [String: (stack: String, rest: String, reads: Int)] = [:]
+        for name in family.keys {
+            let parts = name.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+            guard let i = parts.firstIndex(where: { Int($0) != nil }), let n = Int(parts[i]) else { continue }
+            let stack = parts[..<i].joined(separator: "."), rest = parts[(i + 1)...].joined(separator: ".")
+            let key = stack + "\u{0}" + rest
+            if (stacks[key]?.reads ?? 0) < n + 1 { stacks[key] = (stack, rest, n + 1) }
+        }
+        func named(_ s: (stack: String, rest: String, reads: Int), _ n: Int) -> String { s.rest.isEmpty ? "\(s.stack).\(n)" : "\(s.stack).\(n).\(s.rest)" }
+        for s in stacks.values.sorted(by: { ($0.stack, $0.rest) < ($1.stack, $1.rest) }) where shape(named(s, s.reads)) != nil {
+            var holds = s.reads + 1
+            while shape(named(s, holds)) != nil { holds += 1 }
+            return (s.reads, holds)
+        }
+        return nil
+    }
+
     /// A family's DiT tensors (`FamilyTraits.ditTensors`), its graph built once a process: a classification reads all
     /// five, and an import classifies twice (`recognize`, then `importFile`).
     static func tensors(of family: Family) -> [String: [Int]] {
@@ -110,6 +134,9 @@ package enum ModelImport {
             let map: MapWeights
             do { map = try MapWeights(dit: file) } catch { throw EngineError.importRefused(file: name, detail: "\(error)") }
             if let family = family(shape: map.shape) {
+                if let d = deeper(tensors(of: family), shape: map.shape) {
+                    throw EngineError.importDeeperModel(file: name, model: ModelCard.of(family).id, holds: d.holds, reads: d.reads)
+                }
                 try refuseBase(file, family, hash: sha256.map { said in { _ in said } } ?? Hashes.shared.sha256)
                 return (.model, family)
             }

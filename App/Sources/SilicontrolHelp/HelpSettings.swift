@@ -251,8 +251,9 @@ extension RemoteControlHelp {
           start from an image (it is then dropped at the next change of model). « status » says the same.
 
         FAILURES: img2img (the rack's model does not start from an image), no_start_image (--strength
-        alone, with no image carried), ref (unreadable or missing image), unknown_image, usage, remote
-        (the window computes on another Mac: not offered there yet).
+        alone, with no image carried), ref (unreadable or missing image), unknown_image, usage.
+        On a Mac followed (Compute On), the same: the image goes to the other Mac with each render, an image of its
+        history (i7) by its number.
         """, fr: """
         silicontrol start-image [<image|i7>] [--strength S]
         silicontrol start-image --remove
@@ -286,8 +287,9 @@ extension RemoteControlHelp {
           part pas d'une image (elle part alors au prochain changement de modèle). « status » dit pareil.
 
         ÉCHECS : img2img (le modèle du rack ne part pas d'une image), no_start_image (--strength seul,
-        sans image portée), ref (image illisible ou absente), unknown_image, usage, remote (la fenêtre
-        calcule sur un autre Mac : pas encore offert là).
+        sans image portée), ref (image illisible ou absente), unknown_image, usage.
+        Sur un Mac suivi (Calculer sur), pareil : l'image part vers l'autre Mac avec chaque rendu, une image de son
+        historique (i7) par son numéro.
         """),
 
         "bracket": Page(en: """

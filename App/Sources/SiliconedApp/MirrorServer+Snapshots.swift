@@ -78,6 +78,7 @@ extension MirrorServer {
             if let m = app.model(id) {
                 let d = m.chain.denoising
                 traits[id] = RemoteTraits(maxReferences: d.maxReferences, readsImages: m.chain.text.output.readsImages,
+                                          startsFromImage: m.chain.acceptsStartImage,
                                           acceptsDetail: d.acceptsDetail,
                                           steps: d.scheduledSteps,
                                           text: m.chain.text.name, encoding: m.chain.encoding?.name,
@@ -98,12 +99,13 @@ extension MirrorServer {
         host.send(blob: e.png, id: id, to: identity)
     }
 
-    /// A history image, as the other Mac reads it: its job, its edit's images named by this image.
+    /// A history image, as the other Mac reads it: its job, its edit's images and its starting image named by this image.
     private func remote(_ e: Entry, png id: UInt32) -> RemoteEntry {
         var job = MirrorProjection.remote(e.settings, ordinal: e.job, seeds: [e.seed], previews: false, defaultSteps: nil)
         job.references = e.references.enumerated().map { i, ref in
             RemoteReference(origin: .ofImage(e.ordinal, index: i), name: ref.name, width: ref.width, height: ref.height)
         }
+        job.start = e.start.map { RemoteReference(origin: .startOf(e.ordinal), name: $0.name, width: $0.width, height: $0.height) }
         let r = RemoteEntry(ordinal: e.ordinal, job: job,
                             width: e.width, height: e.height, seed: e.seed, timings: e.timings, footprints: e.footprints,
                             evaluations: e.evaluations, metadata: e.metadata, png: id,

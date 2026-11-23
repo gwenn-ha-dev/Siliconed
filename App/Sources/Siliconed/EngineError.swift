@@ -64,6 +64,10 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
     /// published base checkpoint (`FamilyTraits.baseCheckpoints`) of the family of `model` (an identifier). It has the
     /// Turbo's names and shapes, so the import would take it — and the Turbo's few steps would ruin its image.
     case importBaseModel(file: String, model: String)
+    /// **A model deeper than its family, at the same width**: `file` holds every tensor the family of `model` reads, and
+    /// `holds` layers where it reads `reads` (`ModelImport.deeper`). Rendered on its first layers, its image would be
+    /// wrong; a model's depth read from its file is to come.
+    case importDeeperModel(file: String, model: String, holds: Int, reads: Int)
     /// **The library is on a disk that is not there** — unplugged, a share not mounted (`Library.isReachable`).
     /// Nothing renders, installs or imports until it is back: never another library in its place.
     /// `volume`: the disk's name as the Finder shows it, `nil` when the path does not say.

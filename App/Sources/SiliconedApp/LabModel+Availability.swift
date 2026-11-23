@@ -42,8 +42,7 @@ extension LabModel {
         return model.chain.text.output.readsImages ? model.chain.denoising.maxReferences : 0
     }
 
-    /// **Whether the rack's model starts from an image** (img2img). Never in a mirror — the other Mac's traits do not say it,
-    /// and its jobs carry no starting image.
+    /// **Whether the rack's model starts from an image** (img2img) — in a mirror, as the other Mac's traits say it.
     var startsFromImage: Bool { rack.startsFromImage }
 
     /// The model's start is an img2img's.

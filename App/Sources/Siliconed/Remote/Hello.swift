@@ -11,7 +11,8 @@ package struct Hello: Codable, Equatable, Sendable {
     /// removes the lender's imported models and LoRAs; 7: the margin a job carries is exact or ane; 8: a full disk says
     /// what it stopped, `EngineError.diskFull(writing:)`; 9: a lent render follows the lender's Neural Engine switch, the
     /// job carries no margin, and a render gone wrong says its stage, `EngineError.nonFiniteImage(stage:)`; 10: an installation's
-    /// plan says what is left to download apart from the room it takes, `RemotePlan.toDownload`).
+    /// plan says what is left to download apart from the room it takes, `RemotePlan.toDownload`, and a job carries its starting
+    /// image, `RemoteJob.start`; a model deeper than its family is refused by name, `EngineError.importDeeperModel`).
     package static let protocolVersion = 10
 
     package let protocolVersion: Int

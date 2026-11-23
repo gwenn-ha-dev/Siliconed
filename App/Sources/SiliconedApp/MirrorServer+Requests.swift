@@ -30,7 +30,7 @@ extension MirrorServer {
         while i < held.count {
             let (identity, asked) = held[i]
             let sent = uploads[identity] ?? [:]
-            guard !waiting.contains(identity), asked.references.allSatisfy({ $0.blob.map { sent[$0] != nil } ?? true }) else {
+            guard !waiting.contains(identity), asked.images.allSatisfy({ $0.blob.map { sent[$0] != nil } ?? true }) else {
                 waiting.insert(identity)
                 i += 1
                 continue
@@ -57,7 +57,7 @@ extension MirrorServer {
             } catch {
                 refuse(.engine(EngineError(error)), asked, to: identity)
             }
-            for b in asked.references.compactMap(\.blob) { uploads[identity]?[b] = nil }
+            for b in asked.images.compactMap(\.blob) { uploads[identity]?[b] = nil }
         }
     }
 
@@ -74,7 +74,7 @@ extension MirrorServer {
         return RemoteQuoteAnswer(quote: q, width: f.width, height: f.height, need: nil)
     }
 
-    /// An edit's image as this Mac reads it: one of its history, or the bytes sent — a file's decoded as
+    /// An edit's image or a starting image as this Mac reads it: one of its history, or the bytes sent — a file's decoded as
     /// the file (`ImageRGB(data:)`), an image's PNG to the same `CGImage`.
     private func reference(_ r: RemoteReference, images: [UInt32: Data], from identity: Data) throws -> ReferenceImage {
         switch r.origin {
@@ -88,6 +88,9 @@ extension MirrorServer {
                 throw Refused(.imageGone(o))
             }
             return e.references[i]
+        case .startOf(let o):
+            guard let e = own(o, identity), let start = e.start else { throw Refused(.imageGone(o)) }
+            return start
         case .file(let b):
             guard let d = images[b], let size = ReferenceImage.size(of: d), let vignette = NSImage(data: d) else {
                 throw EngineError.imageUnreadable(file: r.name)
@@ -109,7 +112,13 @@ extension MirrorServer {
         }
         let model = try Model.named(r.model, in: app.library)
         let denoising = model.chain.denoising
-        try denoising.check(steps: r.steps, startImage: false)
+        // A start goes with its strength, as this Mac's queue reads one (`AppState.execute`): without it, a render from noise.
+        if r.start == nil { r.strength = nil }
+        if let strength = r.strength {
+            guard model.chain.acceptsStartImage else { throw EngineError.imageToImageUnsupported(model: r.model) }
+            guard strength > 0, strength <= 1 else { throw EngineError.strengthOutOfRange(strength: strength) }
+        }
+        try denoising.check(steps: r.steps, startImage: r.strength != nil)
         // What the borrower's form offers for this model, from its traits: its word is not the last.
         if r.solver != .euler, !AppState.solverFamilies.contains(card.family) {
             throw Refused(.solverNotOffered(model: card.id, solver: r.solver.rawValue))
@@ -122,6 +131,7 @@ extension MirrorServer {
         }
         guard (1...8).contains(r.seeds.count) else { throw Refused(.seedCount) }
         let references = try r.references.map { try reference($0, images: images, from: identity) }
+        let start = try r.strength == nil ? nil : r.start.map { try reference($0, images: images, from: identity) }
         // A job that cites named subjects (which stayed on the borrower): the rewrite the model reads, and their
         // pictures last among the references — rebuilt as if the subjects were here.
         let subjects = r.subjectImages ?? 0
@@ -147,12 +157,12 @@ extension MirrorServer {
         if let stray = r.loras.first(where: { !installed.contains($0.path) }) {
             throw Refused(.loraNotInstalled(name: RemoteControl.shortName(stray.path)))
         }
-        let f = denoising.space.factor
-        let plan = denoising.plan(height: r.height / f, width: r.width / f, steps: r.steps, start: 0)
+        let plan = AppState.plan(denoising, steps: r.steps, format: RecommendedFormat(r.width, r.height), strength: r.strength)
         var job = MirrorProjection.job(r, ordinal: app.nextJobNumber(), plan: plan)
         job = Job(ordinal: job.ordinal,
                   settings: { var s = job.settings; s.modelName = card.name; s.references = references.count; return s }(),
                   seeds: job.seeds, references: references, previews: job.previews, defaultSteps: card.defaultSteps, plan: plan)
+        job.start = start
         job.owner = identity
         return job
     }
@@ -167,15 +177,24 @@ extension MirrorServer {
             throw Refused(.tooManyReferences(count: g.job.references.count, model: g.job.model, max: Self.gridReferenceBound))
         }
         let references = try g.job.references.map { try reference($0, images: images, from: identity) }
+        // Every cell starts from the image, at the base's strength or its own (a start strength axis), as the series of
+        // this Mac's form does; `enqueueGrid` drops it for a cell whose model does not start from one.
+        let start = try g.job.strength == nil ? nil : g.job.start.map { try reference($0, images: images, from: identity) }
         var settings = MirrorProjection.settings(g.job)
+        if start == nil { settings.strength = nil }
         for id in Set(grid.cells.map { $0.model ?? g.job.model }) {
             guard app.readySet.contains(id), let card = app.cards.first(where: { $0.id == id }) else {
                 throw EngineError.modelNotInstalled(model: id)
             }
             try Format.check(width: g.job.width, height: g.job.height, family: card.family)
             // Each cell's step count against its own model's schedules, as `silicontrol grid` judges it.
-            let denoising = try Model.named(id, in: app.library).chain.denoising
+            let chain = try Model.named(id, in: app.library).chain
+            let denoising = chain.denoising
             if id == g.job.model {
+                // With no models axis the base model renders every cell: it starts from the image, or the grid is refused.
+                if start != nil, !chain.acceptsStartImage, !grid.cells.contains(where: { $0.model != nil }) {
+                    throw EngineError.imageToImageUnsupported(model: id)
+                }
                 settings.modelName = card.name
                 if g.job.detail != .normal, !denoising.acceptsDetail { throw Refused(.detailNotOffered(model: card.id)) }
                 // A solver swept with no model axis is the base model's to walk (`silicontrol grid`'s rule).
@@ -185,7 +204,7 @@ extension MirrorServer {
                 }
             }
             for cell in grid.cells where (cell.model ?? g.job.model) == id {
-                try denoising.check(steps: cell.steps ?? card.defaultSteps, startImage: false)
+                try denoising.check(steps: cell.steps ?? card.defaultSteps, startImage: start != nil && chain.acceptsStartImage)
             }
         }
         let installed = Set(app.library.loras(for: g.job.model).map(\.path))
@@ -194,7 +213,7 @@ extension MirrorServer {
         }
         // Not opened in this Mac's window: it is that Mac's.
         return app.enqueueGrid(grid, settings: settings, references: references, previews: g.job.previews,
-                               named: false, owner: identity, shows: false)
+                               named: false, owner: identity, shows: false, start: start)
     }
 
     /// No model reads more than 3 images (`maxReferences`); each cell is judged against its own model's later.

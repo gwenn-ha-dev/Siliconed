@@ -14,7 +14,7 @@ final class EngineErrorTests: XCTestCase {
     func testEveryCaseHasAUniqueCodeAndASentence() {
         let codes = EngineError.samples.map(\.code)
         XCTAssertEqual(Set(codes).count, codes.count, "two cases share a code: \(codes)")
-        XCTAssertEqual(codes.count, 49, "a case was added: give it a sample, a code, a sentence")
+        XCTAssertEqual(codes.count, 50, "a case was added: give it a sample, a code, a sentence")
         for e in EngineError.samples {
             XCTAssertTrue(e.code.allSatisfy { $0.isLowercase || $0 == "_" }, e.code)
             let sentence = e.errorDescription ?? ""
@@ -148,6 +148,7 @@ extension EngineError {
         .importRefused(file: "x.safetensors", detail: "not recognized"), .notAnImportedModel(model: "Z-Image Turbo"),
         .importNeedsFamily(file: "x.safetensors", model: "anima"),
         .importBaseModel(file: "qwen_image_2.1_bf16.safetensors", model: "qwen-image-2.1"),
+        .importDeeperModel(file: "Fn-Moment-Anima-29B-V5.safetensors", model: "anima", holds: 40, reads: 28),
         .libraryAbsent(path: "/Volumes/Models/Siliconed", volume: "Models"),
         .libraryRefused(path: "/Volumes/KEY/Siliconed", reason: .fileSizeLimit),
         .emptyPrompt, .invalidSteps(steps: 8, allowed: [5, 6, 7, 9]), .tooManyReferences(count: 4, max: 3),

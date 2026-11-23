@@ -15,6 +15,8 @@
 //   model (`--download` is the consent, as here). A cell's, a variation's or an enlargement's answer has
 //   the fields it has here, plus `computing_on`.
 // - `add` and `grid` fill the rack as a click would, and the canvas shows the series once published, as on this Mac.
+// - **A starting image** (`add --image`, `start-image`) goes with the job, its bytes sent first as an edit's are
+//   (`RemoteJob.start`); one of the other Mac's history (`i7`) by its ordinal.
 // - **Named subjects stay on this Mac** (`subjects` acts on them, mirrored or not; no refusal): a job
 //   that cites them goes with its rewrite and their framed pictures (`namedJob`, `RemoteJob.modelPrompt`).
 
@@ -32,9 +34,6 @@ extension RemoteControl {
         case "install" where arguments == ["stop"]:
             break
         // Files go up to the other Mac, whose owner confirms there.
-        case "start-image":
-            throw Refusal("remote", String(localized: "a starting image is not offered while the window computes on “\(name)”"),
-                          help: String(localized: "Render › Compute On › This Mac, then retry"))
         case "install", "import":
             throw Refusal("remote", String(localized: "\(command) acts on this Mac, and the window computes on “\(name)”"),
                           help: String(localized: "Render › Compute On › This Mac, then retry"))
@@ -52,6 +51,7 @@ extension RemoteControl {
                                     "commercial_license": f.license.commercial, "license": f.license.text,
                                     "default": f.id == ModelCard.of(.default).id, "ready": app.readySet.contains(f.id)]
             if let t = catalog?.traits[f.id] {
+                o["start_image"] = t.startsFromImage
                 o["edit"] = t.maxReferences > 0
                 o["max_references"] = t.maxReferences
                 o["loras"] = (catalog?.loras[f.id] ?? []).map { l in
@@ -66,15 +66,10 @@ extension RemoteControl {
     /// **`add` on a mirror**: the request read as `add` reads it, judged with what the other Mac
     /// published, then asked of it — one job per alternative of the prompt, at the same seeds.
     func addOnMirror(_ mirror: MirrorLink, _ arguments: [String], cwd: String, _ c: Connection, grid: Bool = false) throws {
-        let d = try parse(arguments)
+        var d = try parse(arguments)
         // A request while the session is down would be dropped, and its command would wait for an answer
         // that cannot come.
         if let down = app.linkBlocker { throw Refusal("link", down) }
-        // The starting image does not travel to the other Mac yet: said, never dropped in silence.
-        if d.image != nil || d.strength != nil {
-            throw Refusal("remote", String(localized: "a starting image (--image) is not offered while the window computes on “\(mirror.macName)”"),
-                          help: String(localized: "Render › Compute On › This Mac, then retry"))
-        }
         // The rules of `add` here, with what the other Mac published of its models — which judges again.
         try checkUsage(d, grid: grid)
         guard app.readySet.contains(d.model), let card = app.cards.first(where: { $0.id == d.model }) else {
@@ -93,6 +88,8 @@ extension RemoteControl {
             let p = Problem(error)
             throw Refusal("prompt", p.title, help: p.suggestion)
         }
+        let start = try startRequest(&d, startsFromImage: traits?.startsFromImage ?? false, edits: (traits?.maxReferences ?? 0) > 0,
+                                     name: card.name, formats: card.formats, cwd: cwd)
 
         // The references: files here, or images of the other Mac's history (`i7`), sent by their ordinal.
         var references: [ReferenceImage] = []
@@ -120,6 +117,7 @@ extension RemoteControl {
         }
         let steps = d.steps ?? card.defaultSteps
         if let t = traits { try checkSteps(steps, scheduled: t.steps, defaultSteps: card.defaultSteps) }
+        let strength = try startStrength(d, start: start, family: card.family, steps: steps)
         try checkLoRAs(d)
         let available = app.mirrorCatalog?.loras[d.model] ?? []
         let stack = try d.loras.map { entry -> LoRASlot in
@@ -154,16 +152,19 @@ extension RemoteControl {
                 throw Refusal("subject", String(localized: "a grid does not cite named subjects yet"), help: "silicontrol add")
             }
             try addGridOnMirror(mirror, d, prompt: prompt, card: card, format: format, steps: steps, stack: stack,
-                                references: references, seed: firstNumber, folder: folder, c)
+                                references: references, start: start, strength: strength, seed: firstNumber, folder: folder, c)
             return
         }
         let jobs = variants.map { v -> Job in
             var settings = RenderSettings(identifier: card.id, modelName: card.name, prompt: v.prompt, format: format,
                                           steps: steps, loras: stack, references: references.count, detail: d.detail,
                                           solver: d.solver)
+            settings.strength = strength
             let used = app.namedJob(v.prompt, settings: &settings, references: references, capacity: capacity)
-            return Job(ordinal: 0, settings: settings, seeds: (0..<d.batch).map { firstNumber &+ UInt64($0) },
+            var job = Job(ordinal: 0, settings: settings, seeds: (0..<d.batch).map { firstNumber &+ UInt64($0) },
                           references: used, previews: d.previews ?? app.previews, defaultSteps: card.defaultSteps, plan: nil)
+            job.start = start
+            return job
         }
 
         // Each job is answered by the other Mac; the command answers once all are.
@@ -209,7 +210,7 @@ extension RemoteControl {
             }
         }
         // The form takes the request, as after a click, as `add` on this Mac does.
-        app.takeRequest(jobs[0].settings, prompt: prompt, references: references, start: nil, strength: nil,
+        app.takeRequest(jobs[0].settings, prompt: prompt, references: references, start: start, strength: strength,
                         seed: firstNumber, fixed: d.seed != nil, batch: d.batch)
     }
 
@@ -225,10 +226,11 @@ extension RemoteControl {
     /// library (`RenderGrid`, which the other Mac checks again), every cell's step count against the
     /// steps its model published — then the cells are made there, and the command answers with them.
     private func addGridOnMirror(_ mirror: MirrorLink, _ d: AddOrder, prompt: String, card: ModelCard, format: RecommendedFormat,
-                                 steps: Int, stack: [LoRASlot], references: [ReferenceImage], seed: UInt64,
-                                 folder: String?, _ c: Connection) throws {
+                                 steps: Int, stack: [LoRASlot], references: [ReferenceImage], start: ReferenceImage?,
+                                 strength: Double?, seed: UInt64, folder: String?, _ c: Connection) throws {
         let available = app.mirrorCatalog?.loras[d.model] ?? []
-        let g = try readGrid(d, prompt: prompt, seed: seed, steps: steps, stack: stack, images: references.count, start: false) {
+        let g = try readGrid(d, prompt: prompt, seed: seed, steps: steps, stack: stack, images: references.count,
+                             start: start != nil) {
             availableLoRA($0, among: available)?.path
         }
         try checkSolverAxis(g, family: card.family, name: card.name)
@@ -241,11 +243,12 @@ extension RemoteControl {
             throw Refusal("queue_full", String(localized: "\(n) jobs for the grid: the queue has room for \(room) (\(max) jobs)"),
                           help: "silicontrol wait, then retry")
         }
-        let settings = RenderSettings(identifier: card.id, modelName: card.name, prompt: prompt, format: format, steps: steps,
+        var settings = RenderSettings(identifier: card.id, modelName: card.name, prompt: prompt, format: format, steps: steps,
                                       loras: stack, references: references.count, detail: d.detail, solver: d.solver)
+        settings.strength = strength
         let on = mirror.macName
         do {
-            try mirror.explore(g, settings: settings, references: references,
+            try mirror.explore(g, settings: settings, references: references, start: start,
                                previews: d.previews ?? app.previews) { [self] answer in
                 switch answer {
                 case .refused(let text):
@@ -273,7 +276,7 @@ extension RemoteControl {
         }
         // The form takes the grid, as after a click, and the canvas shows it once the other Mac publishes it
         // (`MirrorLink.explore`), as `grid` on this Mac does.
-        app.takeRequest(settings, prompt: prompt, references: references, start: nil, strength: nil, seed: seed,
+        app.takeRequest(settings, prompt: prompt, references: references, start: start, strength: strength, seed: seed,
                         fixed: d.seed != nil)
         _ = app.setSeries(from: g)
         app.followsRender = false

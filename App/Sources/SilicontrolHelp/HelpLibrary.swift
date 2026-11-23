@@ -196,7 +196,8 @@ extension RemoteControlHelp {
         file_missing, import_refused (neither a LoRA nor a model of a supported family: the message
         says what is missing), import_needs_family (a model whose family is not installed: « install »
         it first), import_base_model (a publisher's base model, not distilled: it would not render in
-        8 steps), unsupported_lora (LoKr, LoHa, DoRA, a text encoder's LoRA…).
+        8 steps), import_deeper_model (more layers than its family: not supported yet, coming soon),
+        unsupported_lora (LoKr, LoHa, DoRA, a text encoder's LoRA…).
         """, fr: """
         silicontrol import FICHIER.safetensors [FICHIER.safetensors…]
 
@@ -219,7 +220,8 @@ extension RemoteControlHelp {
         Mac), file_missing, import_refused (ni un LoRA ni un modèle d'une famille connue : le message
         dit ce qui manque), import_needs_family (un modèle dont la famille n'est pas installée :
         « install » d'abord), import_base_model (un modèle de base d'éditeur, non distillé : il ne
-        rendrait pas en 8 pas), unsupported_lora (LoKr, LoHa, DoRA, LoRA d'encodeur de texte…).
+        rendrait pas en 8 pas), import_deeper_model (plus de couches que sa famille : pas encore pris
+        en charge, bientôt), unsupported_lora (LoKr, LoHa, DoRA, LoRA d'encodeur de texte…).
         """),
 
         "compiled": Page(en: """

@@ -509,7 +509,7 @@ extension RemoteControlHelp {
           queue_full           64 jobs waiting, or no room for every alternative or cell
                                                                            → wait, then retry
           remote               (install, import, rewrite, describe, lab rewrite|describe) the window computes on another Mac;
-                               these act on this one; (start-image, add|grid --image) not offered there yet; (uninstall, library move|home) a removal or a move there waits for a click on
+                               these act on this one; (uninstall, library move|home) a removal or a move there waits for a click on
                                the other Mac                               → Render › Compute On › This Mac
           link                 the session with the other Mac is down (add, grid, vary, again); (compute, macs)
                                that Mac refused the session                → macs
@@ -590,7 +590,7 @@ extension RemoteControlHelp {
           queue_full           64 travaux en attente, ou pas de place pour toutes les alternatives ou cases
                                                                            → wait, puis réessayer
           remote               (install, import, rewrite, describe, lab rewrite|describe) la fenêtre calcule sur un autre Mac ;
-                               ces commandes agissent sur celui-ci ; (start-image, add|grid --image) pas encore offert là-bas ; (uninstall, library move|home) un retrait ou un déplacement
+                               ces commandes agissent sur celui-ci ; (uninstall, library move|home) un retrait ou un déplacement
                                attend là un clic sur l'autre Mac           → Rendu › Calculer sur › Ce Mac
           link                 la session avec l'autre Mac est coupée (add, grid, vary, again) ; (compute, macs)
                                ce Mac a refusé la session                  → macs

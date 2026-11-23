@@ -142,6 +142,33 @@ final class ModelImportTests: XCTestCase {
         }
     }
 
+    /// A model of a family's width but deeper (Fn-Moment Anima V5: 40 blocks where Anima reads 28) is refused, not rendered
+    /// on its first layers; a checkpoint's other tensors (its VAE beside the DiT) are not depth.
+    func testADeeperModelIsRefused() throws {
+        let anima = ModelImport.tensors(of: .anima)
+        // The blocks by their index, whatever prefix the family's names carry (`net.blocks.0.…`).
+        func block(_ key: String) -> (head: String, n: Int, rest: String)? {
+            guard let r = key.range(of: #"blocks\.\d+\."#, options: .regularExpression) else { return nil }
+            return (String(key[..<r.lowerBound]), Int(key[r].dropFirst(7).dropLast())!, String(key[r.upperBound...]))
+        }
+        let reads = Set(anima.keys.compactMap { block($0)?.n }).count
+        XCTAssertGreaterThan(reads, 0)
+        let whole = try file("whole.safetensors", anima.merging(["vae.decoder.conv_in.weight": [4, 4]]) { a, _ in a })
+        XCTAssertEqual(try ModelImport.recognize(whole).1, .anima)
+        var deeper = anima
+        for (key, shape) in anima {
+            guard let b = block(key), b.n == 0 else { continue }
+            for n in reads..<(reads + 12) { deeper[b.head + "blocks.\(n)." + b.rest] = shape }
+        }
+        let path = try file("deeper.safetensors", deeper)
+        XCTAssertThrowsError(try ModelImport.recognize(path)) { error in
+            XCTAssertEqual(error as? EngineError, .importDeeperModel(file: "deeper.safetensors", model: ModelCard.of(.anima).id,
+                                                                     holds: reads + 12, reads: reads))
+        }
+        XCTAssertEqual(ModelImport.deeper(["t.mlp.0.weight": [1], "t.mlp.2.weight": [1]], shape: { $0 == "t.mlp.3.weight" ? [1] : nil })?.holds, 4)
+        XCTAssertNil(ModelImport.deeper(["t.mlp.0.weight": [1], "t.mlp.2.weight": [1]], shape: { _ in nil }))
+    }
+
     /// What is neither a model nor a LoRA is refused by name.
     func testWhatIsNotReadIsRefusedByName() throws {
         let other = try file("other.safetensors", ["some.weight": [4, 4]])

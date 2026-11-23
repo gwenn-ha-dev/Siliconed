@@ -75,10 +75,11 @@ final class MirrorServer {
         importing: { [weak self] identity in self?.library.asked(by: identity) }
     enum Asked {
         case render(RemoteJob), grid(RemoteGridRequest)
-        var references: [RemoteReference] {
+        /// The images it carries, its starting image included: each sent as a blob is waited for, then dropped once judged.
+        var images: [RemoteReference] {
             switch self {
-            case .render(let r): r.references
-            case .grid(let g): g.job.references
+            case .render(let r): r.images
+            case .grid(let g): g.job.images
             }
         }
         /// The number the borrower waits for an answer under.

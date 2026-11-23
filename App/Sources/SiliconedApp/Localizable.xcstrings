@@ -991,6 +991,52 @@
         }
       }
     },
+    "%@ has %lld layers where %@ has %lld: not supported yet, coming soon." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ hat %2$lld Schichten, wo %3$@ %4$lld hat: noch nicht unterstützt, bald verfügbar."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ has %2$lld layers where %3$@ has %4$lld: not supported yet, coming soon."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ tiene %2$lld capas donde %3$@ tiene %4$lld: aún no es compatible, próximamente."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ a %2$lld couches là où %3$@ en a %4$lld : pas encore pris en charge, bientôt."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ ha %2$lld livelli dove %3$@ ne ha %4$lld: non ancora supportato, in arrivo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@には%2$lld層ありますが、%3$@は%4$lld層です。まだ対応していません。近日対応予定です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 有 %2$lld 层，而 %3$@ 有 %4$lld 层：暂不支持，即将推出。"
+          }
+        }
+      }
+    },
     "%@ has no %@ version" : {
       "localizations" : {
         "de" : {
@@ -43285,86 +43331,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "求解器轴仅在开启“更多求解器”时提供"
-          }
-        }
-      }
-    },
-    "a starting image (--image) is not offered while the window computes on “%@”" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ein Startbild (--image) wird nicht angeboten, solange das Fenster auf „%@“ rechnet"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "una imagen de partida (--image) no se ofrece mientras la ventana calcula en «%@»"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "une image de départ (--image) n’est pas offerte quand la fenêtre calcule sur « %@ »"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "un’immagine di partenza (--image) non è offerta mentre la finestra calcola su «%@»"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ウインドウが「%@」で計算している間は開始画像（--image）を使えません"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "窗口在“%@”上计算时不提供起始图像（--image）"
-          }
-        }
-      }
-    },
-    "a starting image is not offered while the window computes on “%@”" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ein Startbild wird nicht angeboten, solange das Fenster auf „%@“ rechnet"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "una imagen de partida no se ofrece mientras la ventana calcula en «%@»"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "une image de départ n’est pas offerte quand la fenêtre calcule sur « %@ »"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "un’immagine di partenza non è offerta mentre la finestra calcola su «%@»"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ウインドウが「%@」で計算している間は開始画像を使えません"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "窗口在“%@”上计算时不提供起始图像"
           }
         }
       }

@@ -60,7 +60,7 @@ extension AppState {
         if usedStart != nil { settings.strength = startStrength }
         followsRender = false
         if let mirror {
-            do { try mirror.explore(g, settings: settings, references: renderReferences) }
+            do { try mirror.explore(g, settings: settings, references: renderReferences, start: usedStart) }
             catch { problem = Problem(error); flash(Problem(error).text) }
         } else {
             enqueueGrid(g, settings: settings, references: renderReferences, previews: previews, named: true, start: usedStart)

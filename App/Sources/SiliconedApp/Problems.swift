@@ -97,6 +97,8 @@ struct Problem: Equatable, Sendable {
             return String(localized: "To import \(file(f)), install \(name(m)) first.")
         case let .importBaseModel(f, m):                             // import_base_model
             return String(localized: "\(file(f)) is the base model of \(ModelCard.withID(m)?.family.name ?? m): Siliconed renders \(name(m)).")
+        case let .importDeeperModel(f, m, holds, reads):             // import_deeper_model
+            return String(localized: "\(file(f)) has \(holds) layers where \(name(m)) has \(reads): not supported yet, coming soon.")
         case .notAnImportedModel(let m):                             // not_an_imported_model
             return String(localized: "\(name(m)) wasn’t imported: uninstall it from the Models sheet.")
         case let .libraryAbsent(p, volume):                          // library_absent
@@ -271,7 +273,7 @@ struct Problem: Equatable, Sendable {
             return String(localized: "Choose a folder outside the library.")
         case .libraryRefused(_, .copyDamaged):
             return String(localized: "Check the disk and its cable, then start again: nothing was switched, and the files already checked are kept.")
-        case .notAnImportedModel, .imageEncodingFailed, .cancelled:
+        case .notAnImportedModel, .importDeeperModel, .imageEncodingFailed, .cancelled:
             return nil
         case .emptyPrompt:
             return String(localized: "Write a prompt.")

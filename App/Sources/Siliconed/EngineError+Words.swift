@@ -23,6 +23,7 @@ extension EngineError {
         case .notAnImportedModel: return "not_an_imported_model"
         case .importNeedsFamily: return "import_needs_family"
         case .importBaseModel: return "import_base_model"
+        case .importDeeperModel: return "import_deeper_model"
         case .libraryAbsent: return "library_absent"
         case .libraryRefused: return "library_refused"
         case .emptyPrompt: return "empty_prompt"
@@ -86,6 +87,8 @@ extension EngineError {
         case let .importBaseModel(file, model):
             let card = ModelCard.withID(model)
             return "\(file) is the base model of \(card?.family.name ?? model): Siliconed renders \(card?.name ?? model)."
+        case let .importDeeperModel(file, model, holds, reads):
+            return "\(file) has \(holds) layers where \(ModelCard.withID(model)?.name ?? model) has \(reads): not supported yet, coming soon."
         case let .libraryAbsent(path, volume):
             return volume.map { "The library is on \($0), which is not connected." } ?? "The library cannot be found: \(path)."
         case let .libraryRefused(path, reason):
@@ -198,7 +201,7 @@ extension EngineError {
         case .downloadCorrupt: return "Start again: the damaged file was thrown away."
         case .downloadInProgress: return "Wait for that download to finish, then start again."
         case .importRefused: return "Import a LoRA or a full model of a supported family, as .safetensors."
-        case .notAnImportedModel: return nil
+        case .notAnImportedModel, .importDeeperModel: return nil
         case .importNeedsFamily: return "Install the model, then import the file again: an import downloads nothing."
         case .importBaseModel(_, let model): return "Install \(ModelCard.withID(model)?.name ?? model), or import a model made from it."
         case .libraryAbsent: return "Connect the disk, or go back to this Mac's library in the settings."

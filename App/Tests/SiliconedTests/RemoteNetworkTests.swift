@@ -265,13 +265,53 @@ final class RemoteNetworkTests: XCTestCase {
             .entry(RemoteEntry(ordinal: 7, job: job, width: 1024, height: 1024, seed: 42, timings: t,
                                footprints: Engine.Footprints(), evaluations: 8, metadata: ["parameters": "x"], png: 9)),
             .catalog(MirrorCatalog(ready: ["z-image"], traits: ["z-image": RemoteTraits(
-                maxReferences: 0, readsImages: false, acceptsDetail: true, steps: Array(1...50),
+                maxReferences: 0, readsImages: false, startsFromImage: true, acceptsDetail: true, steps: Array(1...50),
                 text: "Qwen3", encoding: nil, decoding: "Flux VAE", weights: WeightFormats())], loras: [:], loraNames: [:],
                 ceiling: 10 << 30)),
         ]
         for m in messages {
             XCTAssertEqual(try JSONDecoder().decode(SessionMessage.self, from: JSONEncoder().encode(m)), m)
         }
+    }
+
+    /// **A starting image crosses with its job** (img2img on another Mac): a file's bytes or an image of the lender's
+    /// history going, the start a history image was rendered from coming back by its name — and a job without one reads
+    /// as it did before.
+    func testAStartingImageTravelsWithItsJob() throws {
+        var job = RemoteJob(ordinal: 3, model: "z-image", modelName: "Z-Image Turbo", prompt: "woman posing in a library",
+                            width: 832, height: 1216, steps: 8, defaultSteps: 8, loras: [], seeds: [42], detail: .normal,
+                            solver: .euler, previews: true)
+        XCTAssertEqual(job.images, [])
+        let file = RemoteReference(origin: .file(blob: 5), name: "photo.heic", width: 3024, height: 4032)
+        job.start = file
+        job.strength = 0.65
+        XCTAssertEqual(job.images, [file], "the lender waits for the start's blob as for an edit's")
+        XCTAssertEqual(job.images.compactMap(\.blob), [5])
+        var history = job
+        history.start = RemoteReference(origin: .history(7), name: "i7", width: 1024, height: 1024)
+        var back = job
+        back.start = RemoteReference(origin: .startOf(12), name: "photo.heic", width: 3024, height: 4032)
+        XCTAssertNil(back.start?.blob, "the start of a history image stays on the lender")
+        let grid = try RenderGrid(.init(prompt: "a cat", seed: 42, steps: 8, loraStrengths: [], images: 0, start: true),
+                                  x: .startStrength([0.5, 0.75]))
+        var t = Engine.Timings(); t.total = 12.5
+        let messages: [SessionMessage] = [
+            .render(job), .render(history),
+            .grid(RemoteGridRequest(spec: RemoteGridSpec(grid), job: job, request: 4)),
+            .entry(RemoteEntry(ordinal: 13, job: back, width: 832, height: 1216, seed: 42, timings: t,
+                               footprints: Engine.Footprints(), evaluations: 5, metadata: [:], png: 9)),
+        ]
+        for m in messages {
+            XCTAssertEqual(try JSONDecoder().decode(SessionMessage.self, from: JSONEncoder().encode(m)), m)
+        }
+        XCTAssertEqual(try RemoteGridSpec(grid).grid().cells.map(\.startStrength), [0.5, 0.75])
+        // A job from a build that carried no start: no image, no strength — a render from noise.
+        var plain = job
+        plain.start = nil; plain.strength = nil
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(plain)) as? [String: Any])
+        object["start"] = nil; object["strength"] = nil
+        let old = try JSONSerialization.data(withJSONObject: object)
+        XCTAssertEqual(try JSONDecoder().decode(RemoteJob.self, from: old), plain)
     }
 
     /// Named subjects, grids asked from `silicontrol` and an enlargement's source cross the mirror too —

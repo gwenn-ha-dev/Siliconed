@@ -118,8 +118,9 @@ extension AppState {
             if case let .queued(o, _, w, h) = a, let j = link.requested[request], link.jobs[o] == nil {
                 var settings = j.settings
                 settings.format = RecommendedFormat(w, h)
-                let known = Job(ordinal: o, settings: settings, seeds: j.seeds, references: j.references, previews: j.previews,
+                var known = Job(ordinal: o, settings: settings, seeds: j.seeds, references: j.references, previews: j.previews,
                                 defaultSteps: j.defaultSteps, plan: nil)
+                known.start = j.start
                 link.jobs[o] = known
             }
             // A grid's cells are known by their answer, as a render is: they may end before a snapshot shows them.
@@ -212,11 +213,10 @@ extension AppState {
     private func received(_ e: RemoteEntry, png data: Data, image: CGImage, vignette: CGImage, link: MirrorLink,
                           waiter: ((MirrorLink.Enlarged) -> Void)?) {
         var entry = Self.entry(e, png: data, vignette: vignette)
-        // Its edit images stay on the other Mac: named, for « Variations » (`RemoteReference.ofImage`).
-        entry.references = e.job.references.map {
-            ReferenceImage(source: .remote($0.origin), vignette: NSImage(systemSymbolName: "photo", accessibilityDescription: nil) ?? NSImage(),
-                           name: $0.name, width: $0.width, height: $0.height)
-        }
+        // Its edit images and its starting image stay on the other Mac: named, for « Variations » and « Redo »
+        // (`RemoteReference.ofImage`, `.startOf`).
+        entry.references = e.job.references.map(ReferenceImage.remote)
+        entry.start = e.job.start.map(ReferenceImage.remote)
         // An enlargement's source, when it is still in the history: the curtain lays it under the enlarged
         // image. None otherwise — no curtain, as for an edit whose images stayed on the other Mac.
         entry.enlargedFrom = e.enlargedFrom.flatMap { link.entries[$0]?.png }
