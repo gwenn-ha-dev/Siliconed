@@ -141,43 +141,21 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
         return neuralEngine ? .shared(.half, share) : .standard
     }
 
-    /// **A render's**, `of`'s — but for the Standard beside the ANE in flight, the engine's choice between it and the
-    /// Standard's bf16 on the GPU alone, each `declaration` timed on this Mac (`Block.choose`). Measured 20/11/2026 on
-    /// the mini at 1024², whose GPU runs bf16 as fast as f16: the shared forms cost its GPU alone 7 to 16 % over bf16,
-    /// and the ANE won that back on one DiT of five (−15 %), two even, two still slower (+7 to +9 %). Where bf16 runs
-    /// slower than f16 (the M1 Pro: 2.16 TFLOP/s against 3.50), the shared forms should win everywhere.
-    ///
-    /// **The Compact's codes**, one arithmetic on each unit (`SharedWeights`): beside the ANE in flight, on the GPU alone
-    /// too, each timed by `Block.choose`: the ANE kept only where the block is faster with it, as the Settings say.
-    /// Measured 21/11/2026 on the mini at 1024², int8 × int8: Krea 2 and Anima a step 3 % slower beside the ANE than
-    /// alone, at its least share (the ANE then read the codes `[out, in]`, transposed at every call).
-    package static func opened(codes: Bool, neuralEngine: Bool, _ declaration: (Arithmetic) -> Block.Declaration) throws -> Arithmetic {
-        let a = of(codes: codes, neuralEngine: neuralEngine)
-        let alone: Arithmetic
-        switch a {
-        case .shared(.codes, .inFlight): alone = .shared(.codes, .gpu)
-        case .shared(.half, .inFlight): alone = .standard
-        default: return a
-        }
-        let alternatives = [a, alone]
-        return alternatives[try Block.choose(alternatives.map { (declaration($0), $0.share) })]
-    }
-
     /// **Whether a DiT's file holds the Compact's codes**: its product `marker` (a key of the file, `.weight` included)
     /// stored I8.
     package static func codes(_ file: SafeTensors, marker: String) -> Bool { file.tensors[marker]?.dtype == "I8" }
 
-    /// **A render's DiT, opened**: its arithmetic `opened` under the Neural Engine switch, each alternative's
-    /// `declaration` timed where there is a choice; then the block of that
-    /// declaration under `budget` (`Block.open`), on the share the arithmetic says. `marker`: the product whose element
-    /// says the Compact (`codes`).
+    /// **A render's DiT, opened**: its arithmetic `of` its weights and the Neural Engine switch, then the block of that
+    /// `declaration` under `budget` (`Block.open`), on the share the arithmetic says. No other arithmetic is tried: with
+    /// the switch on, the shared forms end to end, their share of none (the GPU alone, the same functions) measured in
+    /// flight like any other (decided 24/11/2026: one arithmetic, one curve; its price on the M5 Pro at 1024², the
+    /// Standard's bf16 on the GPU alone 5.169 s a step against 5.21 in f16 beside the ANE, Krea 2, and 0.839 against
+    /// 0.94, Anima). `marker`: the product whose element says the Compact (`codes`).
     package static func block(file: SafeTensors, codes marker: String, budget: Int,
                               _ declaration: (Arithmetic) -> Block.Declaration) async throws -> (block: Block, arithmetic: Arithmetic) {
         guard let device = MTLCreateSystemDefaultDevice() else { throw ProgramError("no Metal device") }
-        let arithmetic = try opened(codes: Self.codes(file, marker: marker), neuralEngine: CoreAI.neuralEngineInForce, declaration)
-        // The Compact's GPU alone is the same declaration at no share: measured in flight (`Block.open`'s `alone`).
-        let block = try await Block.open(device, declaration(arithmetic), files: [file], budget: budget, share: arithmetic.share,
-                                         alone: arithmetic == .shared(.codes, .inFlight))
+        let arithmetic = of(codes: Self.codes(file, marker: marker), neuralEngine: CoreAI.neuralEngineInForce)
+        let block = try await Block.open(device, declaration(arithmetic), files: [file], budget: budget, share: arithmetic.share)
         return (block, arithmetic)
     }
 

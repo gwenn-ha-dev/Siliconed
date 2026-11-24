@@ -88,6 +88,7 @@ extension Block {
             _ = zeroMeasured(at: Double(end &- b.at) * 1e-9 - (b.moved ?? 0) - (b.climbed ?? 0), share: rows, seconds)
         }
         cycled(until: end)
+        keepRates()
         functions = [:]
         return stage.close()
     }

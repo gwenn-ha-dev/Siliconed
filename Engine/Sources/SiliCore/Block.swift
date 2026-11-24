@@ -74,10 +74,18 @@ public final class Block: @unchecked Sendable {
     /// The buffers a GPU call has read or written (`encode`).
     var seen = Set<ObjectIdentifier>()
     /// The cycle under way, told once done (`Stages.Event.cycle`): its start, the ANE's rows over it and their unit, whether
-    /// the unit was under trial, what its start loaded;
+    /// the unit was under trial, what its start loaded, whether its start's move to the share of none was refused under B;
     /// the calls of the cycle before, summed once timed (`rebalance`).
-    var begun: (at: UInt64, rows: Int, unit: Int, trying: Bool, moved: Double?, climbed: Double?, first: Bool)?
+    var begun: (at: UInt64, rows: Int, unit: Int, trying: Bool, moved: Double?, climbed: Double?, first: Bool, refused: Bool)?
     var lastCalls: Stages.Calls?
+    /// The share of none refused under B at this cycle's start (`probe`): told with the cycle, measured again at the next
+    /// opening (its pace not kept).
+    var zeroRefused = false
+    /// **What the cycle under way executes**, by unit, added up as its calls are made (`Signature.flops`, counted once as
+    /// each function was written): integers, no timing of their own; told with the cycle (`Stages.Cycle.flops`).
+    var flops = Stages.Flops()
+    /// The last warm cycle's rates and the pace key they go under, kept on this Mac at the block's close (`keepRates`).
+    var warmRates: (key: String, rates: Stages.Rates)?
     /// What the loop waited for the ring's weights, in seconds; what building and naming the functions took at open.
     public internal(set) var waited = 0.0
     public let named: Double
@@ -122,10 +130,13 @@ public final class Block: @unchecked Sendable {
     struct Signature {
         var inputs: [(String, [Int], NDArray.ScalarType)]
         var outputs: [(String, [Int], NDArray.ScalarType)]
+        /// What one call executes (`Aicode.Module.flops`).
+        var flops: Int
         init(_ m: Aicode.Module) {
             func t(_ e: Aicode.Entry) -> ([Int], NDArray.ScalarType) { let (s, el) = Aicode.shape(e); return (s, Block.scalar(el)) }
             inputs = zip(m.argumentNames, m.body.arguments).map { n, e in let (s, ty) = t(e); return (n, s, ty) }
             outputs = m.outputs.map { o in let (s, ty) = t(m.body.types[o.value]); return (o.name, s, ty) }
+            flops = m.flops
         }
     }
 

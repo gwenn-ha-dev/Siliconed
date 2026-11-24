@@ -7,8 +7,10 @@ import Foundation
 ///     flight    a block's ANE share in flight, in rows (`flight`: `Block`), where the next block of the same key starts
 ///     neuralUnits  a block's ANE unit, decided once by the first block of its key that ran long enough to try both
 ///               (`Block`), never changed after
-///     paces     a block's seconds a cycle at its kept unit, the median of its life's (`paces`: `Block`), what a client's
-///               choice among declarations of one computation reads (`Block.choose`)
+///     paces     a block's seconds a cycle at its kept unit, the median of its life's (`paces`: `Block`); the GPU
+///               alone's, under the key without a unit, says its share of none was measured (`Block.zero`)
+///     rates     a block's TFLOP/s over a warm cycle, and each unit's over its calls (`Stages.Rates`: `Block`), by its
+///               pace key
 ///     reserves  what a stage's functions took past its first signal, at its largest reading (`Stage.signal`)
 ///     readings  Core AI's share under a stage's functions, its largest reading — the hint a height is chosen on
 ///               (`Stage.estimates`); −1, the fuse stopped the process under them, a mark that holds for the engine
@@ -30,6 +32,9 @@ public struct ThisMac: Codable, Sendable, Equatable {
     /// functions specialized) — the median of its last block's, by its pace key (`Block.paceKey`) and, where it shares
     /// the ANE's rows, the unit it was taken at; nil in a file written before.
     public var paces: [String: Double]? = nil
+    /// A block's rates, TFLOP/s — over a warm cycle at its kept share, and each unit's over its calls (`Stages.Rates`) —
+    /// its last block's, by its pace key, as `paces`; nil in a file written before.
+    public var rates: [String: Stages.Rates]? = nil
     /// What Core AI's share grew past a stage's first signal, its largest reading, by the stage's key (`Stage.key`); nil in a
     /// file written before.
     public var reserves: [String: Int]? = nil

@@ -7,14 +7,11 @@ import Metal
 extension Block {
     /// **The block of `d` under `budget`**: the ANE's unit and share (`Share`; in flight, this Mac's last), its functions
     /// built at the calls' rows and named by their bytes, the plan of the first cut whose socle holds, the stage made; the
-    /// ANE's share said (`Stages.computed`).
-    /// `alone`: the same declaration on the GPU alone is one of its client's alternatives (`choose`) — its share of none
-    /// then measured in flight once (`zero`), the GPU alone's pace with it. Not where the GPU alone is another arithmetic:
-    /// measured 23/11/2026 at 1024² on the M5 Pro, bf16 weights rounded to f16 at 0 rows lost to their share (5.64 s a cycle
-    /// against 5.21, 1.00 against 0.94, two transformers) and to their bf16, which the choice times anyway: two cycles lost.
+    /// ANE's share said (`Stages.computed`). In flight, its share of none (the GPU alone, the same functions) is measured
+    /// once on this Mac like any other share (`zero`): a point of the same curve, legitimate wherever the ANE gains nothing.
     public static func open(_ device: MTLDevice, _ d: Declaration, files: [SafeTensors], budget: Int, share: Share,
-                            alone: Bool = false, measured: ThisMac = .current) async throws -> Block {
-        try await opened(device, d, files: files, budget: budget, share: share, alone: alone, measured: measured, trying: true)
+                            measured: ThisMac = .current) async throws -> Block {
+        try await opened(device, d, files: files, budget: budget, share: share, measured: measured, trying: true)
     }
 
     /// **The edges' functions**, each the GPU's or the ANE's (`Declaration.neuralEdges`). An edge of the ANE's reads no
@@ -37,7 +34,7 @@ extension Block {
     /// `trying`: the unit under trial where this Mac decided none (`UnitTrial`) — false where the plan with both units'
     /// surfaces does not hold under B: the block then runs at the first candidate, the trial left to a block that fits.
     private static func opened(_ device: MTLDevice, _ d: Declaration, files: [SafeTensors], budget: Int, share: Share,
-                               alone: Bool, measured: ThisMac, trying: Bool) async throws -> Block {
+                               measured: ThisMac, trying: Bool) async throws -> Block {
         let forms = Dictionary(uniqueKeysWithValues: d.forms.map { ($0.name, $0) })
         let used = d.used, shareable = d.shareable
         let surfaces = used.contains(where: \.shared) || !d.neuralEdges.isEmpty
@@ -132,7 +129,7 @@ extension Block {
             }
         }
         guard !plans.isEmpty else {
-            if trial != nil { return try await opened(device, d, files: files, budget: budget, share: share, alone: alone, measured: measured, trying: false) }
+            if trial != nil { return try await opened(device, d, files: files, budget: budget, share: share, measured: measured, trying: false) }
             throw refusal!
         }
         let estimates = Stage.estimates(extents: heights.map { ($0.key, $0.extent) }, measured: measured, budget: budget)
@@ -145,7 +142,7 @@ extension Block {
         let pace = told || d.tapped ? "" : try paceKey(d)
         let block = Block(d, stage: stage, heights: heights, height: height, unit: unit, total: total, units: units, share: share, key: key,
                           pace: (pace, shareable > 0 && share == .inFlight), trial: trial,
-                          zero: alone && inFlight && units > 0 && !pace.isEmpty && measured.paces?[pace] == nil,
+                          zero: inFlight && units > 0 && !pace.isEmpty && measured.paces?[pace] == nil,
                           shareable: shareable, neuralRows: neuralRows,
                           copies: copies, named: named, signatures: signatures, forms: forms, groups: groups, resolver: resolver)
         if let unit = decidedAtOpen(inFlight: inFlight, decided: decided, candidates: candidates, trying: trying) { block.keep(unit, best: [:]) }
@@ -155,9 +152,8 @@ extension Block {
 
     /// **The unit a block decides as it opens**, in flight where this Mac decided none: the one unit the shareable rows
     /// allow, or the first candidate where the plan with both units' surfaces did not hold under B (`trying` false) — the
-    /// unit it runs at, kept, so that its pace is kept under it and `choose` goes on to the alternatives never timed
-    /// (undecided, its pace is never read, and the first alternative is chosen again and again). Nil: decided already, or
-    /// left to the trial.
+    /// unit it runs at, kept, so that its pace is kept under it (undecided, a block's pace is never taken). Nil: decided
+    /// already, or left to the trial.
     static func decidedAtOpen(inFlight: Bool, decided: Int?, candidates: [Int], trying: Bool) -> Int? {
         guard inFlight && decided == nil, candidates.count == 1 || !trying else { return nil }
         return candidates[0]
@@ -184,44 +180,8 @@ extension Block {
         return "pace " + digest(bytes) + " of \(d.rows) rows"
     }
 
-    /// The key of a declaration's unit (`ThisMac.neuralUnits`); nil where none of its rows may go to the ANE.
-    static func unitKey(_ d: Declaration) throws -> String? {
-        let shareable = d.shareable
-        return shareable > 0 ? try key(d.used, shareable: shareable) : nil
-    }
-
     /// What a pace key carries once its block shares the ANE's rows: the unit it was taken at.
     static func byUnit(_ unit: Int) -> String { " by \(unit)" }
-
-    /// **Which of `alternatives` a client opens** — declarations of one computation, each its own arithmetic, each with
-    /// the share it would open at: the first never timed on this Mac (`ThisMac.paces`), each in turn, then the first within
-    /// 3 % of the fastest (`choiceMargin`).
-    /// Chosen here, by system (`ThisMac`), at the cost of one opening each at its own pace; an alternative's pace is its
-    /// last block's, a share in flight as far as it went. **The GPU alone beside the ANE in flight**: one declaration at
-    /// both shares is two alternatives, the GPU's pace its own (`byUnit` none) — the share of 0 rows, which a cycle's
-    /// calls do not predict: the GPU runs slower a row beside the ANE than alone (a block of int8 × int8 products on the
-    /// M5 Pro, 21/11/2026: its GPU alone predicted from its calls beside the ANE at 4.3 s a cycle, measured at 3.46).
-    public static func choose(_ alternatives: [(declaration: Declaration, share: Share)], measured: ThisMac = .current) throws -> Int {
-        // A pace counts at the unit kept (`pace`): a declaration that shares the ANE's rows has none until its unit is decided.
-        let paces = try alternatives.map { d, share -> Double? in
-            if case .told = share { preconditionFailure("a control's share is not chosen: it is the control's") }
-            var key = try paceKey(d)
-            if share == .inFlight, let block = try unitKey(d) {
-                guard let unit = measured.neuralUnits?[block] else { return nil }
-                key += byUnit(unit)
-            }
-            return measured.paces?[key]
-        }
-        if let first = paces.firstIndex(where: { $0 == nil }) { return first }
-        let fastest = paces.compactMap { $0 }.min()!
-        return paces.firstIndex { $0! * choiceMargin <= fastest }!
-    }
-
-    /// **What a later alternative must gain to be chosen**: 3 %, the share in flight's own (`rebalance`). Two paces of one
-    /// block come from two openings, each of its own heat and its own noise (1 to 3 % from one to the next); two
-    /// alternatives as fast as each other (2.375 and 2.387 s on the mini, 23/11/2026) would be chosen in turn, each
-    /// change another opening. The first within 3 % of the fastest is chosen: the order of the alternatives, the client's.
-    static let choiceMargin = 0.97
 
     /// **The ANE's rows a block never run on this Mac starts at**: the share of their shareable rows the blocks this Mac
     /// ran kept (`ThisMac.flight`), their median, of its own shareable rows, rounded; none kept, half. The share a block

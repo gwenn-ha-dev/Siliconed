@@ -32,51 +32,35 @@ import Testing
         return m
     }
 
-    /// **The choice among declarations of one computation**: the first never timed on this Mac, each in turn, then the
-    /// first within 3 % of the fastest; a key what the steps compute and the rows, never the name.
-    @Test func theChoiceTimesEachThenTakesTheFastest() throws {
+    /// **A pace key** (`ThisMac.paces`): what the steps compute and the rows, never the name.
+    @Test func aPaceKeyIsWhatTheStepsCompute() throws {
         var other = Self.declaration
         other.name = "the same block, named otherwise"
         #expect(try Block.paceKey(other) == Block.paceKey(Self.declaration))
         other.forms[0] = Block.Form("s", steps: [.init("pre"), .init("heads", on: .gpu)], bind: ["mask": .tensor("mask-a")]) { _, b in Self.module(rows: b.rows) }
-        let (a, b) = (try Block.paceKey(Self.declaration), try Block.paceKey(other))
-        #expect(a != b)
-        var measured = ThisMac()
-        #expect(try Block.choose([(Self.declaration, .inFlight), (other, .inFlight)], measured: measured) == 0)
-        // A declaration that shares the ANE's rows has a pace at its kept unit only: none before its unit is decided, none
-        // taken at another.
-        let (ua, ub) = (try #require(try Block.unitKey(Self.declaration)), try #require(try Block.unitKey(other)))
-        let (pa, pb) = (a + Block.byUnit(512), b + Block.byUnit(512))
-        measured.paces = [pa: 2.0, pb: 2.5]
-        #expect(try Block.choose([(Self.declaration, .inFlight), (other, .inFlight)], measured: measured) == 0)       // none decided: the first untimed
-        measured.neuralUnits = [ua: 1024]; measured.neuralUnits?[ub] = 512
-        #expect(try Block.choose([(Self.declaration, .inFlight), (other, .inFlight)], measured: measured) == 0)       // a's pace was taken at 512, not 1024
-        measured.neuralUnits = [ua: 512]; measured.neuralUnits?[ub] = 512
-        #expect(try Block.choose([(Self.declaration, .inFlight), (other, .inFlight)], measured: measured) == 0)
-        measured.paces = [pa: 2.0, pb: 1.5]
-        #expect(try Block.choose([(Self.declaration, .inFlight), (other, .inFlight)], measured: measured) == 1)
-        measured.paces = [pb: 1.5]
-        #expect(try Block.choose([(Self.declaration, .inFlight), (other, .inFlight)], measured: measured) == 0)
-        // One declaration beside the ANE and on the GPU alone: two paces, the GPU's without a unit.
-        let both: [(declaration: Block.Declaration, share: Block.Share)] = [(Self.declaration, .inFlight), (Self.declaration, .gpu)]
-        measured.paces = [pa: 2.0]
-        #expect(try Block.choose(both, measured: measured) == 1)       // the GPU alone never timed
-        measured.paces = [pa: 2.0, a: 1.9]
-        #expect(try Block.choose(both, measured: measured) == 1)
-        measured.paces = [pa: 2.0, a: 2.1]
-        #expect(try Block.choose(both, measured: measured) == 0)
-        // Within 3 % of the fastest, the first is kept (`choiceMargin`): two paces as fast are not chosen in turn.
-        measured.paces = [pa: 2.0, a: 1.96]
-        #expect(try Block.choose(both, measured: measured) == 0)
+        #expect(try Block.paceKey(other) != Block.paceKey(Self.declaration))
+    }
+
+    /// **A function's FLOP, counted by hand** (`Aicode.Module.flops`): `linear` x [1, 64, 128] · wᵀ, w [256, 128] —
+    /// 2·64·256·128; a batched product [2, 64, 32] · [2, 32, 48] — 2·2·64·48·32; a convolution x [1, 8, 16, 16] by a kernel
+    /// [4, 2, 3, 3] in 4 groups, padded to the same size — 2·(4·16·16)·(2·3·3); the elementwise op between them, none.
+    @Test func aFunctionCountsItsProductsFLOP() {
+        var m = Aicode.Module(arguments: [("x", Aicode.tensor([1, 64, 128], .f16)), ("w", Aicode.tensor([256, 128], .f16)),
+                                          ("a", Aicode.tensor([2, 64, 32], .f16)), ("b", Aicode.tensor([2, 32, 48], .f16)),
+                                          ("i", Aicode.tensor([1, 8, 16, 16], .f16)), ("k", Aicode.tensor([4, 2, 3, 3], .f16))])
+        let body = m.body
+        let y = body.linear(m.argument("x"), m.argument("w"))
+        let z = body.matmul(m.argument("a"), m.argument("b"), result: Aicode.tensor([2, 64, 48], .f16))
+        let c = body.convolution(m.argument("i"), m.argument("k"), stride: [1, 1], padding: [1, 1], dilation: [1, 1], groups: 4,
+                                 result: Aicode.tensor([1, 4, 16, 16], .f16))
+        m.outputs = [("y", body.binary(.mul, y, y)), ("z", z), ("c", c)]
+        #expect(m.flops == 2 * 64 * 256 * 128 + 2 * 2 * 64 * 48 * 32 + 2 * (4 * 16 * 16) * (2 * 3 * 3))
+        #expect(m.trimmed().flops == m.flops)
     }
 
     /// **A trial B refused** (the plan with both units' surfaces over B: the block reopened untried) runs at the first
-    /// candidate and keeps it decided, so that its pace is read under it and the choice goes on to the alternatives never
-    /// timed — undecided, the first alternative was chosen again and again.
-    @Test func aTrialRefusedUnderBDecidesTheFirstCandidate() throws {
-        var d = Self.declaration
-        d.rows = 4096
-        d.passes = [Block.Pass("p", rows: 0..<4096, shareable: 0..<4096), Block.Pass("other", rows: 0..<4096, bind: ["mask": .tensor("mask-b")])]
+    /// candidate and keeps it decided, so that its pace is taken under it — undecided, a block's pace is never taken.
+    @Test func aTrialRefusedUnderBDecidesTheFirstCandidate() {
         let candidates = UnitTrial.candidates(rows: 4096)
         #expect(candidates == [1024, 512])
         #expect(Block.decidedAtOpen(inFlight: true, decided: nil, candidates: candidates, trying: false) == 1024)
@@ -84,16 +68,6 @@ import Testing
         #expect(Block.decidedAtOpen(inFlight: true, decided: nil, candidates: [512], trying: true) == 512)          // one unit: at once
         #expect(Block.decidedAtOpen(inFlight: true, decided: 512, candidates: candidates, trying: false) == nil)    // decided before
         #expect(Block.decidedAtOpen(inFlight: false, decided: nil, candidates: candidates, trying: false) == nil)   // no share in flight
-        // The block ran at 1024 and kept its pace there; the GPU alone is the alternative never timed.
-        let (pace, unit) = (try Block.paceKey(d), try #require(try Block.unitKey(d)))
-        let both: [(declaration: Block.Declaration, share: Block.Share)] = [(d, .inFlight), (d, .gpu)]
-        var measured = ThisMac()
-        measured.paces = [pace + Block.byUnit(1024): 2.0]
-        #expect(try Block.choose(both, measured: measured) == 0)       // its unit undecided: its pace unread
-        measured.neuralUnits = [unit: 1024]
-        #expect(try Block.choose(both, measured: measured) == 1)
-        measured.paces?[pace] = 2.5
-        #expect(try Block.choose(both, measured: measured) == 0)
     }
 
     @Test func anArgumentIsBoundByItsNameFirstMatch() {

@@ -132,7 +132,8 @@ extension Block {
         switch z {
         case .due:
             let rows = units * unit
-            guard let loaded = try await move(to: unit, units: 0, keep: false) else { zero = nil; return nil }
+            // Refused under B: told with the cycle (`Stages.Cycle.refused`), measured again at the next opening.
+            guard let loaded = try await move(to: unit, units: 0, keep: false) else { zero = nil; zeroRefused = true; return nil }
             zero = .cold(rows: rows, seconds: last)
             return loaded
         case .cold(let rows, let seconds):
@@ -144,9 +145,10 @@ extension Block {
     }
 
     /// **A warm cycle at 0 rows taken `zero` seconds**, against `seconds` at `share` rows: the GPU alone's pace kept on
-    /// this Mac (`ThisMac.paces` under the pace's key without its unit, the GPU alone's own, which `choose` reads), and
+    /// this Mac (`ThisMac.paces` under the pace's key without its unit, the GPU alone's own: at the next opening, 0 was
+    /// measured), and
     /// the share of none kept where it took no more than 97 % of the share's (the 3 % a move in flight asks); the faster's
-    /// cycle the block's pace from now (`pace`), so that the next opening chooses without timing it again — the cycles'
+    /// cycle the block's pace from now (`pace`), so that the next opening does not measure it again — the cycles'
     /// starts dropped, so that what `timed` keeps after is the kept share's alone. True: 0 kept.
     func zeroMeasured(at zero: Double, share rows: Int, _ seconds: Double) -> Bool {
         self.zero = nil
@@ -190,14 +192,26 @@ extension Block {
     }
 
     /// **The cycle begun last, told done at `end`** (`Stages.Event.cycle`): at the next cycle's first group, or at the
-    /// block's close.
+    /// block's close. Its rates noted where it ran warm at the share kept — nothing loaded at its start, not the first, not
+    /// a trial's —, under the pace's key: kept on this Mac at the block's close (`keepRates`), no file written in flight.
     func cycled(until end: UInt64) {
-        defer { lastCalls = nil }
+        defer { lastCalls = nil; flops = Stages.Flops() }
         guard let b = begun else { return }
         begun = nil
-        Stages.tell(.cycle(Stages.Cycle(block: declaration.name, unit: b.unit, rows: b.rows, shareable: shareable / b.unit * b.unit,
-                                        trying: b.trying, seconds: Double(end &- b.at) * 1e-9, moved: b.moved, climbed: b.climbed,
-                                        calls: lastCalls)))
+        let cycle = Stages.Cycle(block: declaration.name, unit: b.unit, rows: b.rows, shareable: shareable / b.unit * b.unit,
+                                 trying: b.trying, seconds: Double(end &- b.at) * 1e-9, moved: b.moved, climbed: b.climbed,
+                                 calls: lastCalls, refused: b.refused, flops: flops)
+        Stages.tell(.cycle(cycle))
+        // The last cycle beside the ANE has no calls timed (`rebalance` times them at the next cycle's start): the one before kept.
+        guard !pace.isEmpty, b.moved == nil, b.climbed == nil, !b.first, !b.trying, b.rows == 0 || lastCalls != nil else { return }
+        warmRates = (pace, cycle.rates)
+    }
+
+    /// **The last warm cycle's rates, kept on this Mac** (`ThisMac.rates`), at the block's close: once a block, where they
+    /// moved by 1 % or more from those kept.
+    func keepRates() {
+        guard let (key, rates) = warmRates, ThisMac.current.rates?[key].map({ $0.moved(rates) }) ?? true else { return }
+        try? ThisMac.update { $0.rates = ($0.rates ?? [:]).merging([key: rates]) { $1 } }
     }
 
     /// **A cycle's shared passes with `a` rows the ANE's, predicted from their calls at `a0`**, as `run` orders them: each

@@ -121,3 +121,28 @@ extension Aicode {
         try Data(metadata.utf8).write(to: directory.appendingPathComponent("metadata.json"))
     }
 }
+
+extension Aicode.Module {
+    /// **The floating-point operations one call executes**, its products' and convolutions' — counted from the shapes of
+    /// their operands, once, as the function is written: 2·M·N·K a product (its batch included), 2 per weight a result
+    /// element a convolution. Every product the function runs, a rotation's and a low-rank path's too, and the rows its
+    /// call computes past what is read: what the unit did, not what the model needs. Elementwise ops are left out — a few
+    /// per element against K per product.
+    public var flops: Int { Self.flops(body) }
+
+    static func flops(_ block: Aicode.Block) -> Int {
+        block.ops.reduce(0) { sum, op in
+            switch op.name {
+            case "broadcasting_batch_matmul_v1":
+                let a = Aicode.shape(block.types[op.operands[0]]).shape, y = Aicode.shape(op.results[0]).shape
+                return sum + 2 * y.reduce(1, *) * (a.last ?? 0)
+            case "primitive.conv2d_v1", "primitive.conv3d_v1":
+                // The kernel [out, in / groups, spatial…]: each result element sums one weight of its row each.
+                let w = Aicode.shape(block.types[op.operands[1]]).shape, y = Aicode.shape(op.results[0]).shape
+                return sum + 2 * y.reduce(1, *) * w.dropFirst().reduce(1, *)
+            default:
+                return sum + (op.body.map(flops) ?? 0)
+            }
+        }
+    }
+}

@@ -58,11 +58,13 @@ extension Block {
         var written = Set<String>()
         let f = Self.edge(name), g = group.map { groups[$0]! } ?? held?.group
         if declaration.neuralEdges.contains(name) {
+            flops.ane += signatures[f]?.flops ?? 0
             await settled()
             let io = views(f, start: row, group: g, pass: nil, step: nil, call: bind, neural: true, written: &written)
             try await Run.neural(functions[f]!, inputs: io.inputs, outputs: io.outputs)
             return
         }
+        flops.gpu += signatures[f]?.flops ?? 0
         _ = try await encode(f, views(f, start: row, group: g, pass: nil, step: nil, call: bind, neural: false, written: &written))
     }
 
@@ -90,7 +92,8 @@ extension Block {
             var moved: Double?
             if case .inFlight = share, units > 0 || zero != nil { moved = try await rebalance(last: last, warm: warm) }
             cycled(until: at)
-            begun = (at, units * unit, unit, trial != nil || zero != nil, moved, climbed, first)
+            begun = (at, units * unit, unit, trial != nil || zero != nil, moved, climbed, first, zeroRefused)
+            zeroRefused = false
         }
         let t0 = DispatchTime.now().uptimeNanoseconds
         let weights = try stage.acquire(group)
@@ -132,6 +135,7 @@ extension Block {
                 if s.unit == .either && shared {
                     // What the ANE reads of the GPU's: every GPU call before, when the step before was the GPU's.
                     let gpu = afterGPU ? last : nil
+                    flops.ane += tiles.count * (signatures[Self.neural(g.form, s.name, ane)]?.flops ?? 0)
                     for u in tiles.indices {
                         let previous = launched.last?.task, c = calls[u][s.name]!
                         let function = c.function, ready = copied
@@ -154,6 +158,7 @@ extension Block {
                 }
                 for t in Self.calls(form, s, p, neural: neural, cut: cut, limit: p.limit ?? declaration.rows) {
                     let f = Self.gpu(g.form, s.name, t.rows, tapped: tapped && s.taps)
+                    flops.gpu += signatures[f]?.flops ?? 0
                     let timing = try await encode(f, views(f, start: t.start, group: g, pass: p, step: s, call: [:], neural: false, written: &written))
                     if shared, case .inFlight = share {
                         record.append(Timed(kind: s.unit == .either ? .past : .fixed, step: s.name, phase: Self.phase(form, i), rows: t.rows, timing: timing))

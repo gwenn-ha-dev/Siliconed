@@ -28,7 +28,9 @@ public enum Stages {
     /// **A cycle of a block, as it ran**: the ANE's rows over it at its unit (0: the GPU alone) of the rows it could
     /// take, whether the unit was under trial (`UnitTrial`: a block's first cycles on this Mac); its seconds from its first group to the next cycle's first (the last cycle's, to the block's close); what
     /// its start loaded, in seconds — the GPU's functions of a share moved (`moved`), of taller calls (`climbed`); nil,
-    /// nothing; its calls' seconds, where they were timed (a share in flight, every cycle but the last).
+    /// nothing; its calls' seconds, where they were timed (a share in flight, every cycle but the last); whether its
+    /// start's move to the share of none was refused under B (`Block.zero`: measured again at the next opening); what its
+    /// calls executed (`flops`), and the rates that gives (`rates`).
     public struct Cycle: Sendable, Equatable {
         public let block: String
         public let unit, rows, shareable: Int
@@ -36,6 +38,39 @@ public enum Stages {
         public let seconds: Double
         public let moved, climbed: Double?
         public let calls: Calls?
+        public let refused: Bool
+        public let flops: Flops
+
+        /// **Its rates, TFLOP/s**: the block's over its own seconds (what its start loaded left out); each unit's over its
+        /// calls' seconds, where they were timed.
+        public var rates: Rates {
+            let own = seconds - (moved ?? 0) - (climbed ?? 0), gpu = calls.map { $0.beside + $0.alone } ?? 0
+            return Rates(block: own > 0 ? Double(flops.ane + flops.gpu) / own / 1e12 : 0,
+                         ane: (calls?.ane ?? 0) > 0 ? Double(flops.ane) / calls!.ane / 1e12 : nil,
+                         gpu: gpu > 0 ? Double(flops.gpu) / gpu / 1e12 : nil)
+        }
+    }
+
+    /// **What a cycle's calls executed**, by unit (`Aicode.Module.flops`): counted as each function is written, added up
+    /// as its calls are made — no timing, no wait of their own.
+    public struct Flops: Sendable, Equatable {
+        public internal(set) var ane = 0, gpu = 0
+    }
+
+    /// **A block's rates, TFLOP/s**: over a cycle (`block`), and each unit's over its own calls (nil: not timed — the
+    /// GPU alone, the last cycle).
+    public struct Rates: Codable, Sendable, Equatable {
+        public let block: Double
+        public let ane, gpu: Double?
+
+        /// Whether `other` moved by 1 % or more from these, any of the three.
+        func moved(_ other: Rates) -> Bool {
+            func far(_ a: Double?, _ b: Double?) -> Bool {
+                guard let a, let b else { return (a == nil) != (b == nil) }
+                return abs(a - b) >= 0.01 * max(abs(a), abs(b))
+            }
+            return far(block, other.block) || far(ane, other.ane) || far(gpu, other.gpu)
+        }
     }
 
     /// **A cycle's calls, their seconds summed**: the ANE's; the GPU's beside them (past the ANE's rows); the GPU's
