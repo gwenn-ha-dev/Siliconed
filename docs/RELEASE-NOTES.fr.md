@@ -2,6 +2,36 @@
 
 # Siliconed — notes de version
 
+## 0.32 · Rhossili
+
+Toujours sur le sable de Rhossili : la 0.32 rend le rédacteur de l'Atelier de prompts aux Mac de 16 Go, rend les fine-tunes que Civitai publie en fp8 et en fp16, et finit plus tôt le premier rendu d'un modèle sur un Mac.
+
+### Corrigé
+
+- **Réécrire et Décrire écrivaient « !!!! » en Compacte** (issue 19), donc sur les Mac qui font tourner le rédacteur en Compacte, ceux de 16 Go d'abord : sa dernière couche perdait ses échelles quand elle tenait en un morceau, et chaque mot sortait comme le premier du vocabulaire. Corrigé, et un mot s'écrit un peu plus vite (94,4 → 90,4 ms au Mac mini M5 Pro).
+- **Sur un Mac qui n'avait encore rien mesuré, le décodeur d'Anima et de Krea 2 restait à ses bandes les plus fines**, rendu après rendu : 2,6 s un décodage en 1024² là où ses plus larges bandes en prennent une fraction. Anima Standard en 1024² sur un Mac mini neuf : 9,5 → 7,7 s dès le deuxième rendu.
+- **L'image ne bouge plus dans le canevas pendant un rendu** : la barre sous elle (la progression, puis les actions de l'image) se pose sur son pied, et change de hauteur sans la pousser.
+- **Un téléchargement interrompu dit ce qu'il va vraiment reprendre** : les morceaux déjà entiers sont gardés, et la fenêtre Modèles (et `siliconed library install`) donne à part ce qui reste à télécharger et la place que le disque doit encore donner.
+
+### Vos modèles
+
+- **Les fine-tunes en fp16 et en fp8 « scaled » de ComfyUI se rendent**, lus comme le bf16 qu'ils contiennent (un poids fp8, ce sont ses codes fois son unique échelle) ; un fine-tune int8 dont les petits tenseurs sont en fp16 se rend aussi. Un fp8 à une échelle par rangée reste refusé, par son nom.
+- **Le premier rendu d'un fp8 ou d'un fp16 importé est aussi rapide que celui d'un bf16** : un Krea 2 en fp8, 1024², 8 pas au Mac mini, 212 → 45 s, les mêmes vitesses au bit près.
+- **Un modèle plus profond que sa famille est refusé par son nom** à l'import, au lieu de rendre une image fausse sur ses premières couches : « Fn-Moment-Anima-29B-V5.safetensors a 40 couches là où Anima Turbo en a 28 : pas encore pris en charge, bientôt. » (`import_deeper_model`).
+
+### Plus rapide
+
+- **Un modèle jamais rendu sur ce Mac part de la part du Neural Engine que ce Mac a gardée pour les autres**, là où il partait de la moitié : le premier rendu de Krea 2 Standard en 1024² au Mac mini, 45,3 → 39,7 s.
+- **La Compacte chronomètre le GPU seul dans son premier rendu**, si bien que le deuxième rendu ne l'essaie plus : il rend dès le départ par la voie la plus rapide. Un choix entre deux voies ne change que pour 3 % ou plus, plus tour à tour au gré du bruit.
+- **Temps** au Mac mini M5 Pro, 1024², 8 pas, le modèle chargé. La Compacte : Z-Image 18,3 → 16,2 s, Anima 9,1 → 8,2, Krea 2 30,5 → 27,8, MOSS-Image 19,7 → 18,1, Qwen-Image-2.1 24,0 → 21,0. La Standard : Z-Image 23,1 → 21,7 s, Anima 7,9 → 7,7, MOSS-Image 23,0 → 21,7, Qwen-Image-2.1 32,4 → 29,4, et Krea 2 39,6 → 41,1, plus lent, pas encore expliqué. Ceux du M1 Pro de 16 Go restent ceux de la 0.30 ([Chiffres](ENGINE.fr.md#les-chiffres)).
+
+### L'app
+
+- **« Compilation Core AI… »** remplace « Préparation pour ce Mac, une fois… » pendant que Core AI compile les fonctions d'un modèle, et l'inspecteur Chaîne en donne le temps. Sous le DiT, l'inspecteur montre chaque pas d'un premier rendu : la part du Neural Engine, ses secondes, celles du Neural Engine et du GPU, les pas d'essai marqués, puis la part gardée. `silicontrol status` dit `calibrating` pendant ce temps.
+- **Une image de départ se rend sur un autre Mac** : la fenêtre propose l'image de départ, Rendre à nouveau et les variations sur un Mac suivi comme sur le sien.
+- **Présentation › Zoom avant, Zoom arrière, Taille ajustée en ligne de commande** : `silicontrol zoom in|out|fit`, le geste du menu, sur l'image ou les cases d'une série.
+- **Rendre sur un autre Mac** : les deux Mac en 0.32.
+
 ## 0.31 · Rhossili
 
 Toujours sur le sable de Rhossili : la 0.31, c'est le moteur de la 0.30 rendu plus rapide, la Compact d'abord, et tenu de plus près sous sa limite de mémoire.

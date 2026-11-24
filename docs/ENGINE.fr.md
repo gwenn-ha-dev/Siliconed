@@ -66,13 +66,13 @@ Les cinq modèles à 1024², 8 pas, graine 42, réglages par défaut de l'app, s
 
 | | Mac mini M5 Pro, 64 Go · Standard | Mac mini M5 Pro, 64 Go · Compact | M1 Pro, 16 Go · Compact, 0.30 |
 |---|---:|---:|---:|
-| Z-Image Turbo | 23,1 s | 18,3 s | 75,9 s (93,5) |
-| Anima Turbo | 7,9 s | 9,1 s | 33,6 s (45,8) |
-| Krea 2 Turbo | 39,6 s | 30,5 s | 128,1 s (149,6) |
-| MOSS-Image | 23,0 s | 19,7 s | 76,4 s (99,3) |
-| Qwen-Image-2.1 Turbo | 32,4 s | 24,0 s | 97,7 s (120,7) |
+| Z-Image Turbo | 21,7 s | 16,2 s | 75,9 s (93,5) |
+| Anima Turbo | 7,7 s | 8,2 s | 33,6 s (45,8) |
+| Krea 2 Turbo | 41,1 s | 27,8 s | 128,1 s (149,6) |
+| MOSS-Image | 21,7 s | 18,1 s | 76,4 s (99,3) |
+| Qwen-Image-2.1 Turbo | 29,4 s | 21,0 s | 97,7 s (120,7) |
 
-La colonne du M1 Pro est encore celle de la 0.30, jusqu'à sa mesure en 0.31.
+La colonne du M1 Pro est encore celle de la 0.30, jusqu'à sa prochaine mesure.
 
 **La Compact lit moitié moins d'octets que la Standard**, sur le disque comme en mémoire, et là où le GPU multiplie l'int8 en int32, elle calcule aussi plus vite : au Mac mini, un pas de son DiT à 1024² va de 10 à 40 % plus vite qu'en 0.30, son int8 × int8 contre le W8A16 de la 0.30. Là où le budget ne tient pas les poids de la Standard, c'est la version qui lit le moins.
 

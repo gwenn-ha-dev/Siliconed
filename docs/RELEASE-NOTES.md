@@ -2,6 +2,36 @@ English · [Français](RELEASE-NOTES.fr.md)
 
 # Siliconed — release notes
 
+## 0.32 · Rhossili
+
+Still on Rhossili's sand: 0.32 gives the Prompt Lab's writer back to 16 GB Macs, renders the fine-tunes Civitai publishes in fp8 and fp16, and gets a model's first render on a Mac done sooner.
+
+### Fixed
+
+- **Rewrite and Describe wrote « !!!! » in the Compact** (issue 19), so on the Macs that run the writer in its Compact, 16 GB ones first: its last layer lost its scales when it fit in one piece, and every word came out as the first of the vocabulary. Fixed, and a word is a little faster to write (94.4 → 90.4 ms on the Mac mini M5 Pro).
+- **On a Mac that had measured nothing yet, Anima's and Krea 2's decoder stayed at its narrowest bands**, render after render: 2.6 s a decode at 1024² where its widest bands take a fraction of it. Anima Standard at 1024² on a fresh Mac mini: 9.5 → 7.7 s from the second render.
+- **The image no longer moves on the canvas during a render**: the bar under it (the progress, then the image's actions) lies over its foot, and changes height without pushing it.
+- **An interrupted download says what it will really fetch again**: the pieces already whole are kept, and the Models window (and `siliconed library install`) gives apart what is left to download and the room the disk still has to give.
+
+### Your models
+
+- **Fine-tunes in fp16 and in ComfyUI's « scaled » fp8 render**, read as the bf16 they hold (an fp8 weight is its codes times its one scale); an int8 fine-tune whose small tensors are in fp16 renders too. An fp8 with one scale per row is still refused, by name.
+- **The first render of an imported fp8 or fp16 is as fast as a bf16's**: a Krea 2 in fp8, 1024², 8 steps on the Mac mini, 212 → 45 s, the same velocities to the bit.
+- **A model deeper than its family is refused by name** at its import, instead of rendering a wrong image on its first layers: « Fn-Moment-Anima-29B-V5.safetensors has 40 layers where Anima Turbo has 28: not supported yet, coming soon. » (`import_deeper_model`).
+
+### Faster
+
+- **A model never rendered on this Mac starts at the Neural Engine share this Mac kept for the others**, where it started at half: Krea 2 Standard's first render at 1024² on the Mac mini, 45.3 → 39.7 s.
+- **The Compact times the GPU alone within its first render**, so the second render no longer tries it: it renders at the faster way from the start. A choice between two ways changes only for 3 % or more, no longer by turns on noise.
+- **Times** on the Mac mini M5 Pro, 1024², 8 steps, the model loaded. The Compact: Z-Image 18.3 → 16.2 s, Anima 9.1 → 8.2, Krea 2 30.5 → 27.8, MOSS-Image 19.7 → 18.1, Qwen-Image-2.1 24.0 → 21.0. The Standard: Z-Image 23.1 → 21.7 s, Anima 7.9 → 7.7, MOSS-Image 23.0 → 21.7, Qwen-Image-2.1 32.4 → 29.4, and Krea 2 39.6 → 41.1, slower, not yet traced. The 16 GB M1 Pro's are still 0.30's ([Numbers](ENGINE.md#numbers)).
+
+### The app
+
+- **« Core AI compilation… »** replaces « Preparing for this Mac, once… » while Core AI compiles a model's functions, and the Chain inspector gives its time. Under the DiT, the inspector shows each step of a first render: the Neural Engine's share, its seconds, the Neural Engine's and the GPU's, the trial's steps marked, then the share kept. `silicontrol status` says `calibrating` meanwhile.
+- **A starting image renders on another Mac**: the window offers the start image, Render Again and the variations on a followed Mac as it does on its own.
+- **View › Zoom In, Zoom Out, Zoom to Fit from the command line**: `silicontrol zoom in|out|fit`, the menu's gesture, on the image or a series' cells.
+- **Render on another Mac**: both Macs on 0.32.
+
 ## 0.31 · Rhossili
 
 Still on Rhossili's sand: 0.31 is the engine of 0.30 made faster, the Compact first, and held closer to its memory limit.
