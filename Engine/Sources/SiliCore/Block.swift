@@ -236,8 +236,10 @@ public final class Block: @unchecked Sendable {
     /// order, composites' insides included — what a kin names (`Stage.Extent`): under the same name, other ops or other
     /// element types are another kin; the same ops at other sizes — another height, another size, intermediates larger
     /// or smaller — the same kin, a reading of one bounding the other by the ratio of their results' elements
-    /// (`Stage.Extent.ratio(over:)`) —; and its results' elements, summed and the largest.
-    static func walk(_ body: Aicode.Block) -> (ops: String, results: Int, largest: Int) {
+    /// (`Stage.Extent.ratio(over:)`) —; and its results' elements, summed and the largest. `kinds`: the digest of the
+    /// same ops and element types each once, sorted — what a function of bands computes apart from how many bands it
+    /// writes (`Bands.extent`).
+    static func walk(_ body: Aicode.Block) -> (ops: String, kinds: String, results: Int, largest: Int) {
         var ops: [String] = [], results = 0, largest = 0
         func visit(_ b: Aicode.Block) {
             for op in b.ops {
@@ -256,7 +258,7 @@ public final class Block: @unchecked Sendable {
             }
         }
         visit(body)
-        return (digest(Data(ops.joined(separator: " ").utf8)), results, largest)
+        return (digest(Data(ops.joined(separator: " ").utf8)), digest(Data(Set(ops).sorted().joined(separator: " ").utf8)), results, largest)
     }
 
     /// A hash's first 8 bytes in hexadecimal: what a key on this Mac names (`paceKey`, `key`).

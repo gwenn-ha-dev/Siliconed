@@ -56,7 +56,8 @@ extension Bands {
     }
 
     /// **The output `name` as its bands** (`Geometry.Output`): `value` `[1, C, rows, W]` and its factors `[rows]` cut in
-    /// `name0`, `name0_factor`, …; a whole write's rows past the plane's added, zeros and factors of 1.
+    /// `name0`, `name0_factor`, …; a whole write's rows past the plane's added, zeros and factors of 1. A slice a band,
+    /// one band too: the function's kinds of ops the same at every band's height (`Bands.extent`).
     public static func split(_ b: Aicode.Block, _ name: String, value: Int, factor: Int?, _ o: Geometry.Output) -> [(String, Int)] {
         var (v, f) = (value, factor)
         if o.held > o.rows {
@@ -67,8 +68,8 @@ extension Bands {
         let rho = o.held / o.bands
         var out: [(String, Int)] = []
         for i in 0..<o.bands {
-            out.append(("\(name)\(i)", o.bands == 1 ? v : b.slice(v, axis: 2, start: i * rho, size: rho)))
-            if let f { out.append(("\(name)\(i)_factor", o.bands == 1 ? f : b.slice(f, axis: 0, start: i * rho, size: rho))) }
+            out.append(("\(name)\(i)", b.slice(v, axis: 2, start: i * rho, size: rho)))
+            if let f { out.append(("\(name)\(i)_factor", b.slice(f, axis: 0, start: i * rho, size: rho))) }
         }
         return out
     }

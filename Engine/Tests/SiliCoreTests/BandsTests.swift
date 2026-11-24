@@ -52,6 +52,28 @@ import Testing
         #expect(tall.ratio(over: small) == 2 && small.ratio(over: tall) == 10.0 / 18)
     }
 
+    /// **A whole layer at any band's height, the same kin**: its output written as the bands of the plane that holds
+    /// it (`Bands.split`), one slice a band — more slices in finer bands, the same kinds of ops.
+    @Test func aWholeLayerIsTheSameKinInFinerBands() throws {
+        func plan(_ positions: Int) -> Bands {
+            let head = Bands.Function("head") { g in
+                let o = g.outputs["y"]!
+                var m = Aicode.Module(arguments: [("latent", Aicode.tensor([1, o.channels, o.rows, o.width], .f16))])
+                m.outputs = Bands.split(m.body, "y", value: m.argument("latent"), factor: nil, o)
+                return m
+            }
+            let f = Bands.Function("conv") { _ in Aicode.Module(arguments: []) }
+            return Bands.surveyed(positions: positions, element: .float16, factors: false) { p in
+                let latent = p.plane(8, rows: 64, width: 64), y = p.plane(8, rows: 64, width: 64), z = p.plane(8, rows: 64, width: 64)
+                p.layer(head, reads: [Bands.Read("latent", latent)], writes: [Bands.Write("y", y)], whole: true)
+                p.layer(f, reads: [Bands.Read("x", y, before: true, after: true)], writes: [Bands.Write("y", z)])
+            }
+        }
+        let (coarse, fine) = (plan(1 << 12), plan(1 << 9))
+        #expect(coarse.calls.count < fine.calls.count)
+        #expect(try coarse.extent("p", inFlight: 2).kin == fine.extent("p", inFlight: 2).kin)
+    }
+
     /// A band's window is masked past either end of the plane, and an output's rows past its end are given as not valid.
     @Test func theMasksCutThePlanesEnds() {
         let (p, _, _, _) = Self.plan(rows: 100)

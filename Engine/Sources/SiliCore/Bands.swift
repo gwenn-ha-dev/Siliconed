@@ -313,16 +313,20 @@ public struct Bands: Sendable {
 
     /// **What its calls hold, by names the same at any size** (`Stage.Extent`): of each function in the order of its
     /// first call, numbered among those of its key, each window's elements (its rows each side counted) and each
-    /// output's; its kin named from these names, their elements' type, what each function computes (`Block.walk`: its
-    /// ops), `prefix` and the calls kept in flight. A plane of another size moves a function's widths and rows, not its
-    /// place in the network nor its ops.
+    /// output's; its kin named from these names, their elements' type, what each function computes (`Block.walk`: the
+    /// kinds of its ops, each once), `prefix` and the calls kept in flight. A plane of another size moves a function's
+    /// widths and rows, not its place in the network nor its kinds of ops. Not its ops in order: a whole layer writes its
+    /// output as the bands of the plane that holds it (`split`), one slice each, so that its ops in order were another
+    /// kin at each band's height — no reading of one height bounded another, and a stage whose soberest form was read
+    /// alone never took a taller one again (a network of bands on the M5 Pro, 24/11/2026: bands of 2048 positions read, those
+    /// of 16 384 unknown, its run 2.64 s; its whole render 9.49 → 7.73 s once the kin held at every height).
     public func extent(_ prefix: String, inFlight: Int) throws -> Stage.Extent {
         var named: [Shaped: String] = [:], count: [String: Int] = [:], elements: [String: Int] = [:], lines = ["prefix \(prefix)"]
         for call in calls where named[call.function] == nil {
             let key = call.function.key, name = "\(key)#\(count[key, default: 0])"
             count[key, default: 0] += 1
             named[call.function] = name
-            lines.append("\(name) ops \(Block.walk(try functions[call.function]!.build(call.function.geometry).body).ops)")
+            lines.append("\(name) ops \(Block.walk(try functions[call.function]!.build(call.function.geometry).body).kinds)")
             for (n, w) in call.geometry.windows {
                 elements["\(name) \(n)"] = (w.held + (w.before ? 1 : 0) + (w.after ? 1 : 0)) * w.width * w.channels
                 lines.append("\(name) \(n) \(w.element)")
