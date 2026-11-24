@@ -319,7 +319,7 @@ public struct Bands: Sendable {
     /// output as the bands of the plane that holds it (`split`), one slice each, so that its ops in order were another
     /// kin at each band's height — no reading of one height bounded another, and a stage whose soberest form was read
     /// alone never took a taller one again (a network of bands on the M5 Pro, 24/11/2026: bands of 2048 positions read, those
-    /// of 16 384 unknown, its run 2.64 s; its whole render 9.49 → 7.73 s once the kin held at every height).
+    /// of 16 384 unknown, its run 2.64 s; its client's whole run 9.49 → 7.73 s once the kin held at every height).
     public func extent(_ prefix: String, inFlight: Int) throws -> Stage.Extent {
         var named: [Shaped: String] = [:], count: [String: Int] = [:], elements: [String: Int] = [:], lines = ["prefix \(prefix)"]
         for call in calls where named[call.function] == nil {
