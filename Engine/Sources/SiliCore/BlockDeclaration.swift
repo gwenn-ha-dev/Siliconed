@@ -62,6 +62,12 @@ extension Block {
         public init(rows: Int, tapped: Bool = false, neural: Bool = false) {
             self.rows = rows; self.tapped = tapped; self.neural = neural
         }
+
+        /// The module `write` builds for this unit: its blocks know it (`Aicode.neural`), and the guard writes its
+        /// factors as that unit computes them best (`ranged16`).
+        func module(_ write: (Build) throws -> Aicode.Module) rethrows -> Aicode.Module {
+            try Aicode.$neural.withValue(neural) { try write(self) }
+        }
     }
 
     public struct Form: Sendable {

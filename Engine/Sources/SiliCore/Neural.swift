@@ -144,12 +144,26 @@ extension Aicode.Block {
     /// not round on either unit (875 factors not a power of two). t / F is exact on the GPU, and on the ANE but for 147
     /// values in 3.9 million — a −0 given as +0, a quotient under f16's smallest normal rounded to a step of its own.
     /// The engine's division by the peak, not a power of two, is inexact on the ANE in nearly every row.
-    public func ranged16(_ t: Int, under e0: Double) -> (unit: Int, factor: Int) { ranged16(t, exponent: scale("sub", binade(peak(t)), e0 - 1)) }
+    ///
+    /// **The GPU's function computes F in f32, by `round`** (`ranged`, the f32 guard's: the largest in [2^(e₀−1), 2^e₀],
+    /// within [−13, 15], F cast to f16 at the border, exact): `binade`'s count and `power16` are dozens of small ops a
+    /// row between two passes, which the GPU runs one after the other. Measured 24/11/2026 on the M5 Pro, a shared block
+    /// of 2048 channels at 4096 rows on the GPU alone: its three updates 4.70 → 4.42 ms, 2.55 → 2.16, 12.94 → 12.74, the
+    /// same functions without any guard 3.43, 1.77, 11.32. The two units' rows may then differ in their bits, never in range.
+    public func ranged16(_ t: Int, under e0: Double) -> (unit: Int, factor: Int) {
+        neural ? ranged16(t, exponent: scale("sub", binade(peak(t)), e0 - 1)) : rounded16(t, under: scalar(e0, .f32))
+    }
 
     /// The same with e₀ a value of the graph (an argument, `Recipe.target`): a label of its own, so that a literal exponent is never
     /// read as a value's index.
     public func ranged16(_ t: Int, target e0: Int) -> (unit: Int, factor: Int) {
-        ranged16(t, exponent: scale("add", binary(.sub, binade(peak(t)), e0), 1))
+        neural ? ranged16(t, exponent: scale("add", binary(.sub, binade(peak(t)), e0), 1)) : rounded16(t, under: castUnlessSame(e0, to: .f32))
+    }
+
+    /// The GPU's `ranged16`: the f32 guard's factor (`ranged`, t f16: F within f16's normals), in f16 at the border.
+    private func rounded16(_ t: Int, under e0: Int) -> (unit: Int, factor: Int) {
+        let (u, f) = ranged(t, under: e0)
+        return (u, cast(f, to: .f16))
     }
 
     private func ranged16(_ t: Int, exponent e: Int) -> (unit: Int, factor: Int) {

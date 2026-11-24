@@ -22,7 +22,7 @@ extension Block {
         var modules: [String: (module: Aicode.Module, unit: ComputeUnitKind)] = [:]
         for (name, build) in d.edges {
             let neural = d.neuralEdges.contains(name)
-            let m = try build(Build(rows: 0, neural: neural))
+            let m = try Build(rows: 0, neural: neural).module(build)
             if neural, let codes = Signature(m).inputs.first(where: { $0.2 == .int8 }) {
                 throw Failure("\(d.name): edge \(name) of the ANE's reads the codes \(codes.0), which the ANE reads only from a shared form's copy")
             }
@@ -73,7 +73,7 @@ extension Block {
         var modules: [String: (module: Aicode.Module, unit: ComputeUnitKind)] = [:]
         for f in used where units > 0 {
             for u in tried {
-                for s in f.steps where s.unit == .either { modules[neural(f.name, s.name, u)] = (try f.module(s.name, Build(rows: u, neural: true)), .neuralEngine) }
+                for s in f.steps where s.unit == .either { modules[neural(f.name, s.name, u)] = (try Build(rows: u, neural: true).module { try f.module(s.name, $0) }, .neuralEngine) }
             }
         }
         modules.merge(try edges(d)) { $1 }
@@ -187,7 +187,7 @@ extension Block {
     /// they share.
     static func key(_ used: [Form], shareable: Int) throws -> String {
         var bytes = Data()
-        for f in used { for s in f.steps where s.unit == .either { bytes += try f.module(s.name, Build(rows: 64, neural: true)).trimmed().bytecode() } }
+        for f in used { for s in f.steps where s.unit == .either { bytes += try Build(rows: 64, neural: true).module { try f.module(s.name, $0) }.trimmed().bytecode() } }
         return "block " + digest(bytes) + " of \(shareable) rows"
     }
 
