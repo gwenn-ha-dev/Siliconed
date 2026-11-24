@@ -64,12 +64,19 @@ public final class Block: @unchecked Sendable {
     let neuralRows: Set<String>
     /// The unit under trial (`UnitTrial`; nil: decided).
     var trial: UnitTrial?
+    /// **The share of none, measured once on this Mac** (`probe`): a block whose GPU alone was never timed here, its
+    /// unit decided, runs two cycles at 0 rows — the GPU alone on the same functions and weights, what no cycle beside
+    /// the ANE predicts: the GPU runs faster a row alone than beside it — the first cold (its calls carry their
+    /// specialization), the second against a warm cycle at the share; the faster kept. `due`: to run once a warm cycle at
+    /// the share ran; `cold`, `measured`: at 0 now, the share it left and that share's cycle seconds. Nil: none to run.
+    var zero: Zero?
+    enum Zero: Equatable { case due, cold(rows: Int, seconds: Double), measured(rows: Int, seconds: Double) }
     /// The buffers a GPU call has read or written (`encode`).
     var seen = Set<ObjectIdentifier>()
     /// The cycle under way, told once done (`Stages.Event.cycle`): its start, the ANE's rows over it and their unit, whether
     /// the unit was under trial, what its start loaded;
     /// the calls of the cycle before, summed once timed (`rebalance`).
-    var begun: (at: UInt64, rows: Int, unit: Int, trying: Bool, moved: Double?, climbed: Double?)?
+    var begun: (at: UInt64, rows: Int, unit: Int, trying: Bool, moved: Double?, climbed: Double?, first: Bool)?
     var lastCalls: Stages.Calls?
     /// What the loop waited for the ring's weights, in seconds; what building and naming the functions took at open.
     public internal(set) var waited = 0.0
@@ -84,7 +91,7 @@ public final class Block: @unchecked Sendable {
     var starts: [String: [UInt64]] = [:], kept: Double?
     /// The pace key now: none while the unit is under trial — a cycle at another unit is no pace of the unit kept —, else
     /// the key at the unit the block runs at.
-    var pace: String { paceBase.isEmpty || trial != nil ? "" : paceBase + (paceByUnit ? Self.byUnit(unit) : "") }
+    var pace: String { paceBase.isEmpty || trial != nil || zero != nil ? "" : paceBase + (paceByUnit ? Self.byUnit(unit) : "") }
     var functions: [String: InferenceFunction]
     var signatures: [String: Signature]
     let groups: [String: Group]
@@ -256,10 +263,11 @@ public final class Block: @unchecked Sendable {
     static func digest(_ bytes: Data) -> String { Data(SHA256.hash(data: bytes)).prefix(8).map { String(format: "%02x", $0) }.joined() }
 
     init(_ d: Declaration, stage: Stage, heights: [Height], height: Int, unit: Int, total: Int, units: Int, share: Share, key: String,
-                 pace: (base: String, byUnit: Bool), trial: UnitTrial?, shareable: Int, neuralRows: Set<String>, copies: Set<String>, named: Double,
+                 pace: (base: String, byUnit: Bool), trial: UnitTrial?, zero: Bool, shareable: Int, neuralRows: Set<String>, copies: Set<String>, named: Double,
                  signatures: [String: Signature], forms: [String: Form], groups: [String: Group], resolver: Resolver) {
         (declaration, self.stage, self.heights, self.height, self.unit, self.total, self.units, self.share) = (d, stage, heights, height, unit, total, units, share)
         (self.key, self.paceBase, self.paceByUnit, self.trial, self.shareable, self.home, self.neuralRows) = (key, pace.base, pace.byUnit, trial, shareable, unit, neuralRows)
+        self.zero = zero ? .due : nil
         (self.copies, self.named, self.signatures, self.forms, self.groups, self.resolver) = (copies, named, signatures, forms, groups, resolver)
         functions = stage.functions
         passes = Dictionary(uniqueKeysWithValues: d.passes.map { ($0.name, $0) })

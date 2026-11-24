@@ -175,7 +175,9 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
                               _ declaration: (Arithmetic) -> Block.Declaration) async throws -> (block: Block, arithmetic: Arithmetic) {
         guard let device = MTLCreateSystemDefaultDevice() else { throw ProgramError("no Metal device") }
         let arithmetic = try opened(codes: Self.codes(file, marker: marker), neuralEngine: CoreAI.neuralEngineInForce, declaration)
-        let block = try await Block.open(device, declaration(arithmetic), files: [file], budget: budget, share: arithmetic.share)
+        // The Compact's GPU alone is the same declaration at no share: measured in flight (`Block.open`'s `alone`).
+        let block = try await Block.open(device, declaration(arithmetic), files: [file], budget: budget, share: arithmetic.share,
+                                         alone: arithmetic == .shared(.codes, .inFlight))
         return (block, arithmetic)
     }
 

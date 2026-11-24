@@ -82,7 +82,12 @@ extension Block {
         // A copy prepared ahead writes into the arena: done, or its wait for the ring's next use given up, first.
         stage.stopPeeking()
         copier.sync {}
-        cycled(until: DispatchTime.now().uptimeNanoseconds)
+        let end = DispatchTime.now().uptimeNanoseconds
+        // A run that ended on its measured cycle at 0 rows: decided here, the next opening at the share kept.
+        if case .measured(let rows, let seconds) = zero, let b = begun {
+            _ = zeroMeasured(at: Double(end &- b.at) * 1e-9 - (b.moved ?? 0) - (b.climbed ?? 0), share: rows, seconds)
+        }
+        cycled(until: end)
         functions = [:]
         return stage.close()
     }

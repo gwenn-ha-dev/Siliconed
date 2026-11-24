@@ -70,8 +70,9 @@ extension Block {
     /// told that cycle's seconds — its own work, what its start loaded left out — and answers: a cold cycle moves no share
     /// (its calls carry the specialization), a measured one moves to the unit next with the share it predicted best, in
     /// rows, rounded to the unit's; the last settles on the faster (`settle`).
-    func rebalance() async throws -> Double? {
+    func rebalance(last: Double?, warm: Bool) async throws -> Double? {
         defer { cycleRecords = [] }
+        if trial == nil, let z = zero, let last, z != .due || warm { return try await probe(z, last: last) }
         var records: [[Timed]] = []
         for r in cycleRecords {
             var record = r
@@ -123,12 +124,49 @@ extension Block {
         return (predicted(records, measured: a0, rows: k * unit), k * unit)
     }
 
+    /// **The share of none, measured** (`zero`), at a cycle's first group, the unit decided: `due`, the cycle before ran
+    /// warm at the share — its seconds noted, the block moved to 0 rows (not kept on this Mac yet; refused under B, no
+    /// probe); `cold`, the cycle before was the first at 0 — dropped; `measured`, it was the second (`zeroMeasured`).
+    /// The seconds the loading took; nil, nothing moved.
+    private func probe(_ z: Zero, last: Double) async throws -> Double? {
+        switch z {
+        case .due:
+            let rows = units * unit
+            guard let loaded = try await move(to: unit, units: 0, keep: false) else { zero = nil; return nil }
+            zero = .cold(rows: rows, seconds: last)
+            return loaded
+        case .cold(let rows, let seconds):
+            zero = .measured(rows: rows, seconds: seconds)
+            return nil
+        case .measured(let rows, let seconds):
+            return zeroMeasured(at: last, share: rows, seconds) ? nil : try await move(to: unit, units: rows / unit)
+        }
+    }
+
+    /// **A warm cycle at 0 rows taken `zero` seconds**, against `seconds` at `share` rows: the GPU alone's pace kept on
+    /// this Mac (`ThisMac.paces` under the pace's key without its unit, the GPU alone's own, which `choose` reads), and
+    /// the share of none kept where it took no more than 97 % of the share's (the 3 % a move in flight asks); the faster's
+    /// cycle the block's pace from now (`pace`), so that the next opening chooses without timing it again — the cycles'
+    /// starts dropped, so that what `timed` keeps after is the kept share's alone. True: 0 kept.
+    func zeroMeasured(at zero: Double, share rows: Int, _ seconds: Double) -> Bool {
+        self.zero = nil
+        starts = starts.mapValues { Array($0.suffix(1)) }
+        let (blockKey, alone, atShare, wins) = (key, paceBase, pace, zero <= 0.97 * seconds)
+        kept = wins ? zero : seconds
+        let paces = [alone: zero, atShare: kept!].filter { !$0.key.isEmpty }
+        try? ThisMac.update {
+            $0.paces = ($0.paces ?? [:]).merging(paces) { $1 }
+            if wins { $0.flight = ($0.flight ?? [:]).merging([blockKey: 0]) { $1 } }
+        }
+        return wins
+    }
+
     /// **The ANE's share moved to `n` units of `target`** rows, if what the move loads holds under B: the functions it
     /// loads, their estimate — their reading on this Mac, or a bound from their kin's, the share now among them
     /// (`estimated`) —, holding under B beside what is kept (`Stage.rekey`); a set the fuse stopped or with no bound never
     /// taken. Another unit: the surfaces the ANE reads copied into that unit's, the block runs at
     /// it from here. Its rows kept on this Mac. The seconds the loading took; nil, nothing moved.
-    private func move(to target: Int, units n: Int) async throws -> Double? {
+    private func move(to target: Int, units n: Int, keep: Bool = true) async throws -> Double? {
         let rows = n * target, moving = try form(units: n, unit: target, cut: cut), share = max(stage.observe(), 0)
         guard let estimate = estimated([moving], share: share, now: try form(units: units, unit: unit, cut: cut))[0].bytes,
               stage.rekey(moving.key, expects: estimate - share, extent: moving.extent) else { return nil }
@@ -147,7 +185,7 @@ extension Block {
         let loaded = Functions.seconds(since: t)
         told()
         let blockKey = key
-        try? ThisMac.update { $0.flight = ($0.flight ?? [:]).merging([blockKey: rows]) { $1 } }
+        if keep { try? ThisMac.update { $0.flight = ($0.flight ?? [:]).merging([blockKey: rows]) { $1 } } }
         return loaded
     }
 

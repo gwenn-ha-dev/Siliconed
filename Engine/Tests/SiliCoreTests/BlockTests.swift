@@ -33,7 +33,7 @@ import Testing
     }
 
     /// **The choice among declarations of one computation**: the first never timed on this Mac, each in turn, then the
-    /// fastest; a key what the steps compute and the rows, never the name.
+    /// first within 3 % of the fastest; a key what the steps compute and the rows, never the name.
     @Test func theChoiceTimesEachThenTakesTheFastest() throws {
         var other = Self.declaration
         other.name = "the same block, named otherwise"
@@ -64,6 +64,9 @@ import Testing
         measured.paces = [pa: 2.0, a: 1.9]
         #expect(try Block.choose(both, measured: measured) == 1)
         measured.paces = [pa: 2.0, a: 2.1]
+        #expect(try Block.choose(both, measured: measured) == 0)
+        // Within 3 % of the fastest, the first is kept (`choiceMargin`): two paces as fast are not chosen in turn.
+        measured.paces = [pa: 2.0, a: 1.96]
         #expect(try Block.choose(both, measured: measured) == 0)
     }
 

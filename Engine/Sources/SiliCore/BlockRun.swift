@@ -80,12 +80,17 @@ extension Block {
         precondition(until == nil || form.steps.contains { $0.name == until }, "\(group): no step \(until!)")
         if group == declaration.cycle.first {
             let at = DispatchTime.now().uptimeNanoseconds
+            // The cycle before's own seconds, what its start loaded left out; warm, its functions the ones the cycle
+            // before it called (nothing moved nor climbed at its start, not the first).
+            let last = begun.map { Double(at &- $0.at) * 1e-9 - ($0.moved ?? 0) - ($0.climbed ?? 0) }
+            let warm = begun.map { $0.moved == nil && $0.climbed == nil && !$0.first } ?? false
+            let first = begun == nil
             timed(pass)
             let climbed = try await climb()
             var moved: Double?
-            if case .inFlight = share, units > 0 { moved = try await rebalance() }
+            if case .inFlight = share, units > 0 || zero != nil { moved = try await rebalance(last: last, warm: warm) }
             cycled(until: at)
-            begun = (at, units * unit, unit, trial != nil, moved, climbed)
+            begun = (at, units * unit, unit, trial != nil || zero != nil, moved, climbed, first)
         }
         let t0 = DispatchTime.now().uptimeNanoseconds
         let weights = try stage.acquire(group)
