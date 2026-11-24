@@ -5,12 +5,10 @@ import Foundation
 /// predicts, measured once here and read by every plan after.
 ///
 ///     flight    a block's ANE share in flight, in rows (`flight`: `Block`), where the next block of the same key starts
-///     neuralUnits  a block's ANE unit, decided once by the first block of its key that ran long enough to try both
-///               (`Block`), never changed after
-///     paces     a block's seconds a cycle at its kept unit, the median of its life's (`paces`: `Block`); the GPU
-///               alone's, under the key without a unit, says its share of none was measured (`Block.zero`)
-///     rates     a block's TFLOP/s over a warm cycle, and each unit's over its calls (`Stages.Rates`: `Block`), by its
-///               pace key
+///     capacities  by arithmetic (the ANE reads codes or f16): the ANE's unit, decided once by the first block that ran
+///               long enough to try both (`UnitTrial`), and the ANE's rate against the GPU's beside it (`Capacity`)
+///     zeros     a block's cycle at 0 rows, measured once by key (`Block.zero`)
+///     rates     a block's TFLOP/s over a warm cycle, and each unit's over its calls (`Stages.Rates`: `Block`), by key
 ///     reserves  what a stage's functions took past its first signal, at its largest reading (`Stage.signal`)
 ///     readings  Core AI's share under a stage's functions, its largest reading — the hint a height is chosen on
 ///               (`Stage.estimates`); −1, the fuse stopped the process under them, a mark that holds for the engine
@@ -25,16 +23,26 @@ import Foundation
 public struct ThisMac: Codable, Sendable, Equatable {
     /// A block's ANE share in flight, its rows, by its key (`Block`); nil in a file written before.
     public var flight: [String: Int]? = nil
-    /// A block's ANE unit, its rows, by its key: decided once and kept (`Block.settle`). A field of its own: the units an
-    /// earlier rule kept (`units`, some never measured) are not read.
-    public var neuralUnits: [String: Int]? = nil
-    /// A block's seconds a cycle — between two starts of its cycle over one pass, the first cycle's left out (its
-    /// functions specialized) — the median of its last block's, by its pace key (`Block.paceKey`) and, where it shares
-    /// the ANE's rows, the unit it was taken at; nil in a file written before.
-    public var paces: [String: Double]? = nil
+    /// **What this Mac's ANE does beside its GPU, by arithmetic** (`Block.arithmetic`: the ANE reads codes, or f16): the
+    /// same for every block of that arithmetic, whatever its model or size. Nil in a file written before.
+    public var capacities: [String: Capacity]? = nil
+    /// **A block's cycle at 0 rows**, its seconds, by its key: the share of none measured once (`Block.zero`). Nil in a
+    /// file written before.
+    public var zeros: [String: Double]? = nil
     /// A block's rates, TFLOP/s — over a warm cycle at its kept share, and each unit's over its calls (`Stages.Rates`) —
-    /// its last block's, by its pace key, as `paces`; nil in a file written before.
+    /// its last block's, by its key; nil in a file written before.
     public var rates: [String: Stages.Rates]? = nil
+
+    /// **An arithmetic's capacities on this Mac**: the ANE's unit (`UnitTrial`, decided once: no formula tells 512 from
+    /// 1024 — a call's fixed cost and the share's rounding pull apart, by 0.4 to 8 %); and `ratio`, the ANE's rate against
+    /// the GPU's beside it, FLOP for FLOP over a cycle's shared steps, smoothed from block to block — the share a block
+    /// never run here starts at, S · ratio / (1 + ratio): each step's own ratio lies within ±10 % of the cycle's
+    /// (24/11/2026 on the M5 Pro, two transformers of 6 and 13 billion weights, 0.29 to 0.39), less than a unit of the share apart.
+    public struct Capacity: Codable, Sendable, Equatable {
+        public var unit: Int? = nil
+        public var ratio: Double? = nil
+        public init(unit: Int? = nil, ratio: Double? = nil) { (self.unit, self.ratio) = (unit, ratio) }
+    }
     /// What Core AI's share grew past a stage's first signal, its largest reading, by the stage's key (`Stage.key`); nil in a
     /// file written before.
     public var reserves: [String: Int]? = nil

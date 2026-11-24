@@ -32,13 +32,14 @@ import Testing
         return m
     }
 
-    /// **A pace key** (`ThisMac.paces`): what the steps compute and the rows, never the name.
-    @Test func aPaceKeyIsWhatTheStepsCompute() throws {
-        var other = Self.declaration
-        other.name = "the same block, named otherwise"
-        #expect(try Block.paceKey(other) == Block.paceKey(Self.declaration))
-        other.forms[0] = Block.Form("s", steps: [.init("pre"), .init("heads", on: .gpu)], bind: ["mask": .tensor("mask-a")]) { _, b in Self.module(rows: b.rows) }
-        #expect(try Block.paceKey(other) != Block.paceKey(Self.declaration))
+    /// **A block's arithmetic** (`ThisMac.capacities`): the codes where a group reads them, f16 otherwise.
+    @Test func anArithmeticIsWhatTheANEReads() {
+        var d = Self.declaration
+        #expect(Block.arithmetic(d) == "f16")
+        d.groups[0].weights = [("w", "w.weight", .halfTransposed)]
+        #expect(Block.arithmetic(d) == "f16")
+        d.groups[0].weights = [("w", "w", .codes)]
+        #expect(Block.arithmetic(d) == "codes")
     }
 
     /// **A function's FLOP, counted by hand** (`Aicode.Module.flops`): `linear` x [1, 64, 128] · wᵀ, w [256, 128] —
@@ -207,11 +208,49 @@ import Testing
         #expect(UnitTrial.units(rows: 100, of: 1024, shareable: 4096) == 1)
     }
 
-    /// An entry of the rule before (`units`) is no decision: the key reads `neuralUnits` alone.
+    /// The entries of the rules before (`units`, `neuralUnits`: a unit by key; `paces`) are no decision: the unit is read
+    /// by arithmetic alone, and a block whose share of none was timed before measures it once more.
     @Test func anOldEntryDecidesNothing() throws {
-        let old = #"{"units": {"block k": 256}, "flight": {"block k": 1024}}"#
+        let old = #"{"units": {"block k": 256}, "neuralUnits": {"block k": 512}, "paces": {"pace p": 1.5}, "flight": {"block k": 1024}}"#
         let m = try JSONDecoder().decode(ThisMac.self, from: Data(old.utf8))
-        #expect(m.neuralUnits == nil && m.flight?["block k"] == 1024)
+        #expect(m.capacities == nil && m.zeros == nil && m.flight?["block k"] == 1024)
+    }
+
+    /// **A move pays** where its gain a cycle passes the noise, and over the cycles left its cost and the noise; never
+    /// said, over one cycle.
+    @Test func aMovePaysOverTheCyclesLeft() {
+        func pays(_ gain: Double, left: Int?) -> Bool { Block.pays(gain, noise: 0.02, cost: 0.3, left: left) }
+        #expect(!pays(0.01, left: 9))       // under the noise
+        #expect(!pays(0.1, left: nil))      // one cycle: 0.1 < 0.32
+        #expect(pays(0.4, left: nil))
+        #expect(pays(0.1, left: 5))         // 0.5 > 0.32
+        #expect(!pays(0.1, left: 0))        // the last: one cycle at most
+    }
+
+    /// **A value smoothed** at a half-life of two cycles: the first taken as it is.
+    @Test func aValueIsSmoothedOverTwoCycles() {
+        #expect(Block.smoothing(nil, 1) == 1)
+        let twice = Block.smoothing(Block.smoothing(1, 0), 0)
+        #expect(abs(twice - 0.5) < 0.01)
+    }
+
+    /// **The best share among those admitted**: one B refuses is never predicted, even the fastest.
+    @Test func theBestShareIsOneBAdmits() {
+        typealias T = Block.Timed
+        let cycle = [[T(kind: .neural, step: "s", phase: 0, rows: 1024, seconds: 1.0),
+                      T(kind: .past, step: "s", phase: 0, rows: 3072, seconds: 3.0)]]
+        // A row 1 ms on both: the balance at half.
+        #expect(Block.bestShare(cycle, measured: 1024, unit: 1024, shareable: 4096).rows == 2048)
+        #expect(Block.bestShare(cycle, measured: 1024, unit: 1024, shareable: 4096, admitted: [1, 3]).rows == 1024)
+    }
+
+    /// **A group's calls summed by step**: what a share's count of calls changes, its steps do not.
+    @Test func callsAreSummedByStep() {
+        typealias T = Block.Timed
+        let s = T.summed([T(kind: .neural, step: "a", phase: 0, rows: 512, seconds: 1, flops: 10),
+                          T(kind: .neural, step: "a", phase: 0, rows: 512, seconds: 2, flops: 10),
+                          T(kind: .past, step: "a", phase: 0, rows: 3072, seconds: 4)])
+        #expect(s.count == 2 && s[0].rows == 1024 && s[0].seconds == 3 && s[0].flops == 20 && s[1].kind == .past)
     }
 
     /// A phase lasts the longer of its units; a `gpu` step what it did. The GPU's past rows shrink as the ANE's grow.
@@ -323,14 +362,10 @@ import Testing
     }
 }
 
-/// **A block never run on this Mac starts at the share its blocks kept** (`Block.startRows`): their median share of their
-/// shareable rows, of its own; half on a Mac that kept none; a key not the engine's read as none.
-@Test func aNewBlockStartsAtTheShareThisMacKept() {
-    var mac = ThisMac()
-    #expect(Block.startRows(mac, shareable: 4096) == 2048)
-    mac.flight = ["block a of 4096 rows": 1024, "block b of 6144 rows": 1536, "block c of 4096 rows": 512, "other": 4000]
-    #expect(Block.startRows(mac, shareable: 4096) == 1024)
-    #expect(Block.startRows(mac, shareable: 16384) == 4096)
-    #expect(Block.shareableRows("block 1030f43e05ddb547 of 4056 rows") == 4056)
-    #expect(Block.shareableRows("pace 1030f43e05ddb547 of 4056 rows") == nil)
+/// **A block never run on this Mac starts where its ANE and GPU finish together** (`Block.startRows`): S · ρ / (1 + ρ);
+/// half where no ratio was measured.
+@Test func aNewBlockStartsWhereBothUnitsFinishTogether() {
+    #expect(Block.startRows(ratio: nil, shareable: 4096) == 2048)
+    #expect(Block.startRows(ratio: 1.0 / 3, shareable: 4096) == 1024)
+    #expect(Block.startRows(ratio: 0.37, shareable: 4096) == 1106)
 }

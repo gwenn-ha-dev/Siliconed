@@ -18,6 +18,8 @@ final class RenderLoopTests: XCTestCase {
         var decodesNaN = false
         var cancellation: Cancellation?
         var evaluations = 0
+        /// The evaluations left the loop told the DiT, before each.
+        var told: [Int] = []
         var decoderOpened = 0
         var decoded = 0
     }
@@ -62,6 +64,12 @@ final class RenderLoopTests: XCTestCase {
         XCTAssertEqual(unusable.map(\.1), [.denoising])
         XCTAssertEqual(images, [0, 2], "each image keeps its index in the batch")
         XCTAssertEqual(decoding, [0, 2], "the decoding announced for the images decoded alone")
+    }
+
+    /// **The evaluations left**, told before each: this image's and the batch's after it, down to the last.
+    func testTheDiTIsToldTheEvaluationsLeft() throws {
+        _ = try run(seeds: [1, 2, 3])
+        XCTAssertEqual(Self.script.told, [6, 5, 4, 3, 2, 1])
     }
 
     /// Image 0's times hold the text and the DiT's opening; another's, its own denoising and decoding alone.
@@ -146,6 +154,7 @@ private struct LoopParts: RenderParts {
 }
 
 private final class LoopDiT: RenderDenoiser {
+    func expect(evaluations: Int) { RenderLoopTests.script.told.append(evaluations) }
     func derivative(_ latent: [Float], sigma: Float, solver: Solver, first: Bool) throws -> [Float] {
         let n = RenderLoopTests.script.evaluations
         RenderLoopTests.script.evaluations += 1

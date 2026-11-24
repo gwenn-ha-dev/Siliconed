@@ -102,6 +102,13 @@ enum MemoryStages {
                     + (c.calls.map { String(format: " [ANE %.2f, GPU beside %.2f, alone %.2f]", $0.ane, $0.beside, $0.alone) } ?? "")
             }
             print("flight \(e.name): the ANE's rows of \(first.shareable) by \(first.unit), each cycle: " + cycles.joined(separator: ", "))
+            // Each cycle's calls step by step: a call's fixed cost and its rate, read apart on a line through the steps.
+            for (n, c) in e.cycles.enumerated() {
+                guard let steps = c.calls?.steps, !steps.isEmpty else { continue }
+                print("calls \(e.name) cycle \(n + 1) at \(c.rows) rows: " + steps.map {
+                    String(format: "%@ %@ %d calls %d rows %.5f s %.4g FLOP", $0.unit, $0.name, $0.calls, $0.rows, $0.seconds, Double($0.flops))
+                }.joined(separator: "; "))
+            }
             if let w = e.weighed {
                 let costs = w.seconds.keys.sorted(by: >).map { String(format: "%d: %.2f s at %d rows", $0, w.seconds[$0]!, w.rows[$0] ?? 0) }.joined(separator: ", ")
                 print("flight \(e.name): unit decided, a cycle at each unit's best share: \(costs.isEmpty ? "none, a single unit" : costs); kept \(w.kept)")

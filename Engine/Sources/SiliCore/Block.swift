@@ -39,11 +39,13 @@ import Metal
 ///
 /// **The ANE's share** (`Share`) in units of `unit` rows of the shareable rows from their start, every unit one call of
 /// one ANE function a step, from its byte offset in each per-row tensor's surface (`Arena.take(units:)`): none, a
-/// control's (`told`), or found in flight — each cycle's calls timed, the share moved at the next cycle to the one
-/// `predicted` to finish first (phase by phase, as `run` orders the calls) if it gains 3 % at least, its rows kept on this
-/// Mac (`ThisMac.flight`). **The unit is the engine's**, decided once per block key on this Mac (`ThisMac.neuralUnits`),
-/// never changed after: a finer unit balances the two closer, each a call more of the ANE's. The first block of a key to
-/// run finds it undecided, builds both candidates (`UnitTrial`), runs cycles at each, and keeps the faster (`settle`).
+/// control's (`told`), or followed in flight (`rebalance`) — each cycle's calls timed and smoothed, the share moved at
+/// the next cycle to the one `predicted` to finish first (phase by phase, as `run` orders the calls) among those that
+/// hold under B, where what it gains over the cycles left pays its move, its rows kept on this Mac (`ThisMac.flight`).
+/// A key never run here starts at the share this Mac's ANE and GPU balance at (`ThisMac.Capacity.ratio`). **The unit is
+/// the engine's**, decided once per arithmetic on this Mac (`ThisMac.Capacity.unit`), never changed after: a finer unit
+/// balances the two closer, each a call more of the ANE's. The first block of an arithmetic to run finds it undecided,
+/// builds both candidates (`UnitTrial`), runs cycles at each, and keeps the faster (`settle`).
 public final class Block: @unchecked Sendable {
     // MARK: - The block
 
@@ -84,22 +86,25 @@ public final class Block: @unchecked Sendable {
     /// **What the cycle under way executes**, by unit, added up as its calls are made (`Signature.flops`, counted once as
     /// each function was written): integers, no timing of their own; told with the cycle (`Stages.Cycle.flops`).
     var flops = Stages.Flops()
-    /// The last warm cycle's rates and the pace key they go under, kept on this Mac at the block's close (`keepRates`).
-    var warmRates: (key: String, rates: Stages.Rates)?
+    /// The last warm cycle's rates, kept on this Mac at the block's close (`keepRates`).
+    var warmRates: Stages.Rates?
     /// What the loop waited for the ring's weights, in seconds; what building and naming the functions took at open.
     public internal(set) var waited = 0.0
     public let named: Double
 
     let share: Share
-    /// The block's key on this Mac: its ANE's steps and its shareable rows (`ThisMac.flight`, `ThisMac.neuralUnits`).
-    let key: String
-    /// Its pace key (`paceKey`, `ThisMac.paces`; empty: not timed) and whether it carries the unit (`pace`), each pass's
-    /// cycle starts, the pace last kept.
-    let paceBase: String, paceByUnit: Bool
-    var starts: [String: [UInt64]] = [:], kept: Double?
-    /// The pace key now: none while the unit is under trial — a cycle at another unit is no pace of the unit kept —, else
-    /// the key at the unit the block runs at.
-    var pace: String { paceBase.isEmpty || trial != nil || zero != nil ? "" : paceBase + (paceByUnit ? Self.byUnit(unit) : "") }
+    /// The block's key on this Mac: its ANE's steps and its shareable rows (`ThisMac.flight`, `zeros`, `rates`); its
+    /// arithmetic (`arithmetic`: `ThisMac.capacities`).
+    let key: String, arithmetic: String
+    /// **What the share follows** (`rebalance`): the shares of whole units that hold under B as estimated (`admit`; a
+    /// move refused in flight takes its share out); each cycle's calls smoothed (`smoothed`); the noise between two warm
+    /// cycles at one share and what a move costs, both measured on this block; the cycles its client said are left
+    /// (`expect`); the cycle before's own seconds and share, and the first's; the ANE's rate against the GPU's, smoothed.
+    var admitted: (unit: Int, counts: Set<Int>)?
+    var smoothed: [[Timed]] = [], smoothedAt: (rows: Int, unit: Int)?
+    var noise: Double?, cost: Double?, left: Int?
+    var previous: (seconds: Double, rows: Int, warm: Bool)?, firstCycle: Double?
+    var ratio: Double?
     var functions: [String: InferenceFunction]
     var signatures: [String: Signature]
     let groups: [String: Group]
@@ -272,14 +277,14 @@ public final class Block: @unchecked Sendable {
         return (digest(Data(ops.joined(separator: " ").utf8)), digest(Data(Set(ops).sorted().joined(separator: " ").utf8)), results, largest)
     }
 
-    /// A hash's first 8 bytes in hexadecimal: what a key on this Mac names (`paceKey`, `key`).
+    /// A hash's first 8 bytes in hexadecimal: what a key on this Mac names (`key`).
     static func digest(_ bytes: Data) -> String { Data(SHA256.hash(data: bytes)).prefix(8).map { String(format: "%02x", $0) }.joined() }
 
     init(_ d: Declaration, stage: Stage, heights: [Height], height: Int, unit: Int, total: Int, units: Int, share: Share, key: String,
-                 pace: (base: String, byUnit: Bool), trial: UnitTrial?, zero: Bool, shareable: Int, neuralRows: Set<String>, copies: Set<String>, named: Double,
+                 arithmetic: String, trial: UnitTrial?, zero: Bool, shareable: Int, neuralRows: Set<String>, copies: Set<String>, named: Double,
                  signatures: [String: Signature], forms: [String: Form], groups: [String: Group], resolver: Resolver) {
         (declaration, self.stage, self.heights, self.height, self.unit, self.total, self.units, self.share) = (d, stage, heights, height, unit, total, units, share)
-        (self.key, self.paceBase, self.paceByUnit, self.trial, self.shareable, self.home, self.neuralRows) = (key, pace.base, pace.byUnit, trial, shareable, unit, neuralRows)
+        (self.key, self.arithmetic, self.trial, self.shareable, self.home, self.neuralRows) = (key, arithmetic, trial, shareable, unit, neuralRows)
         self.zero = zero ? .due : nil
         (self.copies, self.named, self.signatures, self.forms, self.groups, self.resolver) = (copies, named, signatures, forms, groups, resolver)
         functions = stage.functions

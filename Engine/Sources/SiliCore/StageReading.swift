@@ -91,6 +91,19 @@ extension Stage {
     /// the new functions are first called in (`signal`), not on the lower functions' numbers before the taller ones took
     /// their working memory. `extent`: what the new functions hold, kept beside their reading. `false`: nothing changed.
     public func rekey(_ key: String, expects: Int, extent: Extent? = nil) -> Bool {
+        guard holds(expects: expects) else { return false }
+        return rekeyed(key, expects: expects, extent: extent)
+    }
+
+    /// **Whether functions whose share grows by `expects` would hold** under B beside what is kept now: `rekey`'s rule,
+    /// nothing changed — what a block weighs its shares by before it moves (`Block.admit`).
+    public func holds(expects: Int) -> Bool {
+        let (share, now, current) = read()
+        let extra = max(expects, 0)
+        return lock.withLock { now + (share - current) + promised + extra + left(share) + max(Stage.margin, (share + extra) / 20) <= plan.budget }
+    }
+
+    private func rekeyed(_ key: String, expects: Int, extent: Extent?) -> Bool {
         let (share, now, current) = read()
         let reserve = measured.reserves?[key], extra = max(expects, 0)
         let old = lock.withLock { () -> (key: String, reading: Int, extent: Extent?)? in

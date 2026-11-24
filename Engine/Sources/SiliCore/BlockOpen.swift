@@ -42,8 +42,9 @@ extension Block {
 
         // The unit and the share.
         let key = shareable > 0 ? try Self.key(used, shareable: shareable) : ""
+        let arithmetic = Self.arithmetic(d), capacity = measured.capacities?[arithmetic]
         let candidates = UnitTrial.candidates(rows: shareable)
-        let decided = measured.neuralUnits?[key].flatMap { candidates.contains($0) ? $0 : nil }
+        let decided = capacity?.unit.flatMap { candidates.contains($0) ? $0 : nil }
         var unit = decided ?? candidates[0], units = 0
         let inFlight = share == .inFlight && shareable > 0 && !d.tapped
         var trial: UnitTrial? = nil
@@ -61,7 +62,8 @@ extension Block {
             let total = shareable / unit
             // A block whose share of none was kept here (`probe`) runs on the GPU alone, its ANE neither built nor placed.
             if total > 1, measured.flight?[key] != 0 {
-                units = min(max((measured.flight?[key] ?? startRows(measured, shareable: shareable)) / unit, 1), total - 1)
+                let rows = measured.flight?[key] ?? startRows(ratio: capacity?.ratio, shareable: shareable)
+                units = UnitTrial.units(rows: rows, of: unit, shareable: shareable)
             }
         }
         let total = shareable / unit
@@ -137,12 +139,9 @@ extension Block {
         signatures = modules.mapValues { Signature($0.module) }
         let named = Functions.seconds(since: began)
         let stage = try await Stage(device, plan: plans[height], files: files, measured: measured)
-        // Timed where it runs as its client's loop runs it: not under a control's share, nor tapped.
-        let told: Bool = if case .told = share { true } else { false }
-        let pace = told || d.tapped ? "" : try paceKey(d)
         let block = Block(d, stage: stage, heights: heights, height: height, unit: unit, total: total, units: units, share: share, key: key,
-                          pace: (pace, shareable > 0 && share == .inFlight), trial: trial,
-                          zero: inFlight && units > 0 && !pace.isEmpty && measured.paces?[pace] == nil,
+                          arithmetic: arithmetic, trial: trial,
+                          zero: inFlight && units > 0 && measured.zeros?[key] == nil,
                           shareable: shareable, neuralRows: neuralRows,
                           copies: copies, named: named, signatures: signatures, forms: forms, groups: groups, resolver: resolver)
         if let unit = decidedAtOpen(inFlight: inFlight, decided: decided, candidates: candidates, trying: trying) { block.keep(unit, best: [:]) }
@@ -150,10 +149,9 @@ extension Block {
         return block
     }
 
-    /// **The unit a block decides as it opens**, in flight where this Mac decided none: the one unit the shareable rows
-    /// allow, or the first candidate where the plan with both units' surfaces did not hold under B (`trying` false) — the
-    /// unit it runs at, kept, so that its pace is kept under it (undecided, a block's pace is never taken). Nil: decided
-    /// already, or left to the trial.
+    /// **The unit a block decides as it opens**, in flight where this Mac decided none for its arithmetic: the one unit
+    /// the shareable rows allow, or the first candidate where the plan with both units' surfaces did not hold under B
+    /// (`trying` false) — the unit it runs at, kept. Nil: decided already, or left to the trial.
     static func decidedAtOpen(inFlight: Bool, decided: Int?, candidates: [Int], trying: Bool) -> Int? {
         guard inFlight && decided == nil, candidates.count == 1 || !trying else { return nil }
         return candidates[0]
@@ -170,38 +168,19 @@ extension Block {
         return order.filter { layouts[$0] != nil }.max { counts[layouts[$0]!]! < counts[layouts[$1]!]! }
     }
 
-    /// **A declaration's pace key** (`ThisMac.paces`): the hash of every step of its forms at 64 rows — what it computes,
-    /// whatever its share and its calls' heights — and its rows.
-    public static func paceKey(_ d: Declaration) throws -> String {
-        var bytes = Data()
-        for f in d.used {
-            for s in f.steps { bytes += try f.module(s.name, Build(rows: 64)).trimmed().bytecode() }
-        }
-        return "pace " + digest(bytes) + " of \(d.rows) rows"
+    /// **A block's arithmetic** (`ThisMac.capacities`): what the ANE reads — the Compact's codes, or f16 weights. One
+    /// Mac's capacities hold for every block of one arithmetic, whatever its model or size.
+    static func arithmetic(_ d: Declaration) -> String {
+        d.groups.contains { $0.weights.contains { $0.recipe == .codes } } ? "codes" : "f16"
     }
 
-    /// What a pace key carries once its block shares the ANE's rows: the unit it was taken at.
-    static func byUnit(_ unit: Int) -> String { " by \(unit)" }
-
-    /// **The ANE's rows a block never run on this Mac starts at**: the share of their shareable rows the blocks this Mac
-    /// ran kept (`ThisMac.flight`), their median, of its own shareable rows, rounded; none kept, half. The share a block
-    /// settles on is the two units’ rates on this Mac more than its model’s: on the M5 Pro 21 of 27 blocks kept a quarter,
-    /// 1/16 to 1/3 the others; the M1 Pro 2560 rows of 4096. Half cost a block's first two cycles on the M5 Pro its ANE at 6.5 s beside a GPU done
-    /// in 2.8, 7.9 s a cycle against 4.8 at a quarter (a transformer of 13 billion weights at 4096 rows, 23/11/2026).
-    static func startRows(_ measured: ThisMac, shareable: Int) -> Int {
-        let kept = (measured.flight ?? [:]).compactMap { key, rows -> Double? in
-            guard let of = shareableRows(key), of > 0 else { return nil }
-            return Double(rows) / Double(of)
-        }.sorted()
-        guard !kept.isEmpty else { return shareable / 2 }
-        return Int((kept[kept.count / 2] * Double(shareable)).rounded())
-    }
-
-    /// The shareable rows a block's key names (`key`).
-    static func shareableRows(_ key: String) -> Int? {
-        let words = key.split(separator: " ")
-        guard words.count == 5, words[0] == "block", words[2] == "of", words[4] == "rows" else { return nil }
-        return Int(words[3])
+    /// **The ANE's rows a block never run on this Mac starts at**: where this Mac's ANE and GPU, beside it, finish
+    /// together — S · ρ / (1 + ρ), ρ the ANE's rate against the GPU's for the block's arithmetic (`ThisMac.Capacity`) —;
+    /// none measured yet, half. (Half cost a block's first two cycles on the M5 Pro its ANE at 6.5 s beside a GPU done in
+    /// 2.8, 7.9 s a cycle against 4.8 at a quarter: a transformer of 13 billion weights at 4096 rows, 23/11/2026.)
+    static func startRows(ratio: Double?, shareable: Int) -> Int {
+        guard let r = ratio, r > 0 else { return shareable / 2 }
+        return Int((Double(shareable) * r / (1 + r)).rounded())
     }
 
     /// **The block's key**: the hash of its ANE's steps at 64 rows — what they compute, not their unit — and the rows

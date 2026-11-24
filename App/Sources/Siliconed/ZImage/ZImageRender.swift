@@ -124,4 +124,7 @@ extension ZImageRender.Denoiser: RenderDenoiser {
         vDSP.multiply(-1, negated, result: &negated)
         return negated
     }
+
+    /// One cycle of its block an evaluation.
+    package func expect(evaluations: Int) { dit.block.expect(cycles: evaluations) }
 }

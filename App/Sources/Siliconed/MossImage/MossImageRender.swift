@@ -120,4 +120,7 @@ extension MossImageRender.Denoiser: RenderDenoiser {
     package func derivative(_ latent: [Float], sigma: Float, solver: Solver, first: Bool) throws -> [Float] {
         try velocity(latent, time: MossImageSchedule.timestep(sigma))
     }
+
+    /// One cycle of its block an evaluation.
+    package func expect(evaluations: Int) { dit.block.expect(cycles: evaluations) }
 }

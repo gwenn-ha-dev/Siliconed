@@ -70,6 +70,9 @@ package protocol RenderDenoiser: AnyObject {
     /// The derivative the solver walks for `latent` at the told σ: the family's time (the solver's integer timestep
     /// at `first`, or its own), its sign.
     func derivative(_ latent: [Float], sigma: Float, solver: Solver, first: Bool) throws -> [Float]
+    /// **The evaluations left**, told before each, that one included: this image's and the batch's after it — what its
+    /// DiT weighs a move of the ANE's share against (`SiliCore.Block.expect`).
+    func expect(evaluations: Int)
 }
 
 /// **The render every family runs**: the stages announced and timed, the text and the image stage once a batch, one
@@ -154,6 +157,7 @@ package enum RenderLoop {
             for step in start..<(schedule.count - 1) {
                 try cancellation.check()
                 let stepStart = Date()
+                dit!.expect(evaluations: plan.evaluations - done + (seeds.count - n - 1) * plan.evaluations)
                 let derivative = try dit!.derivative(latent, sigma: told[step], solver: request.solver, first: step == start)
                 latent.withUnsafeMutableBufferPointer { x in
                     derivative.withUnsafeBufferPointer { walk.step(latent: x.baseAddress!, derivative: $0.baseAddress!) }

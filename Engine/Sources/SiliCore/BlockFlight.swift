@@ -1,25 +1,13 @@
 import CoreAI
 import Foundation
 
-/// **The ANE's share found in flight**: the pace timed, the calls' height climbed, the share moved to the one
-/// predicted to finish first, the unit under trial settled and kept.
+/// **The ANE's share followed in flight**: the calls' height climbed, the share moved to the one predicted to finish
+/// first where it pays its move, the share of none measured once, the unit under trial settled and kept.
 extension Block {
-    /// **The block's pace**, at a cycle's first group over `pass`: the seconds between two starts over one pass (the pass
-    /// that ran most: a pass run once, a prefix's, gives none), the first left out; their median kept on this Mac
-    /// (`ThisMac.paces`) from the second on, again where it moves by 1 % or more. Taken at the unit kept only (`pace`): the
-    /// starts of a trial's cycles are dropped when it settles, so that no period spans two units.
-    func timed(_ pass: String) {
-        guard !paceBase.isEmpty else { return }
-        starts[pass, default: []].append(DispatchTime.now().uptimeNanoseconds)
-        let s = starts.values.max { $0.count < $1.count }!
-        guard s.count >= 4, !pace.isEmpty else { return }
-        let periods = zip(s.dropFirst(2), s.dropFirst()).map { Double($0 - $1) * 1e-9 }.sorted()
-        let median = periods[periods.count / 2]
-        if let kept, abs(median - kept) < 0.01 * kept { return }
-        kept = median
-        let (key, value) = (pace, median)
-        try? ThisMac.update { $0.paces = ($0.paces ?? [:]).merging([key: value]) { $1 } }
-    }
+    /// **The cycles its client says are left**, said before each, that one included (its loop's calls, and those it will
+    /// run after): what a move at that cycle's start is weighed against (`pays`). Never said, a move must pay itself back
+    /// within one cycle.
+    public func expect(cycles n: Int) { left = max(n, 0) }
 
     /// **The calls climbed in flight**, at a turn's first group once a whole turn ran at this height: Core AI's share read
     /// now, the tallest height above whose estimate — its own reading, or a bound from its kin's, this one's share now
@@ -62,16 +50,33 @@ extension Block {
         var rows: Int
         var seconds = 0.0
         var timing: Timing? = nil
+        /// What the call executed (`Signature.flops`).
+        var flops = 0
+
+        /// A group's calls summed by step and unit, in their order: what `predicted` reads of them, whatever the count of
+        /// calls a share makes.
+        static func summed(_ record: [Timed]) -> [Timed] {
+            var order: [String] = [], by: [String: Timed] = [:]
+            for t in record {
+                let k = "\(t.kind) \(t.step)"
+                if var s = by[k] { (s.rows, s.seconds, s.flops) = (s.rows + t.rows, s.seconds + t.seconds, s.flops + t.flops); by[k] = s }
+                else { order.append(k); by[k] = Timed(kind: t.kind, step: t.step, phase: t.phase, rows: t.rows, seconds: t.seconds, flops: t.flops) }
+            }
+            return order.map { by[$0]! }
+        }
     }
 
-    /// **The share in flight moved**, at a cycle's first group: the cycle before's calls timed, the units `predicted`
-    /// to finish first taken if they gain 3 % at least, their rows kept on this Mac, the GPU's functions at the new rows
-    /// loaded (built and specialized where first met) and the others let go. **The unit under trial** (`UnitTrial`) is
-    /// told that cycle's seconds — its own work, what its start loaded left out — and answers: a cold cycle moves no share
-    /// (its calls carry the specialization), a measured one moves to the unit next with the share it predicted best, in
-    /// rows, rounded to the unit's; the last settles on the faster (`settle`).
+    /// **The share in flight moved**, at a cycle's first group: the cycle before's calls timed and smoothed into the
+    /// block's (`smooth`); the share `predicted` to finish first among those admitted under B (`bestShare`, `admitted`)
+    /// taken where it gains more than the noise between two warm cycles, and its gain over the cycles left more than its
+    /// move costs and the noise (`pays`); its rows kept on this Mac, the GPU's functions at the new rows loaded (built and
+    /// specialized where first met) and the others let go. **The unit under trial** (`UnitTrial`) is told that cycle's
+    /// seconds — its own work, what its start loaded left out — and answers: a cold cycle moves no share (its calls carry
+    /// the specialization), a measured one moves to the unit next with the share it predicted best, in rows, rounded to
+    /// the unit's; the last settles on the faster (`settle`). `last`: the cycle before's own seconds.
     func rebalance(last: Double?, warm: Bool) async throws -> Double? {
         defer { cycleRecords = [] }
+        observe(last: last, warm: warm)
         if trial == nil, let z = zero, let last, z != .due || warm { return try await probe(z, last: last) }
         var records: [[Timed]] = []
         for r in cycleRecords {
@@ -88,11 +93,23 @@ extension Block {
             case .fixed: sums.alone += t.seconds
             }
         }
-        lastCalls = Stages.Calls(ane: sums.ane, beside: sums.beside, alone: sums.alone)
+        var steps: [String: Stages.Calls.Step] = [:]
+        for t in records.joined() {
+            let unit = switch t.kind { case .neural: "ane"; case .past: "beside"; case .fixed: "alone" }
+            steps["\(unit) \(t.step)", default: .init(name: t.step, unit: unit)].add(rows: t.rows, seconds: t.seconds, flops: t.flops)
+        }
+        lastCalls = Stages.Calls(ane: sums.ane, beside: sums.beside, alone: sums.alone,
+                                 steps: steps.values.sorted { ($0.unit, $0.name) < ($1.unit, $1.name) })
         let a0 = units * unit
-        func predicted(_ u: Int) -> Double { Self.predicted(records, measured: a0, rows: u * unit) }
-        let (seconds, rows) = Self.bestShare(records, measured: a0, unit: unit, shareable: shareable), best = rows / unit
-        let better = best != units && predicted(best) <= 0.97 * predicted(units)
+        // A cold cycle's calls carry their specialization: neither smoothed nor weighed — but a trial's, which counts it.
+        guard warm || trial != nil else { return nil }
+        if warm { smooth(records, at: a0) }
+        try admit()
+        let basis = warm ? smoothed : records
+        func predicted(_ u: Int) -> Double { Self.predicted(basis, measured: a0, rows: u * unit) }
+        let (seconds, rows) = Self.bestShare(basis, measured: a0, unit: unit, shareable: shareable,
+                                             admitted: admitted?.unit == unit ? admitted!.counts : []), best = rows / unit
+        let better = best != units && pays(predicted(units) - predicted(best))
         guard var t = trial else { return better ? try await move(to: unit, units: best) : nil }
         let cold = t.cold
         let next = t.record(UnitTrial.Best(seconds: seconds, rows: rows))
@@ -115,19 +132,104 @@ extension Block {
         }
     }
 
+    /// **The cycle before, observed** at the next one's start: the noise, the difference
+    /// between two warm cycles at one share, smoothed; the first cycle's own seconds, and the cold cost the second tells —
+    /// what a move costs before any was measured (the functions of a share met first specialize as the first cycle's did).
+    func observe(last: Double?, warm: Bool) {
+        guard let last else { return }
+        let rows = units * unit
+        if let p = previous, p.rows == rows, p.warm, warm { noise = Self.smoothing(noise, abs(last - p.seconds)) }
+        if firstCycle == nil { firstCycle = last } else if cost == nil, warm, previous?.rows == rows { cost = max((firstCycle ?? last) - last, 0) }
+        previous = (last, rows, warm)
+    }
+
+    /// **Whether a move gaining `gain` seconds a cycle pays**: more than the noise, and over the cycles left (one where
+    /// none was said) more than what it costs and the noise.
+    func pays(_ gain: Double) -> Bool { Self.pays(gain, noise: noise, cost: cost, left: left) }
+
+    static func pays(_ gain: Double, noise: Double?, cost: Double?, left: Int?) -> Bool {
+        let n = noise ?? 0
+        return gain > n && gain * Double(max(left ?? 1, 1)) > (cost ?? 0) + n
+    }
+
+    /// **The shares that hold under B**, at the unit the block runs at, once a unit (`admitted`): each count of units
+    /// estimated as `move` estimates it — its functions' reading on this Mac, or a bound from their kin's, the share now
+    /// among them —, against B beside what is kept (`Stage.holds`); a share the fuse stopped or with no bound left out.
+    /// Weighed before any move, so that the share followed is never one B refuses; a refusal in flight (an estimate
+    /// short) takes its share out still.
+    func admit() throws {
+        guard admitted?.unit != unit else { return }
+        let share = max(stage.observe(), 0)
+        let range = Array(1..<max(shareable / unit, 2))
+        let forms = try range.map { try form(units: $0, unit: unit, cut: cut) }
+        let known = estimated(forms, share: share, now: try form(units: units, unit: unit, cut: cut))
+        admitted = (unit, Set(zip(range, known).compactMap { n, e in e.bytes.map { stage.holds(expects: $0 - share) } == true ? n : nil }))
+    }
+
+    /// **A value smoothed**: the new one weighed so that a cycle's half-life is two (1 − 2^−½ ≈ 0.29), the heat and the
+    /// battery followed within a few cycles, one cycle's noise damped.
+    static func smoothing(_ old: Double?, _ new: Double) -> Double {
+        guard let old else { return new }
+        return old + 0.29 * (new - old)
+    }
+
+    /// **A warm cycle's calls smoothed into the block's**, each step's seconds a row (the ANE's over its rows, the GPU's
+    /// beside over the rows past the ANE's, the GPU's alone as they are), at the share they ran at `a0`; the ANE's rate
+    /// against the GPU's beside, FLOP for FLOP. Each group's calls summed step by step first (`Timed.summed`: a share's
+    /// count of calls changes, its steps do not); another unit, or another shape of steps, starts the smoothing over.
+    func smooth(_ cycle: [[Timed]], at a0: Int) {
+        let records = cycle.map(Timed.summed)
+        var ane = (flops: 0, seconds: 0.0), gpu = (flops: 0, seconds: 0.0)
+        for t in records.joined() {
+            switch t.kind {
+            case .neural: ane = (ane.flops + t.flops, ane.seconds + t.seconds)
+            case .past: gpu = (gpu.flops + t.flops, gpu.seconds + t.seconds)
+            case .fixed: break
+            }
+        }
+        if ane.seconds > 0, gpu.seconds > 0, gpu.flops > 0 {
+            ratio = Self.smoothing(ratio, (Double(ane.flops) / ane.seconds) / (Double(gpu.flops) / gpu.seconds))
+        }
+        func shape(_ r: [[Timed]]) -> [[String]] { r.map { $0.map { "\($0.kind) \($0.step) \($0.phase)" } } }
+        guard shape(smoothed) == shape(records), let before = smoothedAt, before.unit == unit else { (smoothed, smoothedAt) = (records, (a0, unit)); return }
+        // Each call's seconds a row now, from the smoothed ones at the share they were taken at.
+        func perRow(_ t: Timed, _ a: Int) -> Double {
+            switch t.kind {
+            case .neural: t.seconds / Double(max(a, 1))
+            case .past: t.seconds / Double(max(t.rows, 1))
+            case .fixed: t.seconds
+            }
+        }
+        for i in records.indices {
+            for j in records[i].indices {
+                let new = records[i][j], old = smoothed[i][j]
+                let value = Self.smoothing(perRow(old, before.rows), perRow(new, a0))
+                smoothed[i][j] = new
+                switch new.kind {
+                case .neural: smoothed[i][j].seconds = value * Double(max(a0, 1))
+                case .past: smoothed[i][j].seconds = value * Double(max(new.rows, 1))
+                case .fixed: smoothed[i][j].seconds = value
+                }
+            }
+        }
+        smoothedAt = (a0, unit)
+    }
+
     /// **A unit's best share predicted** from a cycle's calls (`predicted`, over every share of whole units of `unit`, the
     /// first of the fastest): its seconds and its ANE rows. What two units are compared by — never the raw cycle, run at
     /// the share the other unit's cycle set: the finer unit's whole advantage may be a share the taller cannot take (M1 Pro,
     /// 20/11: 2560 rows at 512, 3072 at 1024; the raw cycles, both at 3072, showed none).
-    static func bestShare(_ records: [[Timed]], measured a0: Int, unit: Int, shareable: Int) -> (seconds: Double, rows: Int) {
-        let k = (1..<max(shareable / unit, 2)).min { (predicted(records, measured: a0, rows: $0 * unit), $0) < (predicted(records, measured: a0, rows: $1 * unit), $1) }!
+    /// `admitted`: the counts of units that hold under B (`admit`); none known, every share.
+    static func bestShare(_ records: [[Timed]], measured a0: Int, unit: Int, shareable: Int, admitted: Set<Int> = []) -> (seconds: Double, rows: Int) {
+        let all = Array(1..<max(shareable / unit, 2)), within = all.filter(admitted.contains)
+        let k = (within.isEmpty ? all : within).min { (predicted(records, measured: a0, rows: $0 * unit), $0) < (predicted(records, measured: a0, rows: $1 * unit), $1) }!
         return (predicted(records, measured: a0, rows: k * unit), k * unit)
     }
 
     /// **The share of none, measured** (`zero`), at a cycle's first group, the unit decided: `due`, the cycle before ran
     /// warm at the share — its seconds noted, the block moved to 0 rows (not kept on this Mac yet; refused under B, no
-    /// probe); `cold`, the cycle before was the first at 0 — dropped; `measured`, it was the second (`zeroMeasured`).
-    /// The seconds the loading took; nil, nothing moved.
+    /// probe, measured again at the next opening); `cold`, the cycle before was the first at 0 — dropped; `measured`, it
+    /// was the second (`zeroMeasured`). The seconds the loading took; nil, nothing moved.
     private func probe(_ z: Zero, last: Double) async throws -> Double? {
         switch z {
         case .due:
@@ -144,23 +246,18 @@ extension Block {
         }
     }
 
-    /// **A warm cycle at 0 rows taken `zero` seconds**, against `seconds` at `share` rows: the GPU alone's pace kept on
-    /// this Mac (`ThisMac.paces` under the pace's key without its unit, the GPU alone's own: at the next opening, 0 was
-    /// measured), and
-    /// the share of none kept where it took no more than 97 % of the share's (the 3 % a move in flight asks); the faster's
-    /// cycle the block's pace from now (`pace`), so that the next opening does not measure it again — the cycles'
-    /// starts dropped, so that what `timed` keeps after is the kept share's alone. True: 0 kept.
+    /// **A warm cycle at 0 rows taken `zero` seconds**, against `seconds` at `share` rows: kept on this Mac by key
+    /// (`ThisMac.zeros`: the next opening does not measure it again), and the share of none kept for the next openings
+    /// where it took less (`flight`). This block goes back to the share only where that pays its move over the cycles
+    /// left (`pays`). True: it stays at 0.
     func zeroMeasured(at zero: Double, share rows: Int, _ seconds: Double) -> Bool {
         self.zero = nil
-        starts = starts.mapValues { Array($0.suffix(1)) }
-        let (blockKey, alone, atShare, wins) = (key, paceBase, pace, zero <= 0.97 * seconds)
-        kept = wins ? zero : seconds
-        let paces = [alone: zero, atShare: kept!].filter { !$0.key.isEmpty }
+        let (blockKey, wins) = (key, zero <= seconds)
         try? ThisMac.update {
-            $0.paces = ($0.paces ?? [:]).merging(paces) { $1 }
+            $0.zeros = ($0.zeros ?? [:]).merging([blockKey: zero]) { $1 }
             if wins { $0.flight = ($0.flight ?? [:]).merging([blockKey: 0]) { $1 } }
         }
-        return wins
+        return wins || !pays(zero - seconds)
     }
 
     /// **The ANE's share moved to `n` units of `target`** rows, if what the move loads holds under B: the functions it
@@ -171,7 +268,10 @@ extension Block {
     private func move(to target: Int, units n: Int, keep: Bool = true) async throws -> Double? {
         let rows = n * target, moving = try form(units: n, unit: target, cut: cut), share = max(stage.observe(), 0)
         guard let estimate = estimated([moving], share: share, now: try form(units: units, unit: unit, cut: cut))[0].bytes,
-              stage.rekey(moving.key, expects: estimate - share, extent: moving.extent) else { return nil }
+              stage.rekey(moving.key, expects: estimate - share, extent: moving.extent) else {
+            if admitted?.unit == target { admitted!.counts.remove(n) }
+            return nil
+        }
         if target != unit {
             await settled()
             for r in declaration.perRow where neuralRows.contains(r.name) {
@@ -185,6 +285,7 @@ extension Block {
         let t = DispatchTime.now().uptimeNanoseconds
         try await stage.loading { try await load() }
         let loaded = Functions.seconds(since: t)
+        cost = Self.smoothing(cost, loaded)
         told()
         let blockKey = key
         if keep { try? ThisMac.update { $0.flight = ($0.flight ?? [:]).merging([blockKey: rows]) { $1 } } }
@@ -193,7 +294,7 @@ extension Block {
 
     /// **The cycle begun last, told done at `end`** (`Stages.Event.cycle`): at the next cycle's first group, or at the
     /// block's close. Its rates noted where it ran warm at the share kept — nothing loaded at its start, not the first, not
-    /// a trial's —, under the pace's key: kept on this Mac at the block's close (`keepRates`), no file written in flight.
+    /// a trial's nor the share of none's —: kept on this Mac at the block's close (`keepRates`), no file written in flight.
     func cycled(until end: UInt64) {
         defer { lastCalls = nil; flops = Stages.Flops() }
         guard let b = begun else { return }
@@ -203,15 +304,25 @@ extension Block {
                                  calls: lastCalls, refused: b.refused, flops: flops)
         Stages.tell(.cycle(cycle))
         // The last cycle beside the ANE has no calls timed (`rebalance` times them at the next cycle's start): the one before kept.
-        guard !pace.isEmpty, b.moved == nil, b.climbed == nil, !b.first, !b.trying, b.rows == 0 || lastCalls != nil else { return }
-        warmRates = (pace, cycle.rates)
+        guard !key.isEmpty, b.moved == nil, b.climbed == nil, !b.first, !b.trying, b.rows == 0 || lastCalls != nil else { return }
+        warmRates = cycle.rates
     }
 
-    /// **The last warm cycle's rates, kept on this Mac** (`ThisMac.rates`), at the block's close: once a block, where they
-    /// moved by 1 % or more from those kept.
-    func keepRates() {
-        guard let (key, rates) = warmRates, ThisMac.current.rates?[key].map({ $0.moved(rates) }) ?? true else { return }
-        try? ThisMac.update { $0.rates = ($0.rates ?? [:]).merging([key: rates]) { $1 } }
+    /// **What the block measured, kept on this Mac** at its close, once a block: its last warm cycle's rates
+    /// (`ThisMac.rates`, where they moved by 1 % or more), and its arithmetic's ANE rate against the GPU's, smoothed from
+    /// block to block as from cycle to cycle (`ThisMac.Capacity.ratio`).
+    func keepMeasured() {
+        let (key, arithmetic, rates, ratio) = (key, arithmetic, warmRates, ratio)
+        let moved = rates.map { r in ThisMac.current.rates?[key].map { $0.moved(r) } ?? true } ?? false
+        guard moved || ratio != nil else { return }
+        try? ThisMac.update {
+            if moved, let rates { $0.rates = ($0.rates ?? [:]).merging([key: rates]) { $1 } }
+            if let ratio {
+                var c = $0.capacities?[arithmetic] ?? ThisMac.Capacity()
+                c.ratio = Self.smoothing(c.ratio, ratio)
+                $0.capacities = ($0.capacities ?? [:]).merging([arithmetic: c]) { $1 }
+            }
+        }
     }
 
     /// **A cycle's shared passes with `a` rows the ANE's, predicted from their calls at `a0`**, as `run` orders them: each
@@ -279,13 +390,11 @@ extension Block {
         stage.drop(gone)
     }
 
-    /// **The unit decided**, at the trial's end: the unit the block runs at kept on this Mac for good, the other's functions
-    /// let go (their surfaces stay, counted in P), the cycles' starts dropped but this one's so that the pace is taken
-    /// at the unit kept alone (`pace`). `best`: each unit's best share predicted.
+    /// **The unit decided**, at the trial's end: the unit the block runs at kept on this Mac for good, for its
+    /// arithmetic, the other's functions let go (their surfaces stay, counted in P). `best`: each unit's best share
+    /// predicted.
     private func settle(_ winner: Int, best: [Int: UnitTrial.Best]) async {
         trial = nil
-        starts = starts.mapValues { Array($0.suffix(1)) }
-        kept = nil
         let gone = functions.keys.filter { $0.hasPrefix("ane-") && !$0.hasSuffix("@\(winner)") }
         if !gone.isEmpty {
             await settled()
@@ -295,10 +404,14 @@ extension Block {
         keep(winner, best: best)
     }
 
-    /// The unit kept on this Mac (`ThisMac.neuralUnits`) and said (`Stages.Event.weighed`).
+    /// The unit kept on this Mac for the block's arithmetic (`ThisMac.Capacity.unit`) and said (`Stages.Event.weighed`).
     func keep(_ unit: Int, best: [Int: UnitTrial.Best]) {
-        let key = key
-        try? ThisMac.update { $0.neuralUnits = ($0.neuralUnits ?? [:]).merging([key: unit]) { $1 } }
+        let arithmetic = arithmetic
+        try? ThisMac.update {
+            var c = $0.capacities?[arithmetic] ?? ThisMac.Capacity()
+            c.unit = unit
+            $0.capacities = ($0.capacities ?? [:]).merging([arithmetic: c]) { $1 }
+        }
         Stages.tell(.weighed(Stages.Weighed(block: declaration.name, seconds: best.mapValues(\.seconds), rows: best.mapValues(\.rows), kept: unit)))
     }
 }

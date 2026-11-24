@@ -221,4 +221,7 @@ extension QwenImage21Render.Denoiser: RenderDenoiser {
     package func derivative(_ latent: [Float], sigma: Float, solver: Solver, first: Bool) throws -> [Float] {
         try velocity(latent, time: QwenImage21Render.modelTime(sigma: sigma, solver: solver, first: first))
     }
+
+    /// One cycle of its block an evaluation.
+    package func expect(evaluations: Int) { loop.block.expect(cycles: evaluations) }
 }

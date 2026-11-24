@@ -87,7 +87,6 @@ extension Block {
             let last = begun.map { Double(at &- $0.at) * 1e-9 - ($0.moved ?? 0) - ($0.climbed ?? 0) }
             let warm = begun.map { $0.moved == nil && $0.climbed == nil && !$0.first } ?? false
             let first = begun == nil
-            timed(pass)
             let climbed = try await climb()
             var moved: Double?
             if case .inFlight = share, units > 0 || zero != nil { moved = try await rebalance(last: last, warm: warm) }
@@ -124,7 +123,8 @@ extension Block {
         func drain() async throws {
             for l in launched {
                 let seconds = try await l.task.value
-                record.append(Timed(kind: .neural, step: l.step, phase: Self.phase(form, l.index), rows: ane, seconds: seconds))
+                record.append(Timed(kind: .neural, step: l.step, phase: Self.phase(form, l.index), rows: ane, seconds: seconds,
+                                    flops: signatures[Self.neural(g.form, l.step, ane)]?.flops ?? 0))
             }
             launched = []
         }
@@ -161,7 +161,8 @@ extension Block {
                     flops.gpu += signatures[f]?.flops ?? 0
                     let timing = try await encode(f, views(f, start: t.start, group: g, pass: p, step: s, call: [:], neural: false, written: &written))
                     if shared, case .inFlight = share {
-                        record.append(Timed(kind: s.unit == .either ? .past : .fixed, step: s.name, phase: Self.phase(form, i), rows: t.rows, timing: timing))
+                        record.append(Timed(kind: s.unit == .either ? .past : .fixed, step: s.name, phase: Self.phase(form, i), rows: t.rows, timing: timing,
+                                            flops: signatures[f]?.flops ?? 0))
                     }
                 }
                 afterGPU = s.unit == .gpu

@@ -239,8 +239,8 @@ import Testing
     }
 
     @Test func whatThisMacMeasuredIsKeptBySystem() throws {
-        try ThisMac.update { $0.neuralUnits = ["block k": 1024]; $0.readings = ["stage f": 42] }
-        #expect(ThisMac.current.neuralUnits?["block k"] == 1024)
+        try ThisMac.update { $0.capacities = ["codes": .init(unit: 1024, ratio: 0.37)]; $0.readings = ["stage f": 42] }
+        #expect(ThisMac.current.capacities?["codes"] == ThisMac.Capacity(unit: 1024, ratio: 0.37))
         #expect(ThisMac.current.readings?["stage f"] == 42)
         let all = try JSONSerialization.jsonObject(with: Data(contentsOf: ThisMac.url)) as? [String: Any]
         #expect(all?.keys.sorted() == [ThisMac.system])

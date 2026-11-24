@@ -74,9 +74,20 @@ public enum Stages {
     }
 
     /// **A cycle's calls, their seconds summed**: the ANE's; the GPU's beside them (past the ANE's rows); the GPU's
-    /// alone (its own steps, every ANE call before them done).
+    /// alone (its own steps, every ANE call before them done); and each step's on each unit (`steps`).
     public struct Calls: Sendable, Equatable {
         public let ane, beside, alone: Double
+        public let steps: [Step]
+
+        /// **A step's calls on one unit over a cycle** (`ane`, `beside`, `alone`): how many, their rows, seconds and FLOP
+        /// summed — what tells a call's fixed cost from its rate, step by step.
+        public struct Step: Sendable, Equatable {
+            public let name, unit: String
+            public internal(set) var calls = 0, rows = 0, flops = 0
+            public internal(set) var seconds = 0.0
+            init(name: String, unit: String) { (self.name, self.unit) = (name, unit) }
+            mutating func add(rows r: Int, seconds s: Double, flops f: Int) { calls += 1; rows += r; seconds += s; flops += f }
+        }
     }
 
     /// **A block's ANE unit decided**: for each unit tried, the seconds of a cycle at its best share, as predicted from its
