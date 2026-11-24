@@ -225,7 +225,7 @@ public final class Block: @unchecked Sendable {
 
     /// The module of a GPU call's function.
     static func module(_ spec: Spec) throws -> Aicode.Module {
-        try Build(rows: spec.rows, tapped: spec.tapped).module { try spec.form.module(spec.step, $0) }
+        try spec.form.module(spec.step, Build(rows: spec.rows, tapped: spec.tapped))
     }
 
     /// The names of per-row tensor `r`'s buffers: its own, or a stream's two.

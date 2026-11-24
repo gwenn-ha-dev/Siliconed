@@ -8,10 +8,9 @@ extension Runs {
     /// The shared forms' residual with Δ under a product of factors (`residual16(_:_:plus:factors:)`): x̂ X + Δ̂ ∏ Gᵢ
     /// against the CPU in f64, the factors' product leaving f16 on the way (2¹⁴ · 2¹² past 2¹⁵) where G does not (2⁻⁷
     /// to 2⁻¹⁰), the stream's factor from 2⁻⁸ to 2⁷ a row: either term the larger, by rows. The bar, set before it ran:
-    /// f16's rounding of the sum, ~1e-3 relative; the value back within [2¹³, 2¹⁴] a row. Written for the ANE (exponents
-    /// counted, the largest in (2¹³, 2¹⁴]) and for the GPU (factors in f32, the largest in [2¹³, 2¹⁴], `ranged`'s).
-    @Test(.enabled(if: metalEnabled), arguments: [true, false])
-    func aResidualUnderFactorsIsTheCPUs(neural: Bool) async throws {
+    /// f16's rounding of the sum, ~1e-3 relative; the value back within [2¹³, 2¹⁴] a row.
+    @Test(.enabled(if: metalEnabled))
+    func aResidualUnderFactorsIsTheCPUs() async throws {
         let bench = try await Bench()
         let (rows, n) = (16, 256)
         var rng = Seeded(state: 11)
@@ -26,12 +25,11 @@ extension Runs {
                   arena.write([Float](repeating: 0x1p-13, count: rows), at: g[2]),
                   arena.write((0..<rows).map { Float(Foundation.pow(2, Double(-10 - $0 % 4))) }, at: g[3])]
 
-        var m = Aicode.$neural.withValue(neural) { Aicode.Module(arguments: [("x", Aicode.tensor([1, rows, n], .f16)), ("x_factor", Aicode.tensor([1, rows, 1], .f16)),
-                                          ("delta", Aicode.tensor([1, rows, n], .f16))] + (0..<4).map { ("g\($0)", Aicode.tensor([1, rows, 1], .f16)) }) }
-        #expect(m.body.neural == neural)
+        var m = Aicode.Module(arguments: [("x", Aicode.tensor([1, rows, n], .f16)), ("x_factor", Aicode.tensor([1, rows, 1], .f16)),
+                                          ("delta", Aicode.tensor([1, rows, n], .f16))] + (0..<4).map { ("g\($0)", Aicode.tensor([1, rows, 1], .f16)) })
         let (value, factor) = m.body.residual16(m.argument("x"), m.argument("x_factor"), plus: m.argument("delta"), factors: (0..<4).map { m.argument("g\($0)") })
         m.outputs = [("y", value), ("y_factor", factor)]
-        let f = try await Functions.load(try Functions.asset(m, "run-residual-factors-\(neural ? "ane" : "gpu")"))
+        let f = try await Functions.load(try Functions.asset(m, "run-residual-factors"))
         func view(_ key: Int, _ shape: [Int]) -> View { View(buffer: arena.buffer(key), type: .float16, shape: shape) }
         try await Run.call(f, bench.stream, inputs: ["x": view(x, [1, rows, n]), "x_factor": view(xf, [1, rows, 1]), "delta": view(delta, [1, rows, n]),
                                                      "g0": view(g[0], [1, rows, 1]), "g1": view(g[1], [1, rows, 1]), "g2": view(g[2], [1, rows, 1]),
@@ -47,7 +45,7 @@ extension Runs {
                 want.append(Float(Double(xs[r * n + i]) * Double(xfs[r]) + Double(ds[r * n + i]) * G))
             }
             let peak = (0..<n).map { abs(got[r * n + $0]) }.max()!
-            #expect((neural ? peak > 0x1p13 : peak >= 0x1p13) && peak <= 0x1p14, "row \(r): its peak \(peak)")
+            #expect(peak > 0x1p13 && peak <= 0x1p14, "row \(r): its peak \(peak)")
         }
         let e = relative(true_, want)
         #expect(e < 2e-3, "relative error \(e)")

@@ -38,11 +38,6 @@ import Foundation
 // MARK: - aicode's entries
 
 public enum Aicode {
-    /// **The unit a function is written for**, while a block's function is built (`Block.Build.module`): true, the ANE's
-    /// or either unit's. A block reads it once, where it is made (`Block.neural`). Outside a build, the ANE's way, which
-    /// both units compute.
-    @TaskLocal public static var neural = true
-
     /// One attribute or type, as `aicode` encodes it: its kind, then fields.
     public struct Entry: Hashable, Sendable {
         public var kind: UInt64
@@ -219,9 +214,6 @@ public enum Aicode {
         /// Every value's type, arguments first.
         public private(set) var types: [Entry]
         public var values: Int { types.count }
-        /// Written for the ANE (`Aicode.neural`, read here): the guard's factors without `round` (`ranged16`). The GPU's
-        /// compute them in f32, by `round`.
-        public let neural = Aicode.neural
         public init(_ arguments: [Entry]) { self.arguments = arguments; types = arguments }
 
         @discardableResult

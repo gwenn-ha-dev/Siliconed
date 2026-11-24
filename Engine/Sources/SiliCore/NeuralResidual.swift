@@ -40,23 +40,7 @@ extension Aicode.Block {
     /// counted: kc = 1 + max(kX, 2, kG + 2)), summed — each term under 2¹³ —, the sum brought back to [2¹³, 2¹⁴]:
     /// (x̂', C · F). Δ̂ within f16 (a product's result under its target), X and C within f16's normals (a stream under
     /// 2²⁹, as `residual16`).
-    ///
-    /// The GPU's function forms G and C in f32 instead (powers of two, far within its range: exact), no exponent counted
-    /// (`ranged16`'s reason): X / C and G / C each applied in two of f16's normal powers, as `scaled16` applies them.
     public func residual16(_ x: Int, _ xf: Int, plus delta: Int, factors: [Int]) -> (value: Int, factor: Int) {
-        if !neural {
-            func wide(_ t: Int) -> Int { castUnlessSame(t, to: .f32) }
-            /// t · r, r ≤ ½ a power of two in f32, by max(r, 2⁻¹⁴) then the rest, each one of f16's normals.
-            func scaled(_ t: Int, _ r: Int) -> Int {
-                let first = scale("maximum", r, 0x1p-14), second = scale("maximum", binary(.divide, r, first), 0x1p-14)
-                return binary(.mul, binary(.mul, t, cast(first, to: .f16)), cast(second, to: .f16))
-            }
-            let x32 = wide(xf), g = factors.dropFirst().reduce(wide(factors[0])) { binary(.mul, $0, wide($1)) }
-            let c = scale("mul", elementwise("maximum", scale("maximum", x32, 4), scale("mul", g, 4)), 2)
-            let sum = binary(.add, scaled(x, binary(.divide, x32, c)), scaled(delta, binary(.divide, g, c)))
-            let (u, f) = ranged16(sum, under: 14)
-            return (u, cast(binary(.mul, c, wide(f)), to: .f16))
-        }
         let kx = exponent16(xf)
         let kg = factors.dropFirst().reduce(exponent16(factors[0])) { binary(.add, $0, exponent16($1)) }
         let kc = scale("add", elementwise("maximum", scale("maximum", kx, 2), scale("add", kg, 2)), 1)
