@@ -17,19 +17,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  # Two jobs, as GitHub's own Pages workflows do: deploy-pages run in the job that just uploaded the artifact
+  # did not find it, three times out of three on 24/11/2026 (actions/deploy-pages#451); a job that `needs` the
+  # upload starts after the artifact is listed.
+  build:
     # `download` is GitHub's « Latest », the newest version under a tag 0.30 does not read as one (tools/release.sh):
-    # the site it holds is that version's, deployed by its own `v…` release; the environment allows only `v*` anyway.
+    # the site it holds is that version's, deployed by its own `v…` release; the environment allows only `v*` and main.
     if: github.event_name != 'release' || github.event.release.tag_name != 'download'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+  deploy:
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
