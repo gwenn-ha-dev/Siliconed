@@ -181,8 +181,8 @@ struct ChainInspector: View {
     }
 
     /// **The Neural Engine's share looked for**, in a model's first render on this Mac (`Engine.Calibration`): each cycle —
-    /// a DiT evaluation — at the share it ran, its seconds, the Neural Engine's calls and the GPU's; the cycles of the unit's
-    /// trial marked; then the share kept for the renders after. Shown only in the render that looked for it.
+    /// a DiT evaluation — at the share it ran, its seconds, the Neural Engine's calls and the GPU's; the cycles of the
+    /// share of none's trial marked. Shown only in the render that looked for it.
     @ViewBuilder private var calibration: some View {
         if let c = m.held.first(where: { $0.stage == .denoising })?.calibration {
             VStack(alignment: .leading, spacing: 4) {

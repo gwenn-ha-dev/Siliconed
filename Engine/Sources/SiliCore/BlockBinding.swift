@@ -60,15 +60,10 @@ extension Block {
     }
 
     /// The stage's tensor of per-row tensor `name`: a stream's current buffer or its other.
-    /// A tensor the ANE reads is the surfaces' of the unit the block runs at (`surface`).
     func tensor(_ name: String, next: Bool) -> String {
-        let surface = neuralRows.contains(name) ? Self.surface(unit == home ? nil : unit) : ""
-        guard let c = current[name] else { return name + surface }
-        return "\(name)#\(next ? 1 - c : c)" + surface
+        guard let c = current[name] else { return name }
+        return "\(name)#\(next ? 1 - c : c)"
     }
-
-    /// The suffix of the names of a trial's second unit's surfaces (the first's have none).
-    static func surface(_ unit: Int?) -> String { unit.map { "@\($0)" } ?? "" }
 
     /// The views of function `f`'s arguments and results over rows from `start` (the ANE's: surfaces), but those of `skip`.
     func views(_ f: String, start: Int, group: Group?, pass: Pass?, step: Step?, call: [String: Bind], neural: Bool,

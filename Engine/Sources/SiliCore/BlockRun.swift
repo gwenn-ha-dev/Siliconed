@@ -89,7 +89,7 @@ extension Block {
             var moved: Double?
             if case .inFlight = share, units > 0 || zero != nil { moved = try await rebalance(last: last, warm: warm) }
             cycled(until: at)
-            begun = (at, units * unit, unit, trial != nil || zero != nil, moved, climbed, first, zeroRefused)
+            begun = (at, units * unit, unit, zero != nil, moved, climbed, first, zeroRefused)
             zeroRefused = false
         }
         let t0 = DispatchTime.now().uptimeNanoseconds

@@ -43,9 +43,8 @@ import Metal
 /// the next cycle to the one `predicted` to finish first (phase by phase, as `run` orders the calls) among those that
 /// hold under B, where what it gains over the cycles left pays its move, its rows kept on this Mac (`ThisMac.flight`).
 /// A key never run here starts at the share this Mac's ANE and GPU balance at (`ThisMac.Capacity.ratio`). **The unit is
-/// the engine's**, decided once per arithmetic on this Mac (`ThisMac.Capacity.unit`), never changed after: a finer unit
-/// balances the two closer, each a call more of the ANE's. The first block of an arithmetic to run finds it undecided,
-/// builds both candidates (`UnitTrial`), runs cycles at each, and keeps the faster (`settle`).
+/// the engine's**, fixed by arithmetic (`neuralUnit`): a finer unit balances the two closer, each a call more of the
+/// ANE's.
 public final class Block: @unchecked Sendable {
     // MARK: - The block
 
@@ -57,17 +56,14 @@ public final class Block: @unchecked Sendable {
     let heights: [Height]
     var height: Int
     var turns = 0
-    /// The ANE's unit (rows), the shareable units, the ANE's now (0: the GPU alone).
-    public internal(set) var unit: Int, total: Int
+    /// The ANE's unit (rows: `neuralUnit`), the shareable units, the ANE's now (0: the GPU alone).
+    public let unit: Int, total: Int
     public internal(set) var units: Int
-    /// The shareable rows; the unit the surfaces of the per-row tensors the ANE reads (`neuralRows`) are named for, the
-    /// others' beside them named `name@<unit>` (a trial's second unit: `places`).
-    let shareable: Int, home: Int
+    /// The shareable rows; the per-row tensors the ANE reads, on surfaces (`places`).
+    let shareable: Int
     let neuralRows: Set<String>
-    /// The unit under trial (`UnitTrial`; nil: decided).
-    var trial: UnitTrial?
-    /// **The share of none, measured once on this Mac** (`probe`): a block whose GPU alone was never timed here, its
-    /// unit decided, runs two cycles at 0 rows — the GPU alone on the same functions and weights, what no cycle beside
+    /// **The share of none, measured once on this Mac** (`probe`): a block whose GPU alone was never timed here runs two
+    /// cycles at 0 rows — the GPU alone on the same functions and weights, what no cycle beside
     /// the ANE predicts: the GPU runs faster a row alone than beside it — the first cold (its calls carry their
     /// specialization), the second against a warm cycle at the share; the faster kept. `due`: to run once a warm cycle at
     /// the share ran; `cold`, `measured`: at 0 now, the share it left and that share's cycle seconds. Nil: none to run.
@@ -76,7 +72,7 @@ public final class Block: @unchecked Sendable {
     /// The buffers a GPU call has read or written (`encode`).
     var seen = Set<ObjectIdentifier>()
     /// The cycle under way, told once done (`Stages.Event.cycle`): its start, the ANE's rows over it and their unit, whether
-    /// the unit was under trial, what its start loaded, whether its start's move to the share of none was refused under B;
+    /// it measures the share of none (`zero`), what its start loaded, whether its start's move to the share of none was refused under B;
     /// the calls of the cycle before, summed once timed (`rebalance`).
     var begun: (at: UInt64, rows: Int, unit: Int, trying: Bool, moved: Double?, climbed: Double?, first: Bool, refused: Bool)?
     var lastCalls: Stages.Calls?
@@ -100,8 +96,8 @@ public final class Block: @unchecked Sendable {
     /// move refused in flight takes its share out); each cycle's calls smoothed (`smoothed`); the noise between two warm
     /// cycles at one share and what a move costs, both measured on this block; the cycles its client said are left
     /// (`expect`); the cycle before's own seconds and share, and the first's; the ANE's rate against the GPU's, smoothed.
-    var admitted: (unit: Int, counts: Set<Int>)?
-    var smoothed: [[Timed]] = [], smoothedAt: (rows: Int, unit: Int)?
+    var admitted: Set<Int>?
+    var smoothed: [[Timed]] = [], smoothedAt: Int?
     var noise: Double?, cost: Double?, left: Int?
     var previous: (seconds: Double, rows: Int, warm: Bool)?, firstCycle: Double?
     var ratio: Double?
@@ -158,7 +154,7 @@ public final class Block: @unchecked Sendable {
 
     /// The names of the stage's functions: a step's at a GPU call's rows, the ANE's at its unit, an edge.
     static func gpu(_ form: String, _ step: String, _ rows: Int, tapped: Bool = false) -> String { "\(form).\(step)\(tapped ? "+taps" : "")-\(rows)" }
-    /// An ANE function at its unit: both candidates' are loaded while the unit is under trial.
+    /// An ANE function at its unit.
     static func neural(_ form: String, _ step: String, _ unit: Int) -> String { "ane-\(form).\(step)@\(unit)" }
     static func edge(_ name: String) -> String { "edge-\(name)" }
     /// A function's name less its rows: a step's at every height one name (`gpu`), an ANE's or an edge's as it is.
@@ -281,10 +277,10 @@ public final class Block: @unchecked Sendable {
     static func digest(_ bytes: Data) -> String { Data(SHA256.hash(data: bytes)).prefix(8).map { String(format: "%02x", $0) }.joined() }
 
     init(_ d: Declaration, stage: Stage, heights: [Height], height: Int, unit: Int, total: Int, units: Int, share: Share, key: String,
-                 arithmetic: String, trial: UnitTrial?, zero: Bool, shareable: Int, neuralRows: Set<String>, copies: Set<String>, named: Double,
+                 arithmetic: String, zero: Bool, shareable: Int, neuralRows: Set<String>, copies: Set<String>, named: Double,
                  signatures: [String: Signature], forms: [String: Form], groups: [String: Group], resolver: Resolver) {
         (declaration, self.stage, self.heights, self.height, self.unit, self.total, self.units, self.share) = (d, stage, heights, height, unit, total, units, share)
-        (self.key, self.arithmetic, self.trial, self.shareable, self.home, self.neuralRows) = (key, arithmetic, trial, shareable, unit, neuralRows)
+        (self.key, self.arithmetic, self.shareable, self.neuralRows) = (key, arithmetic, shareable, neuralRows)
         self.zero = zero ? .due : nil
         (self.copies, self.named, self.signatures, self.forms, self.groups, self.resolver) = (copies, named, signatures, forms, groups, resolver)
         functions = stage.functions

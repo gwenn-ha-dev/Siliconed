@@ -59,16 +59,11 @@ import Testing
         #expect(m.trimmed().flops == m.flops)
     }
 
-    /// **A trial B refused** (the plan with both units' surfaces over B: the block reopened untried) runs at the first
-    /// candidate and keeps it decided, so that its pace is taken under it — undecided, a block's pace is never taken.
-    @Test func aTrialRefusedUnderBDecidesTheFirstCandidate() {
-        let candidates = UnitTrial.candidates(rows: 4096)
-        #expect(candidates == [1024, 512])
-        #expect(Block.decidedAtOpen(inFlight: true, decided: nil, candidates: candidates, trying: false) == 1024)
-        #expect(Block.decidedAtOpen(inFlight: true, decided: nil, candidates: candidates, trying: true) == nil)     // the trial decides
-        #expect(Block.decidedAtOpen(inFlight: true, decided: nil, candidates: [512], trying: true) == 512)          // one unit: at once
-        #expect(Block.decidedAtOpen(inFlight: true, decided: 512, candidates: candidates, trying: false) == nil)    // decided before
-        #expect(Block.decidedAtOpen(inFlight: false, decided: nil, candidates: candidates, trying: false) == nil)   // no share in flight
+    /// **The ANE's unit, by arithmetic**: 512 on the codes, 1024 on f16, 512 for both under two units of 1024.
+    @Test func theUnitIsTheArithmetics() {
+        #expect(Block.neuralUnit("codes", shareable: 4096) == 512 && Block.neuralUnit("f16", shareable: 4096) == 1024)
+        #expect(Block.neuralUnit("f16", shareable: 2048) == 1024 && Block.neuralUnit("f16", shareable: 2047) == 512)
+        #expect(Block.neuralUnit("codes", shareable: 1024) == 512)
     }
 
     @Test func anArgumentIsBoundByItsNameFirstMatch() {
@@ -166,32 +161,10 @@ import Testing
         #expect(Block.steps(d, d.forms, neural: 0, cut: nil).count == 6)
     }
 
-    /// Both units where two of 1024 fit, else 512 alone.
-    @Test func theCandidatesAreTwoUnitsWhereTwoOf1024Fit() {
-        #expect(UnitTrial.candidates(rows: 1024) == [512] && UnitTrial.candidates(rows: 2047) == [512] && UnitTrial.candidates(rows: 100) == [512])
-        #expect(UnitTrial.candidates(rows: 2048) == [1024, 512] && UnitTrial.candidates(rows: 4096) == [1024, 512])
-    }
-
-    /// Each unit's first cycle is cold and left out; the units are compared by their best predicted share, the taller on a tie.
-    @Test func theUnitKeptIsTheFasterAtItsOwnBestShare() {
-        typealias B = UnitTrial.Best
-        var t = UnitTrial([1024, 512])
-        #expect(t.cold)
-        #expect(t.record(B(seconds: 1, rows: 1024)) == .stay)            // cold, however fast
-        #expect(!t.cold)
-        #expect(t.record(B(seconds: 5.0, rows: 3072)) == .move(to: 512))
-        #expect(t.cold && t.unit == 512)
-        #expect(t.record(B(seconds: 1, rows: 512)) == .stay)
-        #expect(t.record(B(seconds: 4.9, rows: 2560)) == .settle(512))
-        #expect(t.best == [1024: B(seconds: 5.0, rows: 3072), 512: B(seconds: 4.9, rows: 2560)])
-        var u = UnitTrial([1024, 512])
-        _ = u.record(B(seconds: 0, rows: 0)); _ = u.record(B(seconds: 5.0, rows: 3072)); _ = u.record(B(seconds: 0, rows: 0))
-        #expect(u.record(B(seconds: 5.0, rows: 2560)) == .settle(1024))
-    }
-
-    /// A unit is worth its best share over its own grid: the cycle ran at 3072 rows, 1024's grid has 3.0 s at best, 512's
-    /// 2.5 s at 2560 rows — a share the taller unit cannot take.
-    @Test func aUnitIsJudgedAtItsOwnBestShare() {
+    /// **The best share is on its unit's grid**: the cycle ran at 3072 rows; 1024's grid has 3.0 s at best, 512's 2.5 s
+    /// at 2560 rows — a share the taller unit cannot take (MOSS-Image on the M1 Pro, 25/11/2026: 8.55 s a step at 2560
+    /// against 9.15 at 3072).
+    @Test func theBestShareIsOnItsUnitsGrid() {
         typealias C = Block.Timed
         let cycle: [[C]] = [[C(kind: .neural, step: "pre", phase: 0, rows: 3072, seconds: 3.0), C(kind: .past, step: "pre", phase: 0, rows: 1024, seconds: 1.5)]]
         let tall = Block.bestShare(cycle, measured: 3072, unit: 1024, shareable: 4096)
@@ -200,20 +173,24 @@ import Testing
         #expect(abs(fine.seconds - 2.5) < 1e-9 && fine.rows == 2560)
     }
 
-    /// The share crosses units in rows, rounded, the GPU keeping a unit.
-    @Test func aShareCrossesUnitsInRows() {
-        #expect(UnitTrial.units(rows: 2048, of: 512, shareable: 4096) == 4)
-        #expect(UnitTrial.units(rows: 1536, of: 1024, shareable: 4096) == 2)
-        #expect(UnitTrial.units(rows: 3584, of: 1024, shareable: 4096) == 3)
-        #expect(UnitTrial.units(rows: 100, of: 1024, shareable: 4096) == 1)
+    /// The share kept crosses into units in rows, rounded, the GPU keeping a unit.
+    @Test func aShareIsCountedInUnits() {
+        #expect(Block.count(rows: 2048, of: 512, shareable: 4096) == 4)
+        #expect(Block.count(rows: 1536, of: 1024, shareable: 4096) == 2)
+        #expect(Block.count(rows: 3584, of: 1024, shareable: 4096) == 3)
+        #expect(Block.count(rows: 100, of: 1024, shareable: 4096) == 1)
+        #expect(Block.count(rows: 4096, of: 512, shareable: 4096) == 7)
     }
 
-    /// The entries of the rules before (`units`, `neuralUnits`: a unit by key; `paces`) are no decision: the unit is read
-    /// by arithmetic alone, and a block whose share of none was timed before measures it once more.
+    /// The entries of the rules before (`units`, `neuralUnits`: a unit by key; `capacities`' `unit`: a unit by
+    /// arithmetic, tried; `paces`) are no decision: the unit is the arithmetic's (`neuralUnit`), and a block whose share of
+    /// none was timed before measures it once more.
     @Test func anOldEntryDecidesNothing() throws {
         let old = #"{"units": {"block k": 256}, "neuralUnits": {"block k": 512}, "paces": {"pace p": 1.5}, "flight": {"block k": 1024}}"#
         let m = try JSONDecoder().decode(ThisMac.self, from: Data(old.utf8))
         #expect(m.capacities == nil && m.zeros == nil && m.flight?["block k"] == 1024)
+        let tried = #"{"capacities": {"codes": {"unit": 1024, "ratio": 0.37}}}"#
+        #expect(try JSONDecoder().decode(ThisMac.self, from: Data(tried.utf8)).capacities == ["codes": ThisMac.Capacity(ratio: 0.37)])
     }
 
     /// **A move pays** where its gain a cycle passes the noise, and over the cycles left its cost and the noise; never

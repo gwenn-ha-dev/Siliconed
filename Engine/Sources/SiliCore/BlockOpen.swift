@@ -2,18 +2,9 @@ import CoreAI
 import Foundation
 import Metal
 
-/// **A block opened**: its functions built at its calls' heights, its unit decided, its stage planned under B, its
-/// arguments placed; the forms its key and its pace name.
+/// **A block opened**: its functions built at its calls' heights, its stage planned under B, its arguments placed; the
+/// forms its key and its pace name.
 extension Block {
-    /// **The block of `d` under `budget`**: the ANE's unit and share (`Share`; in flight, this Mac's last), its functions
-    /// built at the calls' rows and named by their bytes, the plan of the first cut whose socle holds, the stage made; the
-    /// ANE's share said (`Stages.computed`). In flight, its share of none (the GPU alone, the same functions) is measured
-    /// once on this Mac like any other share (`zero`): a point of the same curve, legitimate wherever the ANE gains nothing.
-    public static func open(_ device: MTLDevice, _ d: Declaration, files: [SafeTensors], budget: Int, share: Share,
-                            measured: ThisMac = .current) async throws -> Block {
-        try await opened(device, d, files: files, budget: budget, share: share, measured: measured, trying: true)
-    }
-
     /// **The edges' functions**, each the GPU's or the ANE's (`Declaration.neuralEdges`). An edge of the ANE's reads no
     /// codes: the ANE reads codes `[1, in, out]` from their copy only, which the engine makes for the steps of a shared
     /// form (`places`, `copy`), never for an edge — bound to the codes themselves, `[p, out, in / p]`, it would stop at
@@ -31,10 +22,13 @@ extension Block {
         return modules
     }
 
-    /// `trying`: the unit under trial where this Mac decided none (`UnitTrial`) — false where the plan with both units'
-    /// surfaces does not hold under B: the block then runs at the first candidate, the trial left to a block that fits.
-    private static func opened(_ device: MTLDevice, _ d: Declaration, files: [SafeTensors], budget: Int, share: Share,
-                               measured: ThisMac, trying: Bool) async throws -> Block {
+    /// **The block of `d` under `budget`**: the ANE's unit (`unit`, its arithmetic's) and share (`Share`; in flight, this
+    /// Mac's last), its functions built at the calls' rows and named by their bytes, the plan of the first cut whose socle
+    /// holds, the stage made; the ANE's share said (`Stages.computed`). In flight, its share of none (the GPU alone, the
+    /// same functions) is measured once on this Mac like any other share (`zero`): a point of the same curve, legitimate
+    /// wherever the ANE gains nothing.
+    public static func open(_ device: MTLDevice, _ d: Declaration, files: [SafeTensors], budget: Int, share: Share,
+                            measured: ThisMac = .current) async throws -> Block {
         let forms = Dictionary(uniqueKeysWithValues: d.forms.map { ($0.name, $0) })
         let used = d.used, shareable = d.shareable
         let surfaces = used.contains(where: \.shared) || !d.neuralEdges.isEmpty
@@ -43,12 +37,8 @@ extension Block {
         // The unit and the share.
         let key = shareable > 0 ? try Self.key(used, shareable: shareable) : ""
         let arithmetic = Self.arithmetic(d), capacity = measured.capacities?[arithmetic]
-        let candidates = UnitTrial.candidates(rows: shareable)
-        let decided = capacity?.unit.flatMap { candidates.contains($0) ? $0 : nil }
-        var unit = decided ?? candidates[0], units = 0
+        var unit = Self.neuralUnit(arithmetic, shareable: shareable), units = 0
         let inFlight = share == .inFlight && shareable > 0 && !d.tapped
-        var trial: UnitTrial? = nil
-        if inFlight && trying && decided == nil && candidates.count > 1 { trial = UnitTrial(candidates) }
         switch share {
         case .gpu: break
         case .told(let rows):
@@ -63,18 +53,14 @@ extension Block {
             // A block whose share of none was kept here (`probe`) runs on the GPU alone, its ANE neither built nor placed.
             if total > 1, measured.flight?[key] != 0 {
                 let rows = measured.flight?[key] ?? startRows(ratio: capacity?.ratio, shareable: shareable)
-                units = UnitTrial.units(rows: rows, of: unit, shareable: shareable)
+                units = Self.count(rows: rows, of: unit, shareable: shareable)
             }
         }
         let total = shareable / unit
 
-        // Under trial both units' functions are built, loaded together, and the unit that loses let go (`settle`).
-        let tried = trial?.order ?? [unit]
         var modules: [String: (module: Aicode.Module, unit: ComputeUnitKind)] = [:]
         for f in used where units > 0 {
-            for u in tried {
-                for s in f.steps where s.unit == .either { modules[neural(f.name, s.name, u)] = (try f.module(s.name, Build(rows: u, neural: true)), .neuralEngine) }
-            }
+            for s in f.steps where s.unit == .either { modules[neural(f.name, s.name, unit)] = (try f.module(s.name, Build(rows: unit, neural: true)), .neuralEngine) }
         }
         modules.merge(try edges(d)) { $1 }
         var assets: [String: String] = [:]
@@ -93,7 +79,7 @@ extension Block {
         }
         let resolver = Resolver(d, forms: forms, weights: weightNames, held: heldNames)
         var signatures = modules.mapValues { Signature($0.module) }
-        let tensors = places(d, forms: forms, signatures: signatures, resolver: resolver, unit: units > 0 ? unit : nil, alternate: trial.map { $0.order[1] })
+        let tensors = places(d, forms: forms, signatures: signatures, resolver: resolver, unit: units > 0 ? unit : nil)
         let copies = Set(tensors.compactMap { $0.name.hasPrefix(copy("")) ? String($0.name.dropFirst(copy("").count)) : nil })
         let neuralRows = Set(d.perRow.map(\.name).filter { r in
             tensors.contains { if case .units = $0.place { $0.name == r || $0.name == r + "#0" } else { false } }
@@ -112,7 +98,7 @@ extension Block {
                 let m = try module(spec)
                 (modules[name], assets[name]) = ((m, .gpu), Functions.name(m, prefix: "block"))
             }
-            var s = Stage.Declaration("\(d.name), \(cut.map { "calls of \($0) rows at most" } ?? "a call a pass")\(units > 0 ? ", the ANE by \(tried.map(String.init).joined(separator: " or "))" : "")")
+            var s = Stage.Declaration("\(d.name), \(cut.map { "calls of \($0) rows at most" } ?? "a call a pass")\(units > 0 ? ", the ANE by \(unit)" : "")")
             s.tensors = tensors
             s.residents = d.residents + d.groups.flatMap { g in g.held.map { ("\(g.name).\($0.name)", $0.key, $0.recipe) } }
             for g in d.groups { s.groups[g.name] = g.weights }
@@ -130,31 +116,19 @@ extension Block {
                 refusal = error
             }
         }
-        guard !plans.isEmpty else {
-            if trial != nil { return try await opened(device, d, files: files, budget: budget, share: share, measured: measured, trying: false) }
-            throw refusal!
-        }
+        guard !plans.isEmpty else { throw refusal! }
         let estimates = Stage.estimates(extents: heights.map { ($0.key, $0.extent) }, measured: measured, budget: budget)
         let height = try Stage.choose(plans, estimates)
         signatures = modules.mapValues { Signature($0.module) }
         let named = Functions.seconds(since: began)
         let stage = try await Stage(device, plan: plans[height], files: files, measured: measured)
         let block = Block(d, stage: stage, heights: heights, height: height, unit: unit, total: total, units: units, share: share, key: key,
-                          arithmetic: arithmetic, trial: trial,
+                          arithmetic: arithmetic,
                           zero: inFlight && units > 0 && measured.zeros?[key] == nil,
                           shareable: shareable, neuralRows: neuralRows,
                           copies: copies, named: named, signatures: signatures, forms: forms, groups: groups, resolver: resolver)
-        if let unit = decidedAtOpen(inFlight: inFlight, decided: decided, candidates: candidates, trying: trying) { block.keep(unit, best: [:]) }
         block.told()
         return block
-    }
-
-    /// **The unit a block decides as it opens**, in flight where this Mac decided none for its arithmetic: the one unit
-    /// the shareable rows allow, or the first candidate where the plan with both units' surfaces did not hold under B
-    /// (`trying` false) — the unit it runs at, kept. Nil: decided already, or left to the trial.
-    static func decidedAtOpen(inFlight: Bool, decided: Int?, candidates: [Int], trying: Bool) -> Int? {
-        guard inFlight && decided == nil, candidates.count == 1 || !trying else { return nil }
-        return candidates[0]
     }
 
     /// **A height of the calls**: the tallest a call may be (nil, a call a pass), the key of its functions on this Mac
@@ -172,6 +146,26 @@ extension Block {
     /// Mac's capacities hold for every block of one arithmetic, whatever its model or size.
     static func arithmetic(_ d: Declaration) -> String {
         d.groups.contains { $0.weights.contains { $0.recipe == .codes } } ? "codes" : "f16"
+    }
+
+    /// **The ANE's unit, by arithmetic**: the rows of one call of an ANE function, the share counted in them — 512 on
+    /// the codes, 1024 on f16, and 512 for both where the shareable rows hold fewer than two units of 1024 (a unit the
+    /// share cannot split in two leaves the ANE none or all). A finer unit lets the share sit closer to where the two
+    /// units finish together, for a call more a step, each call reading its weights again: on the codes the grid weighs,
+    /// on f16 weights, twice their bytes, the call. Measured 25/11/2026 on the M1 Pro, 4096 shareable rows: the codes,
+    /// shares told, one transformer 8.55 s a cycle at 2560 rows by 512, 9.15 at the best of 1024's grid (3072), another
+    /// 4.054 at 2048 rows by 512 against 4.035 by 1024; f16, the share in flight, the latter 3.72 s by 512 against 3.55
+    /// by 1024, both at 2048 rows. The M5 Pro's shares kept, 22–24/11, lay on 1024's grid (1024 rows). Fixed, not tried:
+    /// one measured cycle a unit, in a block's first run on a Mac, decided the unit of every block of its arithmetic
+    /// after — left at 1024 by the first to run, the other at 9.57 s.
+    static func neuralUnit(_ arithmetic: String, shareable: Int) -> Int {
+        arithmetic == "codes" || shareable < 2 * 1024 ? 512 : 1024
+    }
+
+    /// **The ANE's rows `rows`, counted in units of `unit`**: the nearest whole count, the ANE and the GPU each at least
+    /// one unit of `shareable` rows.
+    static func count(rows: Int, of unit: Int, shareable: Int) -> Int {
+        min(max((rows + unit / 2) / unit, 1), max(shareable / unit - 1, 1))
     }
 
     /// **The ANE's rows a block never run on this Mac starts at**: where this Mac's ANE and GPU, beside it, finish
@@ -194,8 +188,7 @@ extension Block {
     /// **The stage's tensors**: each per-row tensor (a stream's two buffers) on the heap, or — where an ANE's step reads
     /// or writes it, beside a `unit` — a surface the ANE takes a unit at a time; each tensor as declared, or a surface whole
     /// at the signature's shape where an ANE's step binds it.
-    static func places(_ d: Declaration, forms: [String: Form], signatures: [String: Signature], resolver: Resolver, unit: Int?,
-                       alternate: Int? = nil) -> [Stage.Tensor] {
+    static func places(_ d: Declaration, forms: [String: Form], signatures: [String: Signature], resolver: Resolver, unit: Int?) -> [Stage.Tensor] {
         var neuralRows = Set<String>(), neuralTensors: [String: ([Int], NDArray.ScalarType)] = [:], neuralCodes: [String: [Int]] = [:]
         if unit != nil {
             for g in d.groups where forms[g.form]!.shared {
@@ -225,11 +218,6 @@ extension Block {
                 } else { r.apart ? .apart : .heap }
             }
             for name in Self.buffers(r) { tensors.append(Stage.Tensor(name, bytes: bytes, place(unit))) }
-            // A trial's second unit takes surfaces of its own — a surface is as tall as the view the ANE reads it by — that
-            // the first's rows are copied into when the block moves (`move`).
-            if let alternate, neuralRows.contains(r.name) {
-                for name in Self.buffers(r) { tensors.append(Stage.Tensor(name + Self.surface(alternate), bytes: bytes, place(alternate))) }
-            }
         }
         for t in d.tensors {
             guard let (shape, type) = neuralTensors[t.name] else { tensors.append(t); continue }

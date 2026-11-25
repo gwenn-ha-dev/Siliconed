@@ -5,8 +5,7 @@ import Foundation
 /// predicts, measured once here and read by every plan after.
 ///
 ///     flight    a block's ANE share in flight, in rows (`flight`: `Block`), where the next block of the same key starts
-///     capacities  by arithmetic (the ANE reads codes or f16): the ANE's unit, decided once by the first block that ran
-///               long enough to try both (`UnitTrial`), and the ANE's rate against the GPU's beside it (`Capacity`)
+///     capacities  by arithmetic (the ANE reads codes or f16): the ANE's rate against the GPU's beside it (`Capacity`)
 ///     zeros     a block's cycle at 0 rows, measured once by key (`Block.zero`)
 ///     rates     a block's TFLOP/s over a warm cycle, and each unit's over its calls (`Stages.Rates`: `Block`), by key
 ///     reserves  what a stage's functions took past its first signal, at its largest reading (`Stage.signal`)
@@ -19,7 +18,7 @@ import Foundation
 /// **By Mac and by system**: Core AI's kernels and Metal's change with the OS, so what was measured is kept under the
 /// Mac's model and the system's build (`system`), and measured again past an update; the file keeps every system's.
 /// **A key carries the weights' identity**: a function's is its asset's name, which its client derives from what the
-/// asset computes (its shapes); a block's ANE share and unit, the block's key, likewise.
+/// asset computes (its shapes); a block's ANE share, the block's key, likewise.
 public struct ThisMac: Codable, Sendable, Equatable {
     /// A block's ANE share in flight, its rows, by its key (`Block`); nil in a file written before.
     public var flight: [String: Int]? = nil
@@ -33,15 +32,13 @@ public struct ThisMac: Codable, Sendable, Equatable {
     /// its last block's, by its key; nil in a file written before.
     public var rates: [String: Stages.Rates]? = nil
 
-    /// **An arithmetic's capacities on this Mac**: the ANE's unit (`UnitTrial`, decided once: no formula tells 512 from
-    /// 1024 — a call's fixed cost and the share's rounding pull apart, by 0.4 to 8 %); and `ratio`, the ANE's rate against
-    /// the GPU's beside it, FLOP for FLOP over a cycle's shared steps, smoothed from block to block — the share a block
-    /// never run here starts at, S · ratio / (1 + ratio): each step's own ratio lies within ±10 % of the cycle's
-    /// (24/11/2026 on the M5 Pro, two transformers of 6 and 13 billion weights, 0.29 to 0.39), less than a unit of the share apart.
+    /// **An arithmetic's capacities on this Mac**: `ratio`, the ANE's rate against the GPU's beside it, FLOP for FLOP
+    /// over a cycle's shared steps, smoothed from block to block — the share a block never run here starts at,
+    /// S · ratio / (1 + ratio): each step's own ratio lies within ±10 % of the cycle's (24/11/2026 on the M5 Pro, two
+    /// transformers of 6 and 13 billion weights, 0.29 to 0.39), less than a unit of the share apart.
     public struct Capacity: Codable, Sendable, Equatable {
-        public var unit: Int? = nil
         public var ratio: Double? = nil
-        public init(unit: Int? = nil, ratio: Double? = nil) { (self.unit, self.ratio) = (unit, ratio) }
+        public init(ratio: Double? = nil) { self.ratio = ratio }
     }
     /// What Core AI's share grew past a stage's first signal, its largest reading, by the stage's key (`Stage.key`); nil in a
     /// file written before.

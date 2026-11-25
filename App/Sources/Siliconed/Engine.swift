@@ -50,17 +50,17 @@ package final class Engine: Sendable {
         /// The share of the stage's work the Neural Engine computed (as the family counts it); `nil` when it ran none.
         package var neuralEngine: Double?
         /// **Its share of the Neural Engine found on this Mac**, where the engine looked for it in this render (a model's
-        /// first render here): each cycle of its block as it ran, and the unit kept once decided; `nil`: nothing looked
-        /// for (a render that read the share this Mac kept), or a history written before.
+        /// first render here): each cycle of its block as it ran; `nil`: nothing looked for (a render that read the share
+        /// this Mac kept), or a history written before.
         package var calibration: Calibration?
         package init(stage: Stage) { self.stage = stage }
     }
 
-    /// **The Neural Engine's share looked for** (`SiliCore.UnitTrial`, `Block.rebalance`): the cycles of a stage's block,
-    /// the first under trial, and the unit decided.
+    /// **The Neural Engine's share looked for** (`Block.rebalance`): the cycles of a stage's block, the first trying the
+    /// share of none (`Block.zero`).
     package struct Calibration: Sendable, Codable, Equatable {
-        /// One cycle (a DiT evaluation): the Neural Engine's rows of those it could take, by its unit; whether the unit was
-        /// under trial; its seconds; the Neural Engine's calls and the GPU's, summed (nil: the cycle's calls not timed).
+        /// One cycle (a DiT evaluation): the Neural Engine's rows of those it could take, by its unit; whether it was one
+        /// of the share of none's trial; its seconds; the Neural Engine's calls and the GPU's, summed (nil: the cycle's calls not timed).
         package struct Cycle: Sendable, Codable, Equatable {
             package var rows, shareable, unit: Int
             package var trying: Bool
@@ -71,11 +71,9 @@ package final class Engine: Sendable {
             }
         }
         package var cycles: [Cycle] = []
-        /// The unit kept for this Mac, in rows, once decided.
-        package var kept: Int?
-        /// Still looking: no unit kept yet.
-        package var looking: Bool { kept == nil }
-        package init(cycles: [Cycle] = [], kept: Int? = nil) { (self.cycles, self.kept) = (cycles, kept) }
+        /// Still looking: the last cycle told was the trial's.
+        package var looking: Bool { cycles.last?.trying ?? true }
+        package init(cycles: [Cycle] = []) { self.cycles = cycles }
     }
 
     /// **What a render held**, stage by stage, and what the Neural Engine took of it.

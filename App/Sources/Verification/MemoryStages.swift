@@ -91,7 +91,7 @@ enum MemoryStages {
     static func gib(_ bytes: Int) -> Double { Double(bytes) / Double(1 << 30) }
 
     /// **The ANE in flight, cycle by cycle**, for each engine stage whose block could share its rows: the ANE's rows of
-    /// each cycle and its seconds, what its start loaded (a share moved, taller calls), and the unit decided.
+    /// each cycle and its seconds, what its start loaded (a share moved, taller calls).
     static func flight(_ heard: [StageWatch.Entry]) {
         for e in heard {
             guard let first = e.cycles.first, first.shareable > 0 else { continue }
@@ -108,10 +108,6 @@ enum MemoryStages {
                 print("calls \(e.name) cycle \(n + 1) at \(c.rows) rows: " + steps.map {
                     String(format: "%@ %@ %d calls %d rows %.5f s %.4g FLOP", $0.unit, $0.name, $0.calls, $0.rows, $0.seconds, Double($0.flops))
                 }.joined(separator: "; "))
-            }
-            if let w = e.weighed {
-                let costs = w.seconds.keys.sorted(by: >).map { String(format: "%d: %.2f s at %d rows", $0, w.seconds[$0]!, w.rows[$0] ?? 0) }.joined(separator: ", ")
-                print("flight \(e.name): unit decided, a cycle at each unit's best share: \(costs.isEmpty ? "none, a single unit" : costs); kept \(w.kept)")
             }
         }
     }

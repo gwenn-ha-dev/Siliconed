@@ -21,12 +21,11 @@ public enum Stages {
         case compiled(seconds: Double)
         /// A cycle of a block, done (`Block.run`): told at the next cycle's first group, or at the block's close.
         case cycle(Cycle)
-        /// A block's ANE unit decided (`Block.settle`).
-        case weighed(Weighed)
     }
 
     /// **A cycle of a block, as it ran**: the ANE's rows over it at its unit (0: the GPU alone) of the rows it could
-    /// take, whether the unit was under trial (`UnitTrial`: a block's first cycles on this Mac); its seconds from its first group to the next cycle's first (the last cycle's, to the block's close); what
+    /// take, whether it measures the share of none (`Block.zero`: a block's first cycles on this Mac); its seconds from
+    /// its first group to the next cycle's first (the last cycle's, to the block's close); what
     /// its start loaded, in seconds — the GPU's functions of a share moved (`moved`), of taller calls (`climbed`); nil,
     /// nothing; its calls' seconds, where they were timed (a share in flight, every cycle but the last); whether its
     /// start's move to the share of none was refused under B (`Block.zero`: measured again at the next opening); what its
@@ -88,15 +87,6 @@ public enum Stages {
             init(name: String, unit: String) { (self.name, self.unit) = (name, unit) }
             mutating func add(rows r: Int, seconds s: Double, flops f: Int) { calls += 1; rows += r; seconds += s; flops += f }
         }
-    }
-
-    /// **A block's ANE unit decided**: for each unit tried, the seconds of a cycle at its best share, as predicted from its
-    /// measured cycle, and that share's ANE rows (none: decided without a trial); the unit kept on this Mac.
-    public struct Weighed: Sendable, Equatable {
-        public let block: String
-        public let seconds: [Int: Double]
-        public let rows: [Int: Int]
-        public let kept: Int
     }
 
     /// One observer, heard until it is cancelled.

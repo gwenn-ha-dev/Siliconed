@@ -110,9 +110,8 @@ package final class StageWatch: @unchecked Sendable {
         /// The groups of weights it kept, from the start and in flight (those its plan kept, while it is open).
         package var kept = 0
         package var open = true
-        /// Its block's cycles as they ran, and its ANE unit weighed for the next block (`SiliCore.Stages.Cycle`, `Weighed`).
+        /// Its block's cycles as they ran (`SiliCore.Stages.Cycle`).
         package var cycles: [SiliCore.Stages.Cycle] = []
-        package var weighed: SiliCore.Stages.Weighed?
     }
 
     private let lock = NSLock()
@@ -222,8 +221,6 @@ package final class StageWatch: @unchecked Sendable {
             lock.withLock { if let i = entries.lastIndex(where: \.open) ?? entries.indices.last { entries[i].neuralEngine = share } }
         case .cycle(let c):
             lock.withLock { if let i = entries.lastIndex(where: \.open) ?? entries.indices.last { entries[i].cycles.append(c) } }
-        case .weighed(let w):
-            lock.withLock { if let i = entries.lastIndex(where: \.open) ?? entries.indices.last { entries[i].weighed = w } }
         case .compiling:
             guard lock.withLock({ () -> Bool in
                 guard let stage = order.last else { return false }
@@ -261,12 +258,12 @@ package final class StageWatch: @unchecked Sendable {
                 h.ring = max(h.ring, e.ring)
                 if let n = e.neuralEngine { h.neuralEngine = n }
                 if !e.open { lived += e.seconds; shared += e.seconds * (e.neuralEngine ?? 0) }
-                // A block that looked for its share in this render: its cycles as they ran, and the unit it kept.
+                // A block that looked for its share in this render: its cycles as they ran.
                 if e.cycles.contains(where: \.trying) {
                     h.calibration = Engine.Calibration(cycles: e.cycles.map { c in
                         Engine.Calibration.Cycle(rows: c.rows, shareable: c.shareable, unit: c.unit, trying: c.trying, seconds: c.seconds,
                                                  neuralEngine: c.calls?.ane, gpu: c.calls.map { $0.beside + $0.alone })
-                    }, kept: e.weighed?.kept)
+                    })
                 }
             }
             if let largest = mine.max(by: { $0.groups < $1.groups }) { (h.groups, h.kept) = (largest.groups, largest.kept) }
