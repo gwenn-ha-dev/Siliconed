@@ -132,12 +132,17 @@ public final class BandStage: @unchecked Sendable {
     static let inFlight = 2
 
     /// Every call, in order, `inFlight` on the stream; the marks `keeping` names read back as their calls are done,
-    /// `[C, rows, W]` f32.
+    /// `[C, rows, W]` f32. What the run executed told at its end (`Stages.Work`); under the trace (`Stage.traced`), each
+    /// call's start and end, from the ends its waits give (`Stages.Trace.calls`).
     public func run(keeping: Set<String> = []) async throws -> [String: [Float]] {
         var kept: [String: [Float]] = [:]
         let marks = plan.marks.filter { keeping.contains($0.name) }
         let stream = stage.stream!
         var flight: [Task<UInt64, Never>] = []
+        let traced = stage.traced
+        var calls: [Stages.Called] = [], encoded: [UInt64] = [], ends: [UInt64] = []
+        var flops = 0, first: UInt64?
+        func landed(_ end: UInt64) { if traced { ends.append(end) } }
         for (i, call) in plan.calls.enumerated() {
             let sig = signatures[call.function]!
             func bind(_ arg: String, _ shape: [Int], _ type: NDArray.ScalarType) -> View {
@@ -152,15 +157,34 @@ public final class BandStage: @unchecked Sendable {
             var inputs: [String: View] = [:]
             for (n, s, t) in sig.inputs { inputs[n] = bind(n, s, t) }
             let outputs = sig.outputs.map { n, s, t in (n, bind(n, s, t)) }
-            if flight.count == Self.inFlight { _ = await flight.removeFirst().value }
+            if flight.count == Self.inFlight { landed(await flight.removeFirst().value) }
             let left = try Run.encode(functions[call.function]!, stream, inputs: inputs, outputs: outputs)
             precondition(left.isEmpty, "\(call.function.key): outputs no view holds, \(left.keys.sorted())")
+            let at = DispatchTime.now().uptimeNanoseconds
+            if first == nil { first = at }
+            flops += sig.flops
             flight.append(stream.done())
+            if traced {
+                calls.append(Stages.Called(kind: .fixed, step: call.function.key, group: 0, place: 1, flops: sig.flops))
+                encoded.append(at)
+            }
             // A boundary read back: every call so far done.
             if marks.contains(where: { $0.call == i }) { await Run.finish(stream) }
             for m in marks where m.call == i { kept[m.name] = values(m.plane) }
         }
         await Run.finish(stream)
+        // The last calls in flight, done with the stream: their ends read, no wait.
+        var end = DispatchTime.now().uptimeNanoseconds
+        for t in flight { let e = await t.value; landed(e); end = e }
+        if let first {
+            Stages.tell(.work(Stages.Work(stage: stage.plan.declaration.name, flops: Stages.Flops(gpu: flops),
+                                          seconds: Double(max(end, first) - first) / 1e9, end: max(end, first))))
+        }
+        if traced, let first, ends.count == calls.count {
+            // On one stream, a call starts at its encoding or at the end of the one before, the later.
+            for j in calls.indices { (calls[j].start, calls[j].end) = (max(encoded[j], j > 0 ? ends[j - 1] : 0), ends[j]) }
+            Stages.tell(.traced(.calls(stage: stage.plan.declaration.name, cycle: nil, Stages.occupancy(calls, start: first, end: max(end, first)))))
+        }
         // Every function called: the reading kept now (a client may hold its stage until its process ends).
         stage.keep()
         return kept

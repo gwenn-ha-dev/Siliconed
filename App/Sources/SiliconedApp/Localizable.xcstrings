@@ -13209,6 +13209,46 @@
         }
       }
     },
+    "Debug Live" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Debug live"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depuración en vivo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Debug live"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Debug dal vivo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブデバッグ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实时调试"
+          }
+        }
+      }
+    },
     "Decline" : {
       "localizations" : {
         "de" : {
@@ -17057,6 +17097,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "GPU %@"
+          }
+        }
+      }
+    },
+    "GPU %@ TFLOP/s" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPU %@ TFLOP/s"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPU %@ TFLOP/s"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPU %@ TFLOP/s"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPU %@ TFLOP/s"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPU %@ TFLOP/s"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPU %@ TFLOP/s"
           }
         }
       }
@@ -36929,6 +37009,46 @@
         }
       }
     },
+    "The next renders record where each unit’s time goes, read by silicontrol trace. Off at every launch." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die nächsten Renderings zeichnen auf, wohin die Zeit jeder Einheit geht; silicontrol trace liest es. Bei jedem Start aus."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los próximos renderizados registran adónde va el tiempo de cada unidad; lo lee silicontrol trace. Apagado en cada inicio."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les rendus suivants enregistrent où passe le temps de chaque unité ; silicontrol trace le lit. Éteint à chaque lancement."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I prossimi rendering registrano dove va il tempo di ogni unità; lo legge silicontrol trace. Spento a ogni avvio."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次のレンダリングから、各ユニットの時間の使われ方を記録します。silicontrol trace で読めます。起動のたびにオフ。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "之后的渲染会记录每个单元的时间花在哪里，由 silicontrol trace 读取。每次启动时关闭。"
+          }
+        }
+      }
+    },
     "The object alone, its exact design." : {
       "localizations" : {
         "de" : {
@@ -44675,6 +44795,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "基础 %@ · 峰值 %@ · 上限 %@"
+          }
+        }
+      }
+    },
+    "busy: ANE %@, GPU %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ausgelastet: ANE %1$@, GPU %2$@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "busy: ANE %1$@, GPU %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ocupado: ANE %1$@, GPU %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "occupés : ANE %1$@, GPU %2$@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "occupato: ANE %1$@, GPU %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "稼働：ANE %1$@、GPU %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "占用：ANE %1$@，GPU %2$@"
           }
         }
       }

@@ -79,6 +79,9 @@ public final class Stage: @unchecked Sendable {
     public let before: Int
     /// When it began allocating (`Stages`).
     private let began = DispatchTime.now().uptimeNanoseconds
+    /// **Whether it records what it does** (`Stages.tracing`, read once here): its opening and close piece by piece, its
+    /// calls as they ran (`Block`, `BandStage`).
+    public let traced = Stages.tracing
 
     /// **The stage of `plan`**: the arena allocated (its tensors zeroed), the residents read, the groups kept from the
     /// start placed and read ahead in the loop's order by the ring's reader (which reads the others into its slots), the
@@ -100,6 +103,9 @@ public final class Stage: @unchecked Sendable {
         opened(key)
         Stages.tell(.opened(plan))
         let d = plan.declaration
+        // The trace's pieces of the opening, each to its end; nothing read while it is off.
+        var pieces: [(String, UInt64)] = []
+        func piece(_ name: String) { if traced { pieces.append((name, DispatchTime.now().uptimeNanoseconds)) } }
         guard let queue = device.makeCommandQueue() else { throw Failure("no command queue") }
         self.queue = queue
         stream = SerialStream(commandQueue: queue)
@@ -116,6 +122,7 @@ public final class Stage: @unchecked Sendable {
             at[t.name] = key
             memset(arena.pointer(key), 0, t.size)
         }
+        piece("arena")
         let surfaces = d.surfaces, sizes = plan.sizes
         // The staging: one, the reader's, the residents read through it before the reader starts.
         let staging = sizes.staging
@@ -126,6 +133,7 @@ public final class Stage: @unchecked Sendable {
             try Weights.read(entries, from: file, into: placed, arena: arena, staging: arena.pointer(stagingKey!))
             residents.merge(placed) { $1 }
         }
+        piece("residents")
         // The kept groups' places, the ring's slots.
         var groupFile: [String: Int] = [:]
         for (g, entries) in d.groups {
@@ -158,6 +166,7 @@ public final class Stage: @unchecked Sendable {
                 try Weights.read(groups[g]!, from: uncached[fileOf[g]!], into: place, arena: arena, staging: arena.pointer(stagingKey!))
             })
         }
+        piece("ring")
         let floor = plan.floor
         watch = FootprintWatch { [weak arena] in footprint() - floor - (arena?.allocated ?? 0) }
         for (name, f) in d.functions.sorted(by: { $0.key < $1.key }) {
@@ -167,6 +176,14 @@ public final class Stage: @unchecked Sendable {
         }
         watch?.reset()
         lock.withLock { ready = true }
+        piece("functions")
+        if traced {
+            var from = began
+            Stages.tell(.traced(.opening(stage: d.name, start: began, pieces: pieces.map { name, end in
+                defer { from = end }
+                return Stages.Piece(name: name, seconds: Double(end &- from) / 1e9)
+            })))
+        }
     }
 
     /// **Functions loaded in flight** (`body`: a client's taller calls, another share of the ANE): nothing read or kept
@@ -311,6 +328,7 @@ public final class Stage: @unchecked Sendable {
         // Closed again (its owner's `deinit`): what the first close waited for, not a second wait.
         lock.lock(); let done = settled; lock.unlock()
         if let done { return done }
+        let start = DispatchTime.now().uptimeNanoseconds
         let kept = self.kept.count
         ring?.stop()
         ring = nil
@@ -328,6 +346,11 @@ public final class Stage: @unchecked Sendable {
         var f = Memory.footprint()
         while f > before + Stage.margin && Functions.seconds(since: t) < 2 { usleep(2000); f = Memory.footprint() }
         let settled = Settled(footprint: f, before: before, seconds: Functions.seconds(since: t), alive: Arena.alive, held: Arena.lingering)
+        if traced {
+            Stages.tell(.traced(.closing(stage: plan.declaration.name, start: start,
+                                         pieces: [Stages.Piece(name: "let go", seconds: Double(t &- start) / 1e9),
+                                                  Stages.Piece(name: "footprint back", seconds: settled.seconds)])))
+        }
         Stages.tell(.closed(plan, seconds: Functions.seconds(since: began), kept: kept))
         lock.lock(); self.settled = settled; lock.unlock()
         return settled

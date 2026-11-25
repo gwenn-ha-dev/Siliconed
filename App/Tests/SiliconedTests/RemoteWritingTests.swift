@@ -145,7 +145,7 @@ final class RemoteWritingTests: XCTestCase {
             XCTAssertEqual(SetOrder.parse(bad), .failure(.usage("set memory [GB|default]")), "\(bad)")
         }
         XCTAssertEqual(SetOrder.parse(["volume"]), .failure(.usage(SetOrder.usage)))
-        XCTAssertEqual(SetOrder.usages.map(\.name), ["beta", "neural-engine", "save-images", "glass", "updates", "memory", "preview"])
+        XCTAssertEqual(SetOrder.usages.map(\.name), ["beta", "neural-engine", "save-images", "glass", "updates", "memory", "preview", "debug-live"])
     }
 
     /// The four options of Settings › Advanced › Beta, no more: a fifth has to be added here, in the app's `AppState.beta`

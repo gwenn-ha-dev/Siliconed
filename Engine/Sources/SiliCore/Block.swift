@@ -90,6 +90,28 @@ public final class Block: @unchecked Sendable {
     var flops = Stages.Flops()
     /// The last warm cycle's rates, kept on this Mac at the block's close (`keepRates`).
     var warmRates: Stages.Rates?
+    /// **What the block executed since its opening, over its span** (`Stages.Work`, told at its close): its calls' FLOP,
+    /// its first call put on the stream, its last one's end as a wait read it (`settled`, an ANE call's own end).
+    var worked = Stages.Flops(), firstCall: UInt64?, lastEnd: UInt64 = 0
+    /// **The trace** (`Stage.traced`, read at the opening): the calls recorded since the cycle under way began (before
+    /// the first, since the opening), each GPU call's end and the one's before it as their waits write them; the groups
+    /// run so far, an ordinal each, and the one running; the cycles told; the last GPU call's end on the stream.
+    let traced: Bool
+    var recorded: [Recorded] = []
+    var traceGroup = 0, groupRunning: Int?, traceCycles = 0
+    var streamEnd: Stages.End?
+    var pendingTrace: PendingTrace?
+    /// A run of calls recorded, its cycle's ordinal and span (`nil`: a run outside the cycles, to its last call's end).
+    struct PendingTrace {
+        let cycle: Int?
+        let start, end: UInt64?
+        let records: [Recorded]
+    }
+    struct Recorded {
+        var call: Stages.Called
+        var end: Stages.End? = nil, after: Stages.End? = nil
+        var encoded: UInt64 = 0
+    }
     /// What the loop waited for the ring's weights, in seconds; what building and naming the functions took at open.
     public internal(set) var waited = 0.0
     public let named: Double
@@ -290,6 +312,7 @@ public final class Block: @unchecked Sendable {
         (self.alone, self.zero) = (alone, zero ? .due : nil)
         (self.copies, self.named, self.signatures, self.forms, self.groups, self.resolver) = (copies, named, signatures, forms, groups, resolver)
         functions = stage.functions
+        traced = stage.traced
         passes = Dictionary(uniqueKeysWithValues: d.passes.map { ($0.name, $0) })
         perRow = resolver.perRow
         for r in d.perRow where r.next != nil { current[r.name] = 0 }

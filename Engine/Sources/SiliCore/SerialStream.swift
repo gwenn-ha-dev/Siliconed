@@ -2,6 +2,7 @@ import CoreAI
 import Dispatch
 import Foundation
 import Metal
+import Synchronization
 
 /// **Core AI's stream, touched by one thread at a time**: every call put on it (`Run.encode`) and every wait for it
 /// (`done`) go through here, and nothing else holds a `ComputeStream`.
@@ -31,15 +32,21 @@ public final class SerialStream: @unchecked Sendable {
         try lock.withLock { try body(stream) }
     }
 
-    /// **A task done once every call put on the stream so far is**, its value when (`uptimeNanoseconds`).
-    public func done() -> Task<UInt64, Never> {
+    /// **A task done once every call put on the stream so far is**, its value when (`uptimeNanoseconds`); written also
+    /// into `end` where a trace reads it without waiting (`Stages.tracing`).
+    func done(_ end: Stages.End?) -> Task<UInt64, Never> {
         // The waits' executor holds the lock for every step of this task: the stream is its alone while it runs.
         nonisolated(unsafe) let stream = stream
         return Task(executorPreference: executor) {
             await stream.currentWorkCompleted()
-            return DispatchTime.now().uptimeNanoseconds
+            let t = DispatchTime.now().uptimeNanoseconds
+            end?.value.store(t, ordering: .releasing)
+            return t
         }
     }
+
+    /// **A task done once every call put on the stream so far is**, its value when (`uptimeNanoseconds`).
+    public func done() -> Task<UInt64, Never> { done(nil) }
 
     /// The waits' executor: one queue, each job under the stream's lock.
     private final class Waits: TaskExecutor, @unchecked Sendable {

@@ -65,7 +65,7 @@ package final class EngineWorker: @unchecked Sendable {
     /// render — the stream then ends without throwing (`AsyncThrowingStream`).
     package func render(_ request: Request, seeds: [UInt64], model: String, library: Library) -> AsyncThrowingStream<Engine.Event, Error> {
         let (stream, continuation) = AsyncThrowingStream<Engine.Event, Error>.makeStream()
-        let neuralEngine = CoreAI.neuralEngine
+        let neuralEngine = CoreAI.neuralEngine, trace = CoreAI.debugLive
         let id = register { reply, blobs in
             switch reply {
             case .event(_, let e):
@@ -85,7 +85,7 @@ package final class EngineWorker: @unchecked Sendable {
             try? FileManager.default.createDirectory(at: latents, withIntermediateDirectories: true)
             let kept = latents.appendingPathComponent("\(id).latents")
             let (order, blobs) = RenderOrder.of(request, seeds: seeds, model: model, library: library,
-                                                neuralEngine: neuralEngine, keeping: kept, firstBlob: first)
+                                                neuralEngine: neuralEngine, trace: trace, keeping: kept, firstBlob: first)
             lock.withLock {
                 calls[id]?.kept = kept
                 calls[id]?.again = { [weak self] in self?.send(id, .render(id: id, order), blobs: blobs) }

@@ -122,6 +122,13 @@ final class AppState {
             CoreAI.neuralEngine = neuralEngine
         }
     }
+    /// **Debug live** (the Machine window's switch, `silicontrol set debug-live`): the renders asked from now on record
+    /// their trace — each DiT step's units, busy and idle, step by step; the text encoder's and the decoder's calls; each
+    /// stage's opening and close piece by piece (`CoreAI.debugLive`). Off at every launch, never kept: nothing is
+    /// measured unless asked.
+    var debugLive = false {
+        didSet { CoreAI.debugLive = debugLive }
+    }
     /// **The columns' glass** (Settings ▸ General): on, a zoomed image shows through the chain and the history; off, they
     /// are opaque. The glass composes again whenever the image moves under it: measured on an M5 Pro at +0.4 % of a 1024²
     /// render (median of three) with a zoomed image shown, more on a small GPU.

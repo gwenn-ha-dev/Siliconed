@@ -88,7 +88,14 @@ extension Block {
             _ = zeroMeasured(at: Double(end &- b.at) * 1e-9 - (b.moved ?? 0) - (b.climbed ?? 0), share: rows, seconds)
         }
         cycled(until: end)
+        if traced { toldLast() }
         keepMeasured()
+        // Told once: a client may close twice.
+        if let first = firstCall, worked.ane + worked.gpu > 0 {
+            let last = max(lastEnd, first)
+            Stages.tell(.work(Stages.Work(stage: stage.plan.declaration.name, flops: worked, seconds: Double(last - first) / 1e9, end: last)))
+            firstCall = nil
+        }
         functions = [:]
         return stage.close()
     }

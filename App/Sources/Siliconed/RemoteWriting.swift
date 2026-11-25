@@ -187,7 +187,7 @@ package enum SetOrder: Equatable, Sendable {
     case saveImagesState
     /// `set memory [GB|default]`: B as typed, in GiB, or the default; `nil` reads it. This Mac's range is the app's to judge.
     case memory(Memory?)
-    /// `set neural-engine|glass|updates|preview [on|off]`: one of this Mac's switches; `nil` reads it.
+    /// `set neural-engine|glass|updates|preview|debug-live [on|off]`: one of this Mac's switches; `nil` reads it.
     case toggle(Toggle, on: Bool?)
 
     package enum Memory: Equatable, Sendable {
@@ -197,7 +197,7 @@ package enum SetOrder: Equatable, Sendable {
 
     /// The switches `set` turns on and off, by the name it gives them.
     package enum Toggle: String, CaseIterable, Sendable {
-        case neuralEngine = "neural-engine", glass, updates, preview
+        case neuralEngine = "neural-engine", glass, updates, preview, debugLive = "debug-live"
     }
 
     package enum Failure: Error, Equatable, Sendable {
@@ -210,7 +210,7 @@ package enum SetOrder: Equatable, Sendable {
     }
 
     /// Each subcommand's usage, in the order `help set` gives them.
-    package static let usages: [(name: String, usage: String)] = ["beta", "neural-engine", "save-images", "glass", "updates", "memory", "preview"].map { name in
+    package static let usages: [(name: String, usage: String)] = ["beta", "neural-engine", "save-images", "glass", "updates", "memory", "preview", "debug-live"].map { name in
         let argument = switch name {
         case "beta": "[OPTION on|off]"
         case "save-images": "[FOLDER|off]"

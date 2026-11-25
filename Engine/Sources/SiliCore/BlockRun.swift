@@ -23,9 +23,12 @@ extension Block {
         if (io.inputs.values.map { $0 } + io.outputs.map(\.1)).contains(where: { $0.offset % Arena.page != 0 }) { await settled() }
         let left = try Run.encode(functions[f]!, stage.stream, inputs: io.inputs, outputs: io.outputs)
         precondition(left.isEmpty, "\(f): outputs no view holds, \(left.keys.sorted())")
-        let timing = Timing(before: last, encoded: DispatchTime.now().uptimeNanoseconds, done: stage.stream.done())
+        let end = traced ? Stages.End() : nil
+        let timing = Timing(before: last, encoded: DispatchTime.now().uptimeNanoseconds, done: stage.stream.done(end), end: end, after: streamEnd)
+        if firstCall == nil { firstCall = timing.encoded }
         marks[f] = timing.done
         last = timing.done
+        if traced { streamEnd = end }
         // And its result from off a page is copied back the same way, after the call: the next call reads it once it is, or
         // reads what the call before wrote (measured 19/11 on the mini, a shared form beside the ANE at 512², the rows past
         // the ANE's of a factor a row each, from byte 1024: the attention's gate and keys were the previous block's in
@@ -34,19 +37,42 @@ extension Block {
         return timing
     }
 
-    /// A GPU call's time once done: from its encoding or the call before's end, the later, to its end.
+    /// A GPU call's time once done: from its encoding or the call before's end, the later, to its end. Under the trace
+    /// (`traced`), its end and the call before's as their waits write them (`Stages.End`), read without waiting.
     struct Timing {
         let before: Task<UInt64, Never>?
         let encoded: UInt64
         let done: Task<UInt64, Never>
+        var end: Stages.End? = nil, after: Stages.End? = nil
         func seconds() async -> Double {
             let end = await done.value, start = max(encoded, await before?.value ?? 0)
             return Double(end > start ? end - start : 0) / 1e9
         }
     }
 
-    /// Every call put on the stream, done.
-    public func settled() async { _ = await last?.value }
+    /// Every call put on the stream, done; the last one's end the block's work's (`Stages.Work`).
+    public func settled() async {
+        if let end = await last?.value { lastEnd = max(lastEnd, end) }
+    }
+
+    /// **What a call executes, counted** (`Signature.flops`): the cycle's (`flops`) and the block's since its opening
+    /// (`worked`).
+    func executed(ane: Int = 0, gpu: Int = 0) {
+        (flops.ane, flops.gpu) = (flops.ane + ane, flops.gpu + gpu)
+        (worked.ane, worked.gpu) = (worked.ane + ane, worked.gpu + gpu)
+    }
+
+    /// **A call, recorded for the trace** (`traced`): a GPU call by its timing, its start and end read once told; an ANE
+    /// call by its own. `group`: the group's ordinal (`traceGroup`); `place`: 2 × the `gpu` steps before its step, + 1
+    /// a `gpu` step's (`Stages.Called`).
+    func trace(_ kind: Stages.Called.Kind, _ step: String, group: Int, place: Int, rows: Int, flops: Int, _ t: Timing) {
+        recorded.append(Recorded(call: Stages.Called(kind: kind, step: step, group: group, place: place, rows: rows, flops: flops),
+                                 end: t.end, after: t.after, encoded: t.encoded))
+    }
+    func trace(_ kind: Stages.Called.Kind, _ step: String, group: Int, place: Int, rows: Int, flops: Int, start: UInt64, end: UInt64) {
+        recorded.append(Recorded(call: Stages.Called(kind: kind, step: step, group: group, place: place, rows: rows, flops: flops,
+                                                     start: start, end: end)))
+    }
 
     /// **Edge `name`'s call** (`Declaration.edges`): its per-row arguments from row `row`, the group a run holds its
     /// weights' and its own tensors' (`run`'s `before`), or `group`'s held weights and its own tensors outside a run
@@ -55,16 +81,26 @@ extension Block {
     public func call(_ name: String, group: String? = nil, from row: Int = 0, _ bind: [String: Bind] = [:]) async throws {
         var written = Set<String>()
         let f = Self.edge(name), g = group.map { groups[$0]! } ?? held?.group
+        let n = signatures[f]?.flops ?? 0, ordinal = groupRunning ?? traceGroup
         if declaration.neuralEdges.contains(name) {
-            flops.ane += signatures[f]?.flops ?? 0
+            executed(ane: n)
             await settled()
             let io = views(f, start: row, group: g, pass: nil, step: nil, call: bind, neural: true, written: &written)
+            let start = DispatchTime.now().uptimeNanoseconds
+            if firstCall == nil { firstCall = start }
             try await Run.neural(functions[f]!, inputs: io.inputs, outputs: io.outputs)
+            let end = DispatchTime.now().uptimeNanoseconds
+            lastEnd = max(lastEnd, end)
+            if traced { trace(.neuralEdge, name, group: ordinal, place: ordinal * Self.places - 1, rows: 0, flops: n, start: start, end: end) }
             return
         }
-        flops.gpu += signatures[f]?.flops ?? 0
-        _ = try await encode(f, views(f, start: row, group: g, pass: nil, step: nil, call: bind, neural: false, written: &written))
+        executed(gpu: n)
+        let timing = try await encode(f, views(f, start: row, group: g, pass: nil, step: nil, call: bind, neural: false, written: &written))
+        if traced { trace(.edge, name, group: ordinal, place: ordinal * Self.places - 1, rows: 0, flops: n, timing) }
     }
+
+    /// The places of a group's calls (`Stages.Called.place`): far more than its form's steps take.
+    static let places = 4096
 
     /// **Group `group` over pass `pass`**: its weights acquired (kept, or the ring's next use), `before` (its edges: a
     /// modulation), then its form's steps in turn — a step of either unit the ANE's units of the shareable rows (each
@@ -97,6 +133,10 @@ extension Block {
         waited += Functions.seconds(since: t0)
         held = (g, weights)
         defer { held = nil }
+        // The group's ordinal under the trace (`Stages.Called.group`).
+        let ordinal = traceGroup
+        if traced { (traceGroup, groupRunning) = (traceGroup + 1, ordinal) }
+        defer { groupRunning = nil }
         let shared = !tapped && form.shared && p.shareable != nil && units > 0, neural = shared ? units * unit : 0
         let ane = unit
         // The share is sized on the block's largest shareable pass: a smaller pass would give the ANE rows it has not.
@@ -117,12 +157,14 @@ extension Block {
         }
         nonisolated(unsafe) let calls = made
         var record: [Timed] = []
-        var launched: [(step: String, index: Int, task: Task<Double, Error>)] = []
+        var launched: [(step: String, index: Int, task: Task<(start: UInt64, end: UInt64), Error>)] = []
         func drain() async throws {
             for l in launched {
-                let seconds = try await l.task.value
-                record.append(Timed(kind: .neural, step: l.step, phase: Self.phase(form, l.index), rows: ane, seconds: seconds,
-                                    flops: signatures[Self.neural(g.form, l.step, ane)]?.flops ?? 0))
+                let (start, end) = try await l.task.value
+                let phase = Self.phase(form, l.index), n = signatures[Self.neural(g.form, l.step, ane)]?.flops ?? 0
+                record.append(Timed(kind: .neural, step: l.step, phase: phase, rows: ane, seconds: Double(end &- start) / 1e9, flops: n))
+                lastEnd = max(lastEnd, end)
+                if traced { trace(.neural, l.step, group: ordinal, place: ordinal * Self.places + 2 * phase, rows: ane, flops: n, start: start, end: end) }
             }
             launched = []
         }
@@ -133,18 +175,18 @@ extension Block {
                 if s.unit == .either && shared {
                     // What the ANE reads of the GPU's: every GPU call before, when the step before was the GPU's.
                     let gpu = afterGPU ? last : nil
-                    flops.ane += tiles.count * (signatures[Self.neural(g.form, s.name, ane)]?.flops ?? 0)
+                    executed(ane: tiles.count * (signatures[Self.neural(g.form, s.name, ane)]?.flops ?? 0))
                     for u in tiles.indices {
                         let previous = launched.last?.task, c = calls[u][s.name]!
                         let function = c.function, ready = copied
                         nonisolated(unsafe) let io = c.io
-                        let task = Task { () async throws -> Double in
+                        let task = Task { () async throws -> (start: UInt64, end: UInt64) in
                             _ = try await previous?.value
                             _ = await gpu?.value
                             _ = await ready?.value
                             let t = DispatchTime.now().uptimeNanoseconds
                             try await Run.neural(function, inputs: io.inputs, outputs: io.outputs)
-                            return Functions.seconds(since: t)
+                            return (t, DispatchTime.now().uptimeNanoseconds)
                         }
                         launched.append((s.name, i, task))
                     }
@@ -156,11 +198,17 @@ extension Block {
                 }
                 for t in Self.calls(form, s, p, neural: neural, cut: cut, limit: p.limit ?? declaration.rows) {
                     let f = Self.gpu(g.form, s.name, t.rows, tapped: tapped && s.taps)
-                    flops.gpu += signatures[f]?.flops ?? 0
+                    let n = signatures[f]?.flops ?? 0
+                    executed(gpu: n)
                     let timing = try await encode(f, views(f, start: t.start, group: g, pass: p, step: s, call: [:], neural: false, written: &written))
                     if shared, case .inFlight = share {
                         record.append(Timed(kind: s.unit == .either ? .past : .fixed, step: s.name, phase: Self.phase(form, i), rows: t.rows, timing: timing,
-                                            flops: signatures[f]?.flops ?? 0))
+                                            flops: n))
+                    }
+                    if traced {
+                        let alone = s.unit == .gpu
+                        trace(alone ? .fixed : .past, s.name, group: ordinal, place: ordinal * Self.places + 2 * Self.phase(form, i) + (alone ? 1 : 0),
+                              rows: t.rows, flops: n, timing)
                     }
                 }
                 afterGPU = s.unit == .gpu

@@ -22,7 +22,33 @@ public enum Stages {
         case compiled(seconds: Double)
         /// A cycle of a block, done (`Block.run`): told at the next cycle's first group, or at the block's close.
         case cycle(Cycle)
+        /// **What a stage's calls executed, over their span** (`Work`), in every run: a block's at its close (every call
+        /// since its opening), a stage of bands' at each run's end.
+        case work(Work)
+        /// **What a stage opened under the trace recorded** (`tracing`, `Trace`): told by such a stage alone.
+        case traced(Trace)
     }
+
+    /// **What a stage's calls executed, over their span**: their FLOP by unit (`Aicode.Module.flops`), counted as each
+    /// call is made, from the first call put on the stream to the last done — what the loop waited for the ring and its
+    /// client's own work between two calls inside the span, as in a cycle's seconds. Its end, `DispatchTime` nanoseconds.
+    public struct Work: Sendable, Equatable {
+        public let stage: String
+        public let flops: Flops
+        public let seconds: Double
+        public let end: UInt64
+        /// TFLOP/s over the span.
+        public var rate: Double { seconds > 0 ? Double(flops.ane + flops.gpu) / seconds / 1e12 : 0 }
+    }
+
+    /// **The trace's switch**: a stage opened while it is on records what it does call by call (`Event.traced`), read
+    /// once at its opening and never at a call; a stage opened while it is off records nothing — a test a call. Off
+    /// until a client says otherwise.
+    public static var tracing: Bool {
+        get { lock.withLock { _tracing } }
+        set { lock.withLock { _tracing = newValue } }
+    }
+    nonisolated(unsafe) private static var _tracing = false
 
     /// **A cycle of a block, as it ran**: the ANE's rows over it at its unit (0: the GPU alone) of the rows it could
     /// take, whether it visits the share of none (`Block.zero`: where this Mac's κ is unknown, or predicted the fastest); its seconds from
@@ -57,6 +83,7 @@ public enum Stages {
     /// as its calls are made — no timing, no wait of their own.
     public struct Flops: Sendable, Equatable {
         public internal(set) var ane = 0, gpu = 0
+        init(ane: Int = 0, gpu: Int = 0) { (self.ane, self.gpu) = (ane, gpu) }
     }
 
     /// **A block's rates, TFLOP/s**: over a cycle (`block`), and each unit's over its own calls (nil: not timed — the

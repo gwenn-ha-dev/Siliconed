@@ -83,9 +83,10 @@ final class RemoteControl {
         do {
             try refuseOnMirror(command, arguments)
             // The commands that take nothing: a flag given to them is refused, never ignored.
-            if ["status", "models", "clear", "follow"].contains(command) { _ = try Self.flags(arguments) }
+            if ["status", "models", "clear", "follow", "trace"].contains(command) { _ = try Self.flags(arguments) }
             switch command {
             case "status": finish(c, state())
+            case "trace": finish(c, trace())
             case "models": finish(c, app.mirror == nil ? models() : mirroredModels())
             case "install":
                 finish(c, arguments == ["stop"] ? stopInstallation() : try install(arguments))
@@ -225,7 +226,10 @@ final class RemoteControl {
                 e["cycle"] = ["ane_rows": c.rows, "rows": c.shareable, "seconds": Response.number(c.seconds, 3),
                               "tflops": Response.number(c.tflops, 2),
                               "ane_tflops": c.neuralEngine.map { Response.number($0, 2) } ?? NSNull(),
-                              "gpu_tflops": c.gpu.map { Response.number($0, 2) } ?? NSNull()] as [String: Any]
+                              "gpu_tflops": c.gpu.map { Response.number($0, 2) } ?? NSNull(),
+                              // Under Debug Live: each unit's busy seconds over the step's (`trace` says where it idled).
+                              "ane_busy": c.occupancy.map { Response.number($0.seconds > 0 ? $0.ane / $0.seconds : 0, 3) } ?? NSNull(),
+                              "gpu_busy": c.occupancy.map { Response.number($0.seconds > 0 ? $0.gpu / $0.seconds : 0, 3) } ?? NSNull()] as [String: Any]
             }
             // In a train (`AppState.train`) the engine counts the call's images; a job says its own.
             e["batch_image"] = min(app.batchImage, t.seeds.count - 1) + 1

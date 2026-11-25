@@ -52,7 +52,61 @@ package final class Engine: Sendable {
         /// **Its block's cycles as they ran** (a DiT's evaluations, every image of a batch in turn: one block for the
         /// batch), in every render; empty for a stage without a block.
         package var cycles: [Cycle] = []
+        /// **What its engine stages' calls executed, over their spans** (`SiliCore.Stages.Work`), in every render: a text
+        /// encoder's, a decoder's each image, the DiT's whole.
+        package var work: [Work] = []
+        /// **What the trace recorded** (`SiliCore.Stages.tracing`, the debug live switch): each engine stage's opening and
+        /// close piece by piece, and its runs of calls outside a block's cycles; empty when it was off.
+        package var traces: [StageTrace] = []
         package init(stage: Stage) { self.stage = stage }
+    }
+
+    /// **What an engine stage's calls executed, over their span**: its TFLOP/s, its seconds, where it ended on the
+    /// memory series' clock (`MemorySeries`), the fraction of its FLOP the Neural Engine executed.
+    package struct Work: Sendable, Codable, Equatable {
+        package var tflops, seconds: Double
+        package var end: Double?
+        package var aneFraction: Double
+        package init(tflops: Double, seconds: Double, end: Double? = nil, aneFraction: Double = 0) {
+            (self.tflops, self.seconds, self.end, self.aneFraction) = (tflops, seconds, end, aneFraction)
+        }
+    }
+
+    /// **Where a run's seconds went, unit by unit** (`SiliCore.Stages.Occupancy`, the debug live switch): its seconds,
+    /// each unit's busy seconds, where each stood idle — between two of its calls with a step of the GPU alone between
+    /// them, at the start of a group, between two calls of one stretch, before its first call and after its last —,
+    /// each step's calls on each unit, the calls whose end was not read.
+    package struct Occupancy: Sendable, Codable, Equatable {
+        package struct Idle: Sendable, Codable, Equatable {
+            package var acrossAlone = 0.0, atGroups = 0.0, between = 0.0, outside = 0.0
+            package init() {}
+        }
+        package struct Step: Sendable, Codable, Equatable {
+            /// `ane`, `beside` (the GPU past the Neural Engine's rows), `alone` (the GPU's own step), `edge`, `ane edge`.
+            package var unit, name: String
+            package var calls, rows: Int
+            package var seconds, tflops: Double
+        }
+        package var seconds, ane, gpu: Double
+        package var aneIdle = Idle(), gpuIdle = Idle()
+        package var steps: [Step] = []
+        package var unread = 0
+        package init(seconds: Double, ane: Double, gpu: Double) { (self.seconds, self.ane, self.gpu) = (seconds, ane, gpu) }
+    }
+
+    /// **An engine stage under the trace** (the debug live switch): its name; its opening and its close, piece by piece
+    /// (seconds), from when each began on the memory series' clock; its runs of calls outside a block's cycles (groups run
+    /// once, a decoder's bands).
+    package struct StageTrace: Sendable, Codable, Equatable {
+        package struct Piece: Sendable, Codable, Equatable {
+            package var name: String
+            package var seconds: Double
+        }
+        package var name: String
+        package var opened: Double?, closed: Double?
+        package var opening: [Piece] = [], closing: [Piece] = []
+        package var runs: [Occupancy] = []
+        package init(name: String) { self.name = name }
     }
 
     /// **A cycle of a block, as it ran** (`SiliCore.Stages.Cycle`): one DiT evaluation. The Neural Engine's rows of those
@@ -70,11 +124,14 @@ package final class Engine: Sendable {
         package var neuralEngine: Double?, gpu: Double?
         package var end: Double?
         package var aneFraction: Double?
+        /// Where its seconds went, unit by unit: under the debug live switch only.
+        package var occupancy: Occupancy?
         package init(rows: Int, shareable: Int, unit: Int, zero: Bool = false, seconds: Double, tflops: Double = 0,
-                     neuralEngine: Double? = nil, gpu: Double? = nil, end: Double? = nil, aneFraction: Double? = nil) {
+                     neuralEngine: Double? = nil, gpu: Double? = nil, end: Double? = nil, aneFraction: Double? = nil,
+                     occupancy: Occupancy? = nil) {
             (self.rows, self.shareable, self.unit, self.zero, self.seconds) = (rows, shareable, unit, zero, seconds)
             (self.tflops, self.neuralEngine, self.gpu) = (tflops, neuralEngine, gpu)
-            (self.end, self.aneFraction) = (end, aneFraction)
+            (self.end, self.aneFraction, self.occupancy) = (end, aneFraction, occupancy)
         }
     }
 

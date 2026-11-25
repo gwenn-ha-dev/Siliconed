@@ -179,8 +179,16 @@ extension Block {
             given[name] = value
         }
         let left = try Run.encode(functions[f]!, stage.stream, inputs: [:], chained: given, outputs: io.outputs)
-        let done = stage.stream.done()
+        let end = traced ? Stages.End() : nil, encoded = DispatchTime.now().uptimeNanoseconds
+        let done = stage.stream.done(end)
         (marks[f], last) = (done, done)
+        executed(gpu: signatures[f]?.flops ?? 0)
+        if firstCall == nil { firstCall = encoded }
+        if traced {
+            recorded.append(Recorded(call: Stages.Called(kind: .edge, step: name, group: traceGroup, place: traceGroup * Self.places - 1,
+                                                         flops: signatures[f]?.flops ?? 0), end: end, after: streamEnd, encoded: encoded))
+            streamEnd = end
+        }
         return left
     }
 }

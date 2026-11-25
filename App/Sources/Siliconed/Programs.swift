@@ -223,6 +223,15 @@ package enum CoreAI {
         return try work()
     }
 
+    /// **The debug live switch** (the Machine window's, `silicontrol set debug-live`): whether the renders asked from now
+    /// on record their trace (`SiliCore.Stages.tracing`, read by each engine stage as it opens), this Mac's for what it
+    /// computes. Off at every launch, and never kept: nothing is recorded unless it is asked.
+    package static var debugLive: Bool {
+        get { lock.withLock { tracing } }
+        set { lock.withLock { tracing = newValue } }
+    }
+    nonisolated(unsafe) private static var tracing = false
+
     /// Whether the work computed now may take the Neural Engine: the work's in hand, else the process's switch.
     package static var neuralEngineInForce: Bool { lock.withLock { held ?? chosen.neuralEngine } }
 

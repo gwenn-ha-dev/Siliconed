@@ -38,6 +38,7 @@ extension RemoteControlHelp {
         silicontrol set updates [on|off]
         silicontrol set memory [GB|default]
         silicontrol set preview [on|off]
+        silicontrol set debug-live [on|off]
 
         Settings' switches, and the DiT box's « Preview every step », from the terminal. Each goes through the function its switch calls, so the choice is
         written and the window follows, exactly as a click.
@@ -88,6 +89,12 @@ extension RemoteControlHelp {
         it does not change the image. "on" or "off"; alone, it is read. It is the window's, for the session (this Mac's, or the
         Mac it computes on), and applies to the renders queued next; « add --preview » and « --no-preview » still decide for one job.
 
+        DEBUG-LIVE is the Machine window's « Debug Live », off at every launch and never kept: the renders asked from then
+        on record their trace — each DiT step's units, busy and idle and where, step by step; the text encoder's and the
+        decoder's calls; each engine stage's opening and close, piece by piece. « trace » reads it; « status » gives each
+        step's busy fractions. Off, nothing of it is recorded. It is read as a render is asked: turned on during one, it
+        records from the next. This Mac's, for what it computes.
+
         Answer: {"ok": true, "option": "size-scales", "enabled": true, "previous": false,
                  "beta": {"more_solvers": false, "steps": false, "size_scales": true, "negative_lora": false}}
                 {"ok": true, "neural_engine": true, "previous": false}
@@ -96,8 +103,9 @@ extension RemoteControlHelp {
                 {"ok": true, "updates": false, "previous": true}
                 {"ok": true, "memory": {"budget_bytes": 12884901888, "chosen": true, …}, "previous": {…}}
                 {"ok": true, "preview": false, "previous": true}
+                {"ok": true, "debug_live": true, "previous": false}
         FAILURES: usage (set alone or an unknown subcommand, the message gives every usage; an unknown Beta option, "hint"
-        lists them; neural-engine, glass, updates or preview other than on, off; a memory out of this Mac's range), write
+        lists them; neural-engine, glass, updates, preview or debug-live other than on, off; a memory out of this Mac's range), write
         (save-images: not a folder).
         """, fr: """
         silicontrol set beta [OPTION on|off]
@@ -107,6 +115,7 @@ extension RemoteControlHelp {
         silicontrol set updates [on|off]
         silicontrol set memory [Go|default]
         silicontrol set preview [on|off]
+        silicontrol set debug-live [on|off]
 
         Les interrupteurs des Réglages, et l'« Aperçu à chaque pas » de la boîte du DiT, depuis le terminal. Chacun passe par la fonction que son interrupteur appelle : le
         choix est écrit et la fenêtre suit, exactement comme un clic.
@@ -161,6 +170,13 @@ extension RemoteControlHelp {
         (ce Mac, ou le Mac sur lequel elle calcule), et vaut pour les rendus mis en file ensuite ; « add --preview » et
         « --no-preview » décident toujours pour un job.
 
+        DEBUG-LIVE, c'est le « Debug live » de la fenêtre Machine, éteint à chaque lancement et jamais gardé : les rendus
+        demandés ensuite enregistrent leur trace — les unités de chaque pas du DiT, occupées et à l'arrêt et où, étape par
+        étape ; les appels de l'encodeur de texte et du décodeur ; l'ouverture et la fermeture de chaque étage du moteur,
+        morceau par morceau. « trace » la lit ; « status » donne les parts occupées de chaque pas. Éteint, rien n'en est
+        enregistré. Il se lit quand un rendu est demandé : allumé pendant l'un, il enregistre à partir du suivant. Celui de
+        ce Mac, pour ce qu'il calcule.
+
         Réponse : {"ok": true, "option": "size-scales", "enabled": true, "previous": false,
                    "beta": {"more_solvers": false, "steps": false, "size_scales": true, "negative_lora": false}}
                   {"ok": true, "neural_engine": true, "previous": false}
@@ -169,8 +185,9 @@ extension RemoteControlHelp {
                   {"ok": true, "updates": false, "previous": true}
                   {"ok": true, "memory": {"budget_bytes": 12884901888, "chosen": true, …}, "previous": {…}}
                   {"ok": true, "preview": false, "previous": true}
+                  {"ok": true, "debug_live": true, "previous": false}
         ÉCHECS : usage (set seul ou une sous-commande inconnue, le message donne tous les usages ; une option Bêta inconnue,
-        "hint" les liste ; neural-engine, glass, updates ou preview autre que on, off ; une mémoire hors de la plage de ce
+        "hint" les liste ; neural-engine, glass, updates, preview ou debug-live autre que on, off ; une mémoire hors de la plage de ce
         Mac), write (save-images : pas un dossier).
         """),
 

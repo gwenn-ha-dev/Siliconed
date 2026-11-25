@@ -208,7 +208,9 @@ private final class Server: @unchecked Sendable {
         CoreAI.neuralEngine = order.neuralEngine
         CoreAI.place(order.library.library)
         RenderLoop.keeping = order.keeping.map { URL(fileURLWithPath: $0) }
-        defer { RenderLoop.keeping = nil }
+        // The render's stages record their trace under the app's switch, and only theirs.
+        Stages.tracing = order.trace
+        defer { RenderLoop.keeping = nil; Stages.tracing = false }
         do {
             let request = try order.request(blobs)
             let model = try Model.named(order.model, in: order.library.library)

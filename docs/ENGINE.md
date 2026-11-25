@@ -33,6 +33,7 @@ A family uses a handful of types, all public, each with its tests:
 | `Bands`, `BandStage` | a network of layers over planes (a decoder, an encoder), each layer one function called band after band down its plane's rows, two calls in flight, the bands sized and the planes laid out by the engine |
 | `Layers` | a stack of layers (a text encoder, the Prompt Lab's writer), over the whole prompt at once or one token at a time through every layer |
 | `Memory`, `FootprintWatch` | the process's footprint, read as the system counts it; the fuse |
+| `Stages` | what the stages tell as they run: their plans, their cycles and rates, what their calls executed over their span (`Work`); under the trace (`Stages.tracing`, off unless asked), each stage's opening and close piece by piece and each run's units, busy and idle and where (`Trace`, `Occupancy`) |
 
 **A stage** is declared by its family: its tensors (in the heap, apart, or as surfaces), the weights it holds all along, the weights it can keep or read in turn by groups, the order its loop uses the groups in, the functions it loads. A stage may come in several forms, the tallest calls or bands first (`Block`'s heights, `Bands`' positions): each is planned, and the engine takes the first whose P and what Core AI will hold under its functions on this Mac (read before, or bounded from what was read: below) hold under the budget (`Stage.choose`).
 

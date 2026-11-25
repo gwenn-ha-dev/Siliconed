@@ -37,6 +37,7 @@ extension RemoteControlHelp {
       wait g2 [--out D]                        blocks until a grid's last cell; with --out, its sheet written there too
       status                                   what runs, what waits, the time left
       follow                                   live events until the queue is empty
+      trace                                    what the last render's stages executed; under Debug Live, where each unit's seconds went
       cancel [t3 …]                            stops the running render, or removes jobs
       clear                                    empties the queue and stops the running render
       set beta [OPTION on|off]                 the four Beta options of Settings, as a click; alone, reads them
@@ -46,6 +47,7 @@ extension RemoteControlHelp {
       set updates [on|off]                     Check at Launch of Settings: each launch asks GitHub for the latest version; alone, reads it
       set memory [GB|default]                  Memory Limit of Settings › Macs: the most a render holds (B); alone, reads it
       set preview [on|off]                     Preview every step, in the DiT box: the image taking shape after each step; alone, reads it
+      set debug-live [on|off]                  Debug Live, in the Machine window: the next renders record their trace; alone, reads it
       compiled [erase]                         what Core AI compiled for this Mac weighs; erase: erases it, as Settings › Macs does
       history [N]                              the session's images (most recent first)
       save i7 [i8 …] DEST [--format F]         writes images (.png/.jpg/.heic file, or folder in png|jpeg|heic)
@@ -130,6 +132,7 @@ extension RemoteControlHelp {
       wait g2 [--out D]                        bloque jusqu'à la dernière case d'une grille ; avec --out, y écrit aussi sa planche
       status                                   ce qui tourne, ce qui attend, le temps restant
       follow                                   les évènements en direct jusqu'à file vide
+      trace                                    ce qu'ont exécuté les étages du dernier rendu ; sous Debug live, où sont allées les secondes de chaque unité
       cancel [t3 …]                            arrête le rendu en cours, ou retire des travaux
       clear                                    vide la file et arrête le rendu en cours
       set beta [OPTION on|off]                 les quatre options Bêta des Réglages, comme un clic ; seul, les lit
@@ -139,6 +142,7 @@ extension RemoteControlHelp {
       set updates [on|off]                     Vérifier au lancement, des Réglages : chaque lancement demande à GitHub la dernière version ; seul, le lit
       set memory [Go|default]                  Limite de mémoire, de Réglages › Mac : le plus qu'un rendu tient (B) ; seul, la lit
       set preview [on|off]                     Aperçu à chaque pas, dans la boîte du DiT : l'image qui se forme après chaque pas ; seul, le lit
+      set debug-live [on|off]                  Debug live, dans la fenêtre Machine : les rendus suivants enregistrent leur trace ; seul, le lit
       compiled [erase]                         ce que Core AI a compilé pour ce Mac pèse ; erase : l'efface, comme Réglages › Mac
       history [N]                              les images de la session (la plus récente d'abord)
       save i7 [i8 …] DEST [--format F]         écrit des images (fichier .png/.jpg/.heic, ou dossier en png|jpeg|heic)
@@ -354,7 +358,7 @@ extension RemoteControlHelp {
            "running": {"job": "t3", "stage": "denoising", "compiling": false, "batch_image": 1, "step": 4,
                        "steps_total": 8, "fraction": 0.52, "remaining_s": 21.3, "model": "z-image",
                        "cycle": {"ane_rows": 2560, "rows": 4096, "seconds": 8.39, "tflops": 6.1,
-                                 "ane_tflops": 3.4, "gpu_tflops": 4.2},
+                                 "ane_tflops": 3.4, "gpu_tflops": 4.2, "ane_busy": 0.56, "gpu_busy": 0.91},
                        "prompt": "…", "seeds": [42], …} | null,
            "queue": [{"job": "t4", "estimate_s": 45.2, …}, …],
            "waiting_for_license": [{"job": "t5", "state": "waiting_for_license",
@@ -387,7 +391,9 @@ extension RemoteControlHelp {
                              the function it is at of those of that key, the models after it; null otherwise.
         cycle              : the DiT's last step, as the Chain inspector shows each: the Neural Engine's rows of those it
                              could take (0: the GPU alone), its seconds, its TFLOP/s — the block's, and the Neural Engine's
-                             and the GPU's over their own calls (null where they were not timed).
+                             and the GPU's over their own calls (null where they were not timed). Under Debug Live (help
+                             set), ane_busy and gpu_busy: each unit's busy seconds over the step's (help trace says where
+                             it idled); null otherwise.
         steps_total        : the model's evaluations, not the requested steps.
         remaining_s        : null until the app has a measurement for this render.
         remaining_complete : false if a waiting job has no estimate (queue_remaining_s is a minimum).
@@ -410,7 +416,7 @@ extension RemoteControlHelp {
            "running": {"job": "t3", "stage": "denoising", "compiling": false, "batch_image": 1, "step": 4,
                        "steps_total": 8, "fraction": 0.52, "remaining_s": 21.3, "model": "z-image",
                        "cycle": {"ane_rows": 2560, "rows": 4096, "seconds": 8.39, "tflops": 6.1,
-                                 "ane_tflops": 3.4, "gpu_tflops": 4.2},
+                                 "ane_tflops": 3.4, "gpu_tflops": 4.2, "ane_busy": 0.56, "gpu_busy": 0.91},
                        "prompt": "…", "seeds": [42], …} | null,
            "queue": [{"job": "t4", "estimate_s": 45.2, …}, …],
            "waiting_for_license": [{"job": "t5", "state": "waiting_for_license",
@@ -445,6 +451,8 @@ extension RemoteControlHelp {
         cycle              : le dernier pas du DiT, comme l'inspecteur Chaîne montre chacun : les rangées du Neural Engine
                              sur celles qu'il pouvait prendre (0 : le GPU seul), ses secondes, ses TFLOP/s — ceux du bloc, et
                              ceux du Neural Engine et du GPU sur leurs propres appels (null où ils n'ont pas été chronométrés).
+                             Sous Debug live (help set), ane_busy et gpu_busy : les secondes occupées de chaque unité sur
+                             celles du pas (help trace dit où elle a attendu) ; null sinon.
         steps_total        : les évaluations du modèle, pas les pas demandés.
         remaining_s        : null tant que l'app n'a pas de mesure pour ce rendu.
         remaining_complete : false si un travail en attente n'a pas d'estimation (queue_remaining_s est un minimum).
@@ -458,6 +466,88 @@ extension RemoteControlHelp {
                              "code": "license_not_accepted". « wait » les attend, « cancel t5 » les
                              retire. Rien ne peut accepter depuis le terminal : l'utilisateur lit la
                              licence dans l'app.
+        """),
+
+        "trace": Page(en: """
+        silicontrol trace
+
+        What the render under way, or the last one, executed, stage by stage. Does not block.
+
+        Answer:
+          {"ok": true, "debug_live": true,
+           "stages": [{"stage": "text", "work": [{"tflops": 2.1, "seconds": 0.42, "end": 1.03, "ane_fraction": 0}],
+                       "engine_stages": [{"name": "…", "opened": 0.31, "closed": 1.10,
+                                          "opening": [{"name": "arena", "seconds": 0.01}, …],
+                                          "closing": [{"name": "let go", "seconds": 0.02}, {"name": "footprint back", "seconds": 0.35}],
+                                          "runs": [{…occupancy…}]}]},
+                      {"stage": "denoising", "work": […],
+                       "cycles": [{"index": 1, "ane_rows": 2560, "rows": 4096, "seconds": 8.39, "end": 9.8, "tflops": 6.1,
+                                   "ane_tflops": 3.4, "gpu_tflops": 4.2,
+                                   "occupancy": {"seconds": 8.39, "ane_busy": 4.7, "gpu_busy": 7.6,
+                                                 "ane_idle": {"across_alone": 3.0, "at_groups": 0.4, "between": 0.1, "outside": 0.2},
+                                                 "gpu_idle": {…}, "unread": 0,
+                                                 "steps": [{"unit": "ane", "name": "…", "calls": 90, "rows": 46080,
+                                                            "seconds": 1.9, "tflops": 3.6}, …]}}, …]},
+                      {"stage": "decoding", "work": […], "engine_stages": […]}]}
+
+        work           : in every render, what each engine stage's calls executed over their span — from the first call
+                         to the last done, the waits between included: a text encoder's, a decoder's for each image, the
+                         DiT's whole —, its TFLOP/s, its seconds, its end, the Neural Engine's fraction of its FLOP.
+        cycles         : the DiT's steps, as in status ("cycle"); "occupancy" under Debug Live only, null otherwise.
+        occupancy      : where a run's seconds went: each unit's busy seconds, and where each stood idle — across_alone
+                         between two of its calls with a step of the GPU alone between them (the Neural Engine has nothing
+                         to do meanwhile; the GPU waits for its last calls before that step), at_groups at the start of a
+                         layer, between two calls of one stretch, outside before its first call and after its last —;
+                         each step's calls on each unit: "ane", "beside" (the GPU past the Neural Engine's rows),
+                         "alone" (the GPU's own steps), "edge"; "unread", the calls whose end was not read.
+        engine_stages  : under Debug Live, each engine stage's opening (arena, residents, ring, functions) and close (let
+                         go, then the wait for the memory to come back), in seconds, from "opened" and "closed" on the
+                         render's clock; its "runs", its calls outside the DiT's steps (a text encoder's layers, a
+                         decoder's bands).
+
+        Seconds on the render's clock, from its start (the Machine window's). Debug Live (help set) is read as a render
+        is asked: turned on during one, it records from the next. What it records stays in memory, the last render's.
+        """, fr: """
+        silicontrol trace
+
+        Ce qu'a exécuté le rendu en cours, ou le dernier, étage par étage. Ne bloque pas.
+
+        Réponse :
+          {"ok": true, "debug_live": true,
+           "stages": [{"stage": "text", "work": [{"tflops": 2.1, "seconds": 0.42, "end": 1.03, "ane_fraction": 0}],
+                       "engine_stages": [{"name": "…", "opened": 0.31, "closed": 1.10,
+                                          "opening": [{"name": "arena", "seconds": 0.01}, …],
+                                          "closing": [{"name": "let go", "seconds": 0.02}, {"name": "footprint back", "seconds": 0.35}],
+                                          "runs": [{…occupancy…}]}]},
+                      {"stage": "denoising", "work": […],
+                       "cycles": [{"index": 1, "ane_rows": 2560, "rows": 4096, "seconds": 8.39, "end": 9.8, "tflops": 6.1,
+                                   "ane_tflops": 3.4, "gpu_tflops": 4.2,
+                                   "occupancy": {"seconds": 8.39, "ane_busy": 4.7, "gpu_busy": 7.6,
+                                                 "ane_idle": {"across_alone": 3.0, "at_groups": 0.4, "between": 0.1, "outside": 0.2},
+                                                 "gpu_idle": {…}, "unread": 0,
+                                                 "steps": [{"unit": "ane", "name": "…", "calls": 90, "rows": 46080,
+                                                            "seconds": 1.9, "tflops": 3.6}, …]}}, …]},
+                      {"stage": "decoding", "work": […], "engine_stages": […]}]}
+
+        work           : dans tout rendu, ce qu'ont exécuté les appels de chaque étage du moteur sur leur durée — du premier
+                         appel au dernier fini, les attentes entre eux comprises : d'un encodeur de texte, d'un décodeur à
+                         chaque image, du DiT entier —, ses TFLOP/s, ses secondes, sa fin, la part de ses FLOP au Neural Engine.
+        cycles         : les pas du DiT, comme dans status ("cycle") ; "occupancy" sous Debug live seulement, null sinon.
+        occupancy      : où sont allées les secondes d'un passage : les secondes occupées de chaque unité, et où chacune a
+                         attendu — across_alone entre deux de ses appels séparés par une étape du GPU seul (le Neural
+                         Engine n'a rien à faire pendant ce temps ; le GPU attend ses derniers appels avant cette étape),
+                         at_groups au début d'une couche, between entre deux appels d'un même enchaînement, outside avant
+                         son premier appel et après son dernier — ; les appels de chaque étape sur chaque unité : "ane",
+                         "beside" (le GPU après les rangées du Neural Engine), "alone" (les étapes du GPU seul), "edge" ;
+                         "unread", les appels dont la fin n'a pas été lue.
+        engine_stages  : sous Debug live, l'ouverture de chaque étage du moteur (arène, résidents, anneau, fonctions) et sa
+                         fermeture (tout lâcher, puis l'attente du retour de la mémoire), en secondes, depuis "opened" et
+                         "closed" sur l'horloge du rendu ; ses "runs", ses appels hors des pas du DiT (les couches d'un
+                         encodeur de texte, les bandes d'un décodeur).
+
+        Secondes sur l'horloge du rendu, depuis son début (celle de la fenêtre Machine). Debug live (help set) se lit quand
+        un rendu est demandé : allumé pendant l'un, il enregistre à partir du suivant. Ce qu'il enregistre reste en mémoire,
+        celui du dernier rendu.
         """),
 
         "follow": Page(en: """

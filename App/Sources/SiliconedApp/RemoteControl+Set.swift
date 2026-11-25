@@ -51,12 +51,15 @@ extension RemoteControl {
     /// - `glass`: Settings › General's Glass. `updates`: Settings › General's Check at Launch.
     /// - `preview`: the DiT box's « Preview every step » — the window's state, this Mac's or the one it computes on, whose
     ///   renders it changes from the next one on (`add --preview` and `--no-preview` still decide for one job).
+    /// - `debug-live`: the Machine window's Debug Live, this Mac's (`AppState.debugLive`): the renders asked from then on
+    ///   record their trace, which `trace` reads; off at every launch.
     func setToggle(_ toggle: SetOrder.Toggle, _ on: Bool?) -> [String: Any] {
         let (key, read, write): (String, () -> Bool, (Bool) -> Void) = switch toggle {
         case .neuralEngine: ("neural_engine", { self.local.neuralEngine }, { self.local.neuralEngine = $0 })
         case .glass: ("glass", { self.local.glass }, { self.local.glass = $0 })
         case .updates: ("updates", { Updates.shared.atLaunch }, { Updates.shared.atLaunch = $0 })
         case .preview: ("preview", { self.app.previews }, { self.app.previews = $0 })
+        case .debugLive: ("debug_live", { self.local.debugLive }, { self.local.debugLive = $0 })
         }
         let previous = read()
         if let on { write(on) }

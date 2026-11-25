@@ -15,6 +15,7 @@
 //         COMPUTE, IN TFLOP/S ░░▅▆▆▆▇▇▇▇▇▇▇▇▇▇▇▇▇░░
 //         0       10 s      20 s      30 s
 //         Text |          DiT              | VAE
+//         [ ] Debug Live
 //
 // - **The Mac that computes**: this one, or the lender in a mirror — named by its model, not by the name its owner gave
 //   it —; the memory Siliconed may hold of it, said as Siliconed's.
@@ -24,8 +25,11 @@
 //   before the engine's stages opened —, the model's weights they hold (`Engine.MemoryLevel`: the residents, the groups
 //   kept, the ring's slots), and above them the intermediates (the stages' tensors and Core AI's working memory, what
 //   comes and goes within the calls), under Siliconed's limit. The compute, in TFLOP/s: each DiT cycle at its rate, the
-//   Neural Engine's part over the GPU's (`Engine.Cycle.aneFraction`), a mark where the share moved. The text encoder's
-//   and the VAE's rates are not counted yet: their spans are shaded.
+//   Neural Engine's part over the GPU's (`Engine.Cycle.aneFraction`), a mark where the share moved; the text encoder's
+//   and the VAE's at their rate over their calls' span (`Engine.Held.work`, the VAE's an image each). A stage that told
+//   no rate (a text read from the cache, a Mac lent that does not say it) is shaded.
+// - **Debug Live** (`AppState.debugLive`, this Mac's, off at every launch): the next renders record their trace, which
+//   `silicontrol trace` reads; under the pointer, a DiT step's units busy over its seconds.
 // - **Its refresh is the data's**: the memory comes four times a second while a stage is open, a cycle at its end; the
 //   pointer redraws the readout and the line under it, not the graphs (`Equatable` lanes).
 
@@ -51,6 +55,7 @@ struct MachineInspector: View {
                         RenderTimeline(series: m.memory, held: m.held,
                                        cycles: m.held.first { $0.stage == .denoising }?.cycles ?? [])
                     }
+                    if app.mirror == nil { debugLive }
                 }
             }
             .padding(12)
@@ -60,6 +65,17 @@ struct MachineInspector: View {
     }
 
     private var m: Measures { app.measurements }
+
+    /// The switch, and what it does said under it.
+    private var debugLive: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Toggle("Debug Live", isOn: Binding(get: { app.debugLive }, set: { app.debugLive = $0 }))
+                .toggleStyle(.checkbox)
+            Text("The next renders record where each unit’s time goes, read by silicontrol trace. Off at every launch.")
+                .font(.caption).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.top, 6)
+    }
 
     // ── The Mac ──
 
@@ -237,9 +253,14 @@ private struct RenderTimeline: View {
                                                    : String(localized: "\(span.kept) of \(span.groups) weight groups kept"))
         }
         if let c = t.cycle(at: at) {
-            parts.append(String(localized: "ANE \(Figures.tflops(c.ane)) + GPU \(Figures.tflops(c.gpu)) TFLOP/s"))
-            parts.append(c.rows > 0 ? String(localized: "\(c.rows) rows on the ANE") : String(localized: "GPU only"))
-        } else if let stage, stage != .denoising {
+            parts.append(c.ane > 0 || c.cycle ? String(localized: "ANE \(Figures.tflops(c.ane)) + GPU \(Figures.tflops(c.gpu)) TFLOP/s")
+                                              : String(localized: "GPU \(Figures.tflops(c.gpu)) TFLOP/s"))
+            if c.cycle { parts.append(c.rows > 0 ? String(localized: "\(c.rows) rows on the ANE") : String(localized: "GPU only")) }
+            if let busy = c.busy {
+                let ane = Figures.percent(Int((busy.ane * 100).rounded())), gpu = Figures.percent(Int((busy.gpu * 100).rounded()))
+                parts.append(String(localized: "busy: ANE \(ane), GPU \(gpu)"))
+            }
+        } else if let stage, stage != .denoising, !t.counted.contains(stage) {
             parts.append(String(localized: "rates not counted"))
         }
         return parts.joined(separator: " · ")
@@ -258,19 +279,26 @@ private struct Timeline: Equatable {
         let floor: Int?
     }
 
-    /// A DiT cycle on the render's clock, its block's rate split between the units.
+    /// A DiT cycle on the render's clock, its block's rate split between the units; or another stage's calls over
+    /// their span (`Engine.Work`: not a cycle, no rows).
     struct Laid: Equatable {
         let from, to: Double
         let ane, gpu: Double
         let rows: Int
         /// Its rows on the Neural Engine are not the cycle before's.
         let moved: Bool
+        var cycle = true
+        /// Under Debug Live: each unit's busy seconds over the cycle's (`Engine.Occupancy`).
+        var busy: Busy? = nil
         var total: Double { ane + gpu }
+        struct Busy: Equatable { let ane, gpu: Double }
     }
 
     let series: Engine.MemorySeries
     let spans: [Span]
     let laid: [Laid]
+    /// The stages other than the DiT that told their rates.
+    let counted: Set<Engine.Stage>
     let duration: Double
     let limit: Int
 
@@ -282,10 +310,23 @@ private struct Timeline: Equatable {
         for (n, c) in cycles.enumerated() {
             let to = c.end ?? cursor + c.seconds, from = max(0, to - c.seconds)
             let ane = c.tflops * (c.aneFraction ?? 0)
-            laid.append(Laid(from: from, to: to, ane: ane, gpu: c.tflops - ane, rows: c.rows, moved: n > 0 && cycles[n - 1].rows != c.rows))
+            var l = Laid(from: from, to: to, ane: ane, gpu: c.tflops - ane, rows: c.rows, moved: n > 0 && cycles[n - 1].rows != c.rows)
+            l.busy = c.occupancy.flatMap { o in o.seconds > 0 ? Laid.Busy(ane: o.ane / o.seconds, gpu: o.gpu / o.seconds) : nil }
+            laid.append(l)
             cursor = to
         }
-        self.laid = laid
+        // The other stages' calls, each run at its rate over its span: one that does not say its end is not laid.
+        var counted = Set<Engine.Stage>()
+        for h in held where h.stage != .denoising {
+            for w in h.work {
+                guard let to = w.end, w.seconds > 0 else { continue }
+                let ane = w.tflops * w.aneFraction
+                laid.append(Laid(from: max(0, to - w.seconds), to: to, ane: ane, gpu: w.tflops - ane, rows: 0, moved: false, cycle: false))
+                counted.insert(h.stage)
+            }
+        }
+        self.counted = counted
+        self.laid = laid.sorted { $0.from < $1.from }
         let duration = max(series.duration, laid.last?.to ?? 0, 0.001)
         self.duration = duration
         let marks = series.marks
@@ -383,8 +424,8 @@ private struct MemoryLane: View, Equatable {
 }
 
 /// **The compute lane, in TFLOP/s**: each DiT cycle a column as wide as it lasted, at its block's rate — the GPU's part
-/// under, the Neural Engine's over it —, a mark at the top where the share moved; the stages whose rates are not counted
-/// shaded.
+/// under, the Neural Engine's over it —, a mark at the top where the share moved; the text encoder's and the VAE's calls
+/// each a column over their span; the stages that told no rate shaded.
 private struct ComputeLane: View, Equatable {
     let timeline: Timeline
 
@@ -399,7 +440,7 @@ private struct ComputeLane: View, Equatable {
         let top = max(t.laid.map(\.total).max() ?? 0, 0.5) * 1.15
         let y: (Double) -> CGFloat = { h - h * CGFloat($0 / top) }
         let x: (Double) -> CGFloat = { size.width * CGFloat($0 / t.duration) }
-        for s in t.spans where s.stage != .denoising {
+        for s in t.spans where s.stage != .denoising && !t.counted.contains(s.stage) {
             context.fill(Path(CGRect(x: x(s.from), y: 0, width: max(1, x(s.to) - x(s.from)), height: h)), with: .color(Palette.well))
         }
         for line in Timeline.grid(top, steps: [0.5, 1, 2, 5, 10, 20, 50], count: 4) {

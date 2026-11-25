@@ -308,6 +308,7 @@ extension Block {
     /// the share of none's —: kept on this Mac at the block's close (`keepRates`), no file written in flight.
     func cycled(until end: UInt64) {
         defer { lastCalls = nil; flops = Stages.Flops() }
+        if traced { told(until: end) }
         guard let b = begun else { return }
         begun = nil
         let cycle = Stages.Cycle(block: declaration.name, unit: b.unit, rows: b.rows, shareable: shareable / b.unit * b.unit,
@@ -317,6 +318,44 @@ extension Block {
         // The last cycle beside the ANE has no calls timed (`rebalance` times them at the next cycle's start): the one before kept.
         guard !key.isEmpty, b.moved == nil, b.climbed == nil, !b.first, !b.trying, b.rows == 0 || lastCalls != nil else { return }
         warmRates = cycle.rates
+    }
+
+    /// **The trace's calls told** (`Stages.Trace.calls`): those recorded since the cycle under way began, the cycle's
+    /// under its ordinal; before the first cycle — groups run once, edges — or in a block that runs none, a run of its
+    /// own, to its last call's end. The stream runs ahead of the calls put on it: a run whose GPU calls are not all done
+    /// waits for the next one's telling, or the close (`toldLast`), its ends read then, never waited for.
+    func told(until end: UInt64) {
+        let cycle: Int? = begun == nil ? nil : traceCycles
+        if begun != nil { traceCycles += 1 }
+        if let p = pendingTrace { pendingTrace = nil; tell(p) }
+        guard !recorded.isEmpty else { return }
+        let run = PendingTrace(cycle: cycle, start: begun?.at, end: begun == nil ? nil : end, records: recorded)
+        recorded = []
+        if run.records.contains(where: { $0.end?.value.load(ordering: .acquiring) == 0 }) { pendingTrace = run } else { tell(run) }
+    }
+
+    /// The run held for its ends, told at the block's close.
+    func toldLast() {
+        if let p = pendingTrace { pendingTrace = nil; tell(p) }
+    }
+
+    /// A run of calls told: a GPU call's start its encoding or the call before's end, the later (`Timing`); an end its
+    /// wait has not written yet left unread.
+    private func tell(_ run: PendingTrace) {
+        let calls = run.records.map { r -> Stages.Called in
+            var c = r.call
+            if let e = r.end {
+                c.end = e.value.load(ordering: .acquiring)
+                c.start = max(r.encoded, r.after?.value.load(ordering: .acquiring) ?? 0)
+            }
+            return c
+        }
+        let first: UInt64 = calls.map(\.start).filter { $0 > 0 }.min() ?? 0
+        let start: UInt64 = run.start ?? first
+        let last: UInt64 = calls.map(\.end).max() ?? start
+        let stop: UInt64 = run.end ?? max(last, start)
+        // Told under the stage's name, as its opening and its close are (`Stage.Declaration.name`, not the block's).
+        Stages.tell(.traced(.calls(stage: stage.plan.declaration.name, cycle: run.cycle, Stages.occupancy(calls, start: start, end: stop))))
     }
 
     /// **What the block measured, kept on this Mac** at its close, once a block: its last warm cycle's rates

@@ -129,6 +129,14 @@ package final class StageWatch: @unchecked Sendable {
         package var open = true
         /// Its block's cycles as they ran (`SiliCore.Stages.Cycle`).
         package var cycles: [SiliCore.Stages.Cycle] = []
+        /// What its calls executed, over their spans (`SiliCore.Stages.Work`).
+        package var works: [SiliCore.Stages.Work] = []
+        /// What the trace recorded (`SiliCore.Stages.Trace`): its opening and close from their starts, piece by piece;
+        /// each cycle's occupancy by its ordinal; its runs of calls outside the cycles.
+        package var openingStart: UInt64?, closingStart: UInt64?
+        package var opening: [SiliCore.Stages.Piece] = [], closing: [SiliCore.Stages.Piece] = []
+        package var traced: [Int: SiliCore.Stages.Occupancy] = [:]
+        package var runs: [SiliCore.Stages.Occupancy] = []
     }
 
     private let lock = NSLock()
@@ -250,6 +258,20 @@ package final class StageWatch: @unchecked Sendable {
             lock.withLock { if let i = entries.lastIndex(where: \.open) ?? entries.indices.last { entries[i].neuralEngine = share } }
         case .cycle(let c):
             lock.withLock { if let i = entries.lastIndex(where: \.open) ?? entries.indices.last { entries[i].cycles.append(c) } }
+        case .work(let w):
+            lock.withLock { if let i = entry(w.stage) { entries[i].works.append(w) } }
+        case .traced(let t):
+            lock.withLock {
+                switch t {
+                case .opening(let stage, let start, let pieces):
+                    if let i = entry(stage) { (entries[i].openingStart, entries[i].opening) = (start, pieces) }
+                case .closing(let stage, let start, let pieces):
+                    if let i = entry(stage) { (entries[i].closingStart, entries[i].closing) = (start, pieces) }
+                case .calls(let stage, let cycle, let o):
+                    guard let i = entry(stage) else { return }
+                    if let cycle { entries[i].traced[cycle] = o } else { entries[i].runs.append(o) }
+                }
+            }
         case .compiling:
             guard lock.withLock({ () -> Bool in
                 guard let stage = order.last else { return false }
@@ -266,6 +288,27 @@ package final class StageWatch: @unchecked Sendable {
             }) else { return }
             changed?()
         }
+    }
+
+    /// Under `lock`: the engine stage named `name`, the last open one, else the last one.
+    private func entry(_ name: String) -> Int? {
+        entries.lastIndex { $0.open && $0.name == name } ?? entries.lastIndex { $0.name == name }
+    }
+
+    /// An occupancy as a render tells it (`Engine.Occupancy`): each step's TFLOP/s over its calls' seconds.
+    static func occupancy(_ o: SiliCore.Stages.Occupancy) -> Engine.Occupancy {
+        func idle(_ i: SiliCore.Stages.Occupancy.Idle) -> Engine.Occupancy.Idle {
+            var x = Engine.Occupancy.Idle()
+            (x.acrossAlone, x.atGroups, x.between, x.outside) = (i.acrossAlone, i.atGroups, i.between, i.outside)
+            return x
+        }
+        var x = Engine.Occupancy(seconds: o.seconds, ane: o.ane, gpu: o.gpu)
+        (x.aneIdle, x.gpuIdle, x.unread) = (idle(o.aneIdle), idle(o.gpuIdle), o.unread)
+        x.steps = o.steps.map { s in
+            Engine.Occupancy.Step(unit: s.unit, name: s.name, calls: s.calls, rows: s.rows, seconds: s.seconds,
+                                  tflops: s.seconds > 0 ? Double(s.flops) / s.seconds / 1e12 : 0)
+        }
+        return x
     }
 
     /// **What each stage of the render held so far**, in their order (`Engine.Held`), and the render's Neural Engine
@@ -289,12 +332,26 @@ package final class StageWatch: @unchecked Sendable {
                 if !e.open { lived += e.seconds; shared += e.seconds * (e.neuralEngine ?? 0) }
                 // Its block's cycles as they ran, each with its rates: the last block of the stage that ran one.
                 if !e.cycles.isEmpty {
-                    h.cycles = e.cycles.map { c in
+                    h.cycles = e.cycles.enumerated().map { n, c in
                         let r = c.rates, total = c.flops.ane + c.flops.gpu
                         return Engine.Cycle(rows: c.rows, shareable: c.shareable, unit: c.unit, zero: c.trying, seconds: c.seconds,
                                             tflops: r.block, neuralEngine: r.ane, gpu: r.gpu, end: recorder.seconds(c.end),
-                                            aneFraction: total > 0 ? Double(c.flops.ane) / Double(total) : nil)
+                                            aneFraction: total > 0 ? Double(c.flops.ane) / Double(total) : nil,
+                                            occupancy: e.traced[n].map(Self.occupancy))
                     }
+                }
+                h.work += e.works.map { w in
+                    let total = w.flops.ane + w.flops.gpu
+                    return Engine.Work(tflops: w.rate, seconds: w.seconds, end: recorder.seconds(w.end),
+                                       aneFraction: total > 0 ? Double(w.flops.ane) / Double(total) : 0)
+                }
+                if e.openingStart != nil || e.closingStart != nil || !e.runs.isEmpty {
+                    var t = Engine.StageTrace(name: e.name)
+                    (t.opened, t.closed) = (e.openingStart.map(recorder.seconds), e.closingStart.map(recorder.seconds))
+                    t.opening = e.opening.map { Engine.StageTrace.Piece(name: $0.name, seconds: $0.seconds) }
+                    t.closing = e.closing.map { Engine.StageTrace.Piece(name: $0.name, seconds: $0.seconds) }
+                    t.runs = e.runs.map(Self.occupancy)
+                    h.traces.append(t)
                 }
             }
             if let largest = mine.max(by: { $0.groups < $1.groups }) { (h.groups, h.kept) = (largest.groups, largest.kept) }
