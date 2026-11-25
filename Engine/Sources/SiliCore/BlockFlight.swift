@@ -2,7 +2,7 @@ import CoreAI
 import Foundation
 
 /// **The ANE's share followed in flight**: the calls' height climbed, the share moved to the one predicted to finish
-/// first where it pays its move, the share of none measured once.
+/// first where it pays its move, the share of none among them (visited where predicted the fastest, or to measure κ).
 extension Block {
     /// **The cycles its client says are left**, said before each, that one included (its loop's calls, and those it will
     /// run after): what a move at that cycle's start is weighed against (`pays`). Never said, a move must pay itself back
@@ -75,7 +75,8 @@ extension Block {
     func rebalance(last: Double?, warm: Bool) async throws -> Double? {
         defer { cycleRecords = [] }
         observe(last: last, warm: warm)
-        if let z = zero, let last, z != .due || warm { return try await probe(z, last: last) }
+        // At 0 rows: the visit goes on (its cycles' calls are not timed).
+        if let z = zero, let last, z != .due { return try await probe(z, last: last) }
         var records: [[Timed]] = []
         for r in cycleRecords {
             var record = r
@@ -105,7 +106,31 @@ extension Block {
         try admit()
         func predicted(_ u: Int) -> Double { Self.predicted(smoothed, measured: a0, rows: u * unit) }
         let best = Self.bestShare(smoothed, measured: a0, unit: unit, shareable: shareable, admitted: admitted ?? []).rows / unit
+        // The share of none, visited where κ is unknown (`zero` due: the visit measures it), or where the curve predicts it
+        // the fastest and the move pays — once a block: its own κ is the visit's from then on.
+        if let last, zero == .due || shouldVisitZero(than: predicted(best), now: predicted(units)) {
+            zero = .due
+            return try await probe(.due, last: last)
+        }
         return best != units && pays(predicted(units) - predicted(best)) ? try await move(units: best) : nil
+    }
+
+    /// **Whether the share of none is predicted the fastest** (`zero`): its cycle predicted from the smoothed calls at the
+    /// share and this block's κ, faster than the best share's, and the move there paying over the cycles left.
+    private func shouldVisitZero(than best: Double, now: Double) -> Bool {
+        guard let alone, !zeroVisited, let at = smoothedAt else { return false }
+        let zero = Self.predicted(smoothed, measured: at, rows: 0, alone: alone)
+        return zero < best && pays(now - zero)
+    }
+
+    /// **κ, from a warm cycle at 0 rows** that took `zero` seconds and the smoothed calls at the share `a0` before it: the
+    /// GPU's past the ANE's rows over every row at their seconds a row beside the ANE, against the cycle's own past its
+    /// `gpu` steps (which run alone at any share). Nil where the cycle is no longer than those steps.
+    static func aloneRate(_ records: [[Timed]], measured a0: Int, zero: Double) -> Double? {
+        let fixed = records.joined().filter { $0.kind == .fixed }.reduce(0) { $0 + $1.seconds }
+        let beside = predicted(records, measured: a0, rows: 0) - fixed
+        guard zero > fixed, beside > 0 else { return nil }
+        return beside / (zero - fixed)
     }
 
     /// **The cycle before, observed** at the next one's start: the noise, the difference
@@ -209,6 +234,7 @@ extension Block {
     private func probe(_ z: Zero, last: Double) async throws -> Double? {
         switch z {
         case .due:
+            zeroVisited = true
             let rows = units * unit
             // Refused under B: told with the cycle (`Stages.Cycle.refused`), measured again at the next opening.
             guard let loaded = try await move(units: 0, keep: false) else { zero = nil; zeroRefused = true; return nil }
@@ -222,15 +248,22 @@ extension Block {
         }
     }
 
-    /// **A warm cycle at 0 rows taken `zero` seconds**, against `seconds` at `share` rows: kept on this Mac by key
-    /// (`ThisMac.zeros`: the next opening does not measure it again), and the share of none kept for the next openings
-    /// where it took less (`flight`). This block goes back to the share only where that pays its move over the cycles
-    /// left (`pays`). True: it stays at 0.
+    /// **A warm cycle at 0 rows taken `zero` seconds**, against `seconds` at `share` rows: κ measured from it and the
+    /// smoothed calls at the share (`aloneRate`), this block's from now on and its arithmetic's on this Mac, smoothed from block
+    /// to block (`ThisMac.Capacity.alone`: the next openings predict their share of none, and visit it no more); the share
+    /// of none kept for the next openings where it took less (`flight`). This block goes back to the share only where that
+    /// pays its move over the cycles left (`pays`). True: it stays at 0.
     func zeroMeasured(at zero: Double, share rows: Int, _ seconds: Double) -> Bool {
         self.zero = nil
-        let (blockKey, wins) = (key, zero <= seconds)
+        let (blockKey, arithmetic, wins) = (key, arithmetic, zero <= seconds)
+        let measured = smoothedAt.flatMap { Self.aloneRate(smoothed, measured: $0, zero: zero) }
+        if let measured { alone = measured }
         try? ThisMac.update {
-            $0.zeros = ($0.zeros ?? [:]).merging([blockKey: zero]) { $1 }
+            if let measured {
+                var c = $0.capacities?[arithmetic] ?? ThisMac.Capacity()
+                c.alone = Self.smoothing(c.alone, measured)
+                $0.capacities = ($0.capacities ?? [:]).merging([arithmetic: c]) { $1 }
+            }
             if wins { $0.flight = ($0.flight ?? [:]).merging([blockKey: 0]) { $1 } }
         }
         return wins || !pays(zero - seconds)
@@ -297,8 +330,10 @@ extension Block {
     /// at theirs (`neural` times them: another unit's cost a row); the `gpu` steps' calls, in turn. (A balance of the
     /// pass's sums, f = 1 / (1 + r), overlaps the ANE with every `gpu` step: 7 units of 256 at 1024² predicted 1.99 s, run
     /// in 2.60; this, 2.57 — measured 19/11 on the mini.)
-    static func predicted(_ records: [[Timed]], measured a0: Int, rows a: Int, neural: Double = 1) -> Double {
-        records.reduce(0) { sum, r in
+    static func predicted(_ records: [[Timed]], measured a0: Int, rows a: Int, neural: Double = 1, alone: Double = 1) -> Double {
+        // At 0 rows the GPU runs every row alone, κ times its rate beside the ANE (`ThisMac.Capacity.alone`).
+        let gpuRate = a == 0 ? alone : 1
+        return records.reduce(0) { sum, r in
             var steps: [String: (kind: Timed.Kind, phase: Int, seconds: Double, rows: Int)] = [:]
             for c in r {
                 let k = "\(c.kind) \(c.step)"
@@ -309,7 +344,7 @@ extension Block {
             for s in steps.values {
                 switch s.kind {
                 case .neural: ane[s.phase, default: 0] += s.seconds * neural * Double(a) / Double(max(a0, 1))
-                case .past: gpu[s.phase, default: 0] += s.seconds / Double(s.rows) * Double(max(s.rows - (a - a0), 0))
+                case .past: gpu[s.phase, default: 0] += s.seconds / Double(s.rows) * Double(max(s.rows - (a - a0), 0)) / gpuRate
                 case .fixed: serial += s.seconds
                 }
             }

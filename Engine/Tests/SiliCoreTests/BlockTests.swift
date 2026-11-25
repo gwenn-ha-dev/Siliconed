@@ -183,12 +183,12 @@ import Testing
     }
 
     /// The entries of the rules before (`units`, `neuralUnits`: a unit by key; `capacities`' `unit`: a unit by
-    /// arithmetic, tried; `paces`) are no decision: the unit is the arithmetic's (`neuralUnit`), and a block whose share of
-    /// none was timed before measures it once more.
+    /// arithmetic, tried; `paces`; `zeros`: a block's share of none, timed by key) are no decision: the unit is the
+    /// arithmetic's (`neuralUnit`), and the share of none is predicted from κ, measured once by arithmetic.
     @Test func anOldEntryDecidesNothing() throws {
-        let old = #"{"units": {"block k": 256}, "neuralUnits": {"block k": 512}, "paces": {"pace p": 1.5}, "flight": {"block k": 1024}}"#
+        let old = #"{"units": {"block k": 256}, "neuralUnits": {"block k": 512}, "paces": {"pace p": 1.5}, "zeros": {"block k": 5.6}, "flight": {"block k": 1024}}"#
         let m = try JSONDecoder().decode(ThisMac.self, from: Data(old.utf8))
-        #expect(m.capacities == nil && m.zeros == nil && m.flight?["block k"] == 1024)
+        #expect(m.capacities == nil && m.flight?["block k"] == 1024)
         let tried = #"{"capacities": {"codes": {"unit": 1024, "ratio": 0.37}}}"#
         #expect(try JSONDecoder().decode(ThisMac.self, from: Data(tried.utf8)).capacities == ["codes": ThisMac.Capacity(ratio: 0.37)])
     }
@@ -241,6 +241,26 @@ import Testing
         #expect(Block.predicted([pass, pass], measured: 256, rows: 256, neural: 2) == 2 * (0.5 + 2 + 0.75))
         let f = Self.declaration.forms[0]
         #expect(f.steps.indices.map { Block.phase(f, $0) } == [0, 0, 1])
+    }
+
+    /// **The share of none, predicted from a cycle at a share and κ** (`ThisMac.Capacity.alone`): the GPU's past rows over
+    /// every row, κ times faster alone, its `gpu` steps as they were; and κ read back from the cycle at 0 it predicts.
+    /// Z-Image Compact 1024² on the M1 Pro (25/11/2026): the GPU beside the ANE at 2048 rows 6.60 s for 2108 rows a layer,
+    /// its `gpu` steps 3.15 s; at 0, 16.14 s: κ 1.00.
+    @Test func theShareOfNoneIsPredictedByKappa() {
+        typealias C = Block.Timed
+        let cycle: [[C]] = [[C(kind: .neural, step: "ffn", phase: 0, rows: 2048, seconds: 3.84),
+                             C(kind: .past, step: "ffn", phase: 0, rows: 2108, seconds: 6.60),
+                             C(kind: .fixed, step: "heads", phase: 1, rows: 4156, seconds: 3.15)]]
+        let beside = 6.60 / 2108 * 4156
+        #expect(abs(Block.predicted(cycle, measured: 2048, rows: 0) - (beside + 3.15)) < 1e-9)
+        #expect(abs(Block.predicted(cycle, measured: 2048, rows: 0, alone: 1.24) - (beside / 1.24 + 3.15)) < 1e-9)
+        // κ touches the share of none only.
+        #expect(Block.predicted(cycle, measured: 2048, rows: 2048, alone: 1.24) == Block.predicted(cycle, measured: 2048, rows: 2048))
+        #expect(Block.aloneRate(cycle, measured: 2048, zero: beside / 1.24 + 3.15).map { abs($0 - 1.24) < 1e-9 } == true)
+        #expect(abs(Block.aloneRate(cycle, measured: 2048, zero: 16.14)! - 1.0) < 0.01)
+        // A cycle at 0 no longer than the `gpu` steps tells nothing.
+        #expect(Block.aloneRate(cycle, measured: 2048, zero: 3.0) == nil)
     }
 
     /// A tapped run is the GPU's alone over every row: a block declared tapped has the GPU's functions of the whole pass

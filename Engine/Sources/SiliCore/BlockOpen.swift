@@ -25,8 +25,8 @@ extension Block {
     /// **The block of `d` under `budget`**: the ANE's unit (`unit`, its arithmetic's) and share (`Share`; in flight, this
     /// Mac's last), its functions built at the calls' rows and named by their bytes, the plan of the first cut whose socle
     /// holds, the stage made; the ANE's share said (`Stages.computed`). In flight, its share of none (the GPU alone, the
-    /// same functions) is measured once on this Mac like any other share (`zero`): a point of the same curve, legitimate
-    /// wherever the ANE gains nothing.
+    /// same functions) is a point of the same curve, legitimate wherever the ANE gains nothing: predicted from this Mac's
+    /// κ, visited where it is predicted the fastest, and where κ is not known yet (`zero`).
     public static func open(_ device: MTLDevice, _ d: Declaration, files: [SafeTensors], budget: Int, share: Share,
                             measured: ThisMac = .current) async throws -> Block {
         let began = DispatchTime.now().uptimeNanoseconds
@@ -35,7 +35,9 @@ extension Block {
         let stage = try await Stage(device, plan: o.plans[o.height], files: files, measured: measured)
         let block = Block(d, stage: stage, heights: o.heights, height: o.height, unit: o.unit, total: o.total, units: o.units, share: share,
                           key: o.key, arithmetic: o.arithmetic,
-                          zero: o.inFlight && o.units > 0 && measured.zeros?[o.key] == nil,
+                          // κ unknown on this Mac for its arithmetic: the share of none visited, to measure it.
+                          zero: o.inFlight && o.units > 0 && measured.capacities?[o.arithmetic]?.alone == nil,
+                          alone: measured.capacities?[o.arithmetic]?.alone,
                           shareable: d.shareable, neuralRows: o.neuralRows,
                           copies: o.copies, named: named, signatures: o.signatures, forms: o.forms, groups: o.groups, resolver: o.resolver)
         block.told()

@@ -24,11 +24,11 @@ public enum Stages {
     }
 
     /// **A cycle of a block, as it ran**: the ANE's rows over it at its unit (0: the GPU alone) of the rows it could
-    /// take, whether it measures the share of none (`Block.zero`: a block's first cycles on this Mac); its seconds from
+    /// take, whether it visits the share of none (`Block.zero`: where this Mac's κ is unknown, or predicted the fastest); its seconds from
     /// its first group to the next cycle's first (the last cycle's, to the block's close); what
     /// its start loaded, in seconds — the GPU's functions of a share moved (`moved`), of taller calls (`climbed`); nil,
     /// nothing; its calls' seconds, where they were timed (a share in flight, every cycle but the last); whether its
-    /// start's move to the share of none was refused under B (`Block.zero`: measured again at the next opening); what its
+    /// start's move to the share of none was refused under B (`Block.zero`: κ measured at a later opening); what its
     /// calls executed (`flops`), and the rates that gives (`rates`).
     public struct Cycle: Sendable, Equatable {
         public let block: String

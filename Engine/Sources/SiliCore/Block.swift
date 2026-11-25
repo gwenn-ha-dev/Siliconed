@@ -62,13 +62,19 @@ public final class Block: @unchecked Sendable {
     /// The shareable rows; the per-row tensors the ANE reads, on surfaces (`places`).
     let shareable: Int
     let neuralRows: Set<String>
-    /// **The share of none, measured once on this Mac** (`probe`): a block whose GPU alone was never timed here runs two
-    /// cycles at 0 rows — the GPU alone on the same functions and weights, what no cycle beside
-    /// the ANE predicts: the GPU runs faster a row alone than beside it — the first cold (its calls carry their
-    /// specialization), the second against a warm cycle at the share; the faster kept. `due`: to run once a warm cycle at
-    /// the share ran; `cold`, `measured`: at 0 now, the share it left and that share's cycle seconds. Nil: none to run.
+    /// **The share of none, visited** (`probe`): two cycles at 0 rows — the GPU alone on the same functions and weights —,
+    /// the first cold (its calls carry their first calls), the second against a warm cycle at the share; the faster kept.
+    /// Visited where this Mac's κ for the block's arithmetic is not known yet, which the visit measures
+    /// (`ThisMac.Capacity.alone`), and where the curve predicts it the fastest (`rebalance`): a point of the curve like
+    /// any other share, predicted from the cycles at a share and κ, not measured on each key. `due`: to
+    /// run once a warm cycle at the share ran; `cold`, `measured`: at 0 now, the share it left and that share's cycle
+    /// seconds. Nil: none to run.
     var zero: Zero?
     enum Zero: Equatable { case due, cold(rows: Int, seconds: Double), measured(rows: Int, seconds: Double) }
+    /// **κ for this block** (`ThisMac.Capacity.alone`): its arithmetic's on this Mac at the opening, then its own once it
+    /// visited the share of none; nil, unknown. Whether it visited it: once a block.
+    var alone: Double?
+    var zeroVisited = false
     /// The buffers a GPU call has read or written (`encode`).
     var seen = Set<ObjectIdentifier>()
     /// The cycle under way, told once done (`Stages.Event.cycle`): its start, the ANE's rows over it and their unit, whether
@@ -89,7 +95,7 @@ public final class Block: @unchecked Sendable {
     public let named: Double
 
     let share: Share
-    /// The block's key on this Mac: its ANE's steps and its shareable rows (`ThisMac.flight`, `zeros`, `rates`); its
+    /// The block's key on this Mac: its ANE's steps and its shareable rows (`ThisMac.flight`, `rates`); its
     /// arithmetic (`arithmetic`: `ThisMac.capacities`).
     let key: String, arithmetic: String
     /// **What the share follows** (`rebalance`): the shares of whole units that hold under B as estimated (`admit`; a
@@ -277,11 +283,11 @@ public final class Block: @unchecked Sendable {
     static func digest(_ bytes: Data) -> String { Data(SHA256.hash(data: bytes)).prefix(8).map { String(format: "%02x", $0) }.joined() }
 
     init(_ d: Declaration, stage: Stage, heights: [Height], height: Int, unit: Int, total: Int, units: Int, share: Share, key: String,
-                 arithmetic: String, zero: Bool, shareable: Int, neuralRows: Set<String>, copies: Set<String>, named: Double,
+                 arithmetic: String, zero: Bool, alone: Double?, shareable: Int, neuralRows: Set<String>, copies: Set<String>, named: Double,
                  signatures: [String: Signature], forms: [String: Form], groups: [String: Group], resolver: Resolver) {
         (declaration, self.stage, self.heights, self.height, self.unit, self.total, self.units, self.share) = (d, stage, heights, height, unit, total, units, share)
         (self.key, self.arithmetic, self.shareable, self.neuralRows) = (key, arithmetic, shareable, neuralRows)
-        self.zero = zero ? .due : nil
+        (self.alone, self.zero) = (alone, zero ? .due : nil)
         (self.copies, self.named, self.signatures, self.forms, self.groups, self.resolver) = (copies, named, signatures, forms, groups, resolver)
         functions = stage.functions
         passes = Dictionary(uniqueKeysWithValues: d.passes.map { ($0.name, $0) })
