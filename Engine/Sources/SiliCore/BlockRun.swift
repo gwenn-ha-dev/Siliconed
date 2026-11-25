@@ -23,9 +23,7 @@ extension Block {
         if (io.inputs.values.map { $0 } + io.outputs.map(\.1)).contains(where: { $0.offset % Arena.page != 0 }) { await settled() }
         let left = try Run.encode(functions[f]!, stage.stream, inputs: io.inputs, outputs: io.outputs)
         precondition(left.isEmpty, "\(f): outputs no view holds, \(left.keys.sorted())")
-        nonisolated(unsafe) let stream = stage.stream!
-        let timing = Timing(before: last, encoded: DispatchTime.now().uptimeNanoseconds,
-                            done: Task { await stream.currentWorkCompleted(); return DispatchTime.now().uptimeNanoseconds })
+        let timing = Timing(before: last, encoded: DispatchTime.now().uptimeNanoseconds, done: stage.stream.done())
         marks[f] = timing.done
         last = timing.done
         // And its result from off a page is copied back the same way, after the call: the next call reads it once it is, or

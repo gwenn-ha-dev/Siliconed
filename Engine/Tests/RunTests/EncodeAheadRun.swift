@@ -25,8 +25,7 @@ extension Runs {
         func chain(_ x: MTLBuffer, _ y: MTLBuffer) async throws -> [Float] {
             let p = x.contents().bindMemory(to: Float16.self, capacity: n)
             for i in 0..<n { p[i] = Float16(Float(i % 7)) }
-            var last: [Int: Task<Void, Never>] = [:]
-            nonisolated(unsafe) let stream = bench.stream
+            var last: [Int: Task<UInt64, Never>] = [:]
             let t0 = DispatchTime.now().uptimeNanoseconds
             for i in 0..<16 {
                 let (fn, from, to) = i % 2 == 0 ? (f, x, y) : (g, y, x)
@@ -34,7 +33,7 @@ extension Runs {
                 let left = try Run.encode(fn, bench.stream, inputs: ["x": View(buffer: from, type: .float16, shape: [n])],
                                           outputs: [("y", View(buffer: to, type: .float16, shape: [n]))])
                 #expect(left.isEmpty)
-                last[i % 2] = Task { await stream.currentWorkCompleted() }
+                last[i % 2] = bench.stream.done()
             }
             let encoded = Functions.seconds(since: t0)
             await Run.finish(bench.stream)

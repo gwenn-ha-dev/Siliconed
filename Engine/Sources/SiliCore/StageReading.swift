@@ -169,13 +169,13 @@ extension Stage {
     nonisolated(unsafe) private static var calls: [ObjectIdentifier: Bool] = [:]
 
     /// A call put on `stream`: its stage's, if a stage's.
-    static func call(on stream: ComputeStream) {
+    static func call(on stream: SerialStream) {
         let id = ObjectIdentifier(stream)
         openLock.withLock { if calls[id] != nil { calls[id] = true } }
     }
 
     /// The stage's stream listened to (at its opening), or no longer (`nil`, at its close).
-    func listen(_ stream: ComputeStream?) {
+    func listen(_ stream: SerialStream?) {
         Self.openLock.withLock {
             if let stream { Self.calls[ObjectIdentifier(stream)] = false } else if let id = streamID { Self.calls[id] = nil }
         }

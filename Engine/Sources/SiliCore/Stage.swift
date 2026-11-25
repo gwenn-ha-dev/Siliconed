@@ -25,7 +25,7 @@ public final class Stage: @unchecked Sendable {
     public let device: MTLDevice
     /// The stage's own queue and stream: let go with it (`close`).
     public private(set) var queue: MTLCommandQueue!
-    public private(set) var stream: ComputeStream!
+    public private(set) var stream: SerialStream!
     public private(set) var arena: Arena!
     /// The functions loaded, by the declaration's names.
     public private(set) var functions: [String: InferenceFunction] = [:]
@@ -97,7 +97,7 @@ public final class Stage: @unchecked Sendable {
         let d = plan.declaration
         guard let queue = device.makeCommandQueue() else { throw Failure("no command queue") }
         self.queue = queue
-        stream = ComputeStream(commandQueue: queue)
+        stream = SerialStream(commandQueue: queue)
         listen(stream)
         let arena = try Arena(device, bytes: plan.heap + plan.apart, apart: plan.apart)
         self.arena = arena

@@ -123,8 +123,8 @@ public final class BandStage: @unchecked Sendable {
     public func run(keeping: Set<String> = []) async throws -> [String: [Float]] {
         var kept: [String: [Float]] = [:]
         let marks = plan.marks.filter { keeping.contains($0.name) }
-        nonisolated(unsafe) let stream = stage.stream!
-        var flight: [Task<Void, Never>] = []
+        let stream = stage.stream!
+        var flight: [Task<UInt64, Never>] = []
         for (i, call) in plan.calls.enumerated() {
             let sig = signatures[call.function]!
             func bind(_ arg: String, _ shape: [Int], _ type: NDArray.ScalarType) -> View {
@@ -139,10 +139,10 @@ public final class BandStage: @unchecked Sendable {
             var inputs: [String: View] = [:]
             for (n, s, t) in sig.inputs { inputs[n] = bind(n, s, t) }
             let outputs = sig.outputs.map { n, s, t in (n, bind(n, s, t)) }
-            if flight.count == Self.inFlight { await flight.removeFirst().value }
+            if flight.count == Self.inFlight { _ = await flight.removeFirst().value }
             let left = try Run.encode(functions[call.function]!, stream, inputs: inputs, outputs: outputs)
             precondition(left.isEmpty, "\(call.function.key): outputs no view holds, \(left.keys.sorted())")
-            flight.append(Task { await stream.currentWorkCompleted() })
+            flight.append(stream.done())
             // A boundary read back: every call so far done.
             if marks.contains(where: { $0.call == i }) { await Run.finish(stream) }
             for m in marks where m.call == i { kept[m.name] = values(m.plane) }

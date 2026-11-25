@@ -21,12 +21,12 @@ let metalEnabled = ProcessInfo.processInfo.environment["SILICORE_METAL"] != nil
 /// Core AI paid before any test reads a floor (`Functions.witness`), as a client's process pays it at its start.
 struct Bench {
     let device: MTLDevice
-    let stream: ComputeStream
+    let stream: SerialStream
 
     init() async throws {
         guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else { throw Failure("no Metal device") }
         self.device = device
-        stream = ComputeStream(commandQueue: queue)
+        stream = SerialStream(commandQueue: queue)
         let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../.build/run").standardizedFileURL
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         Functions.folder = folder

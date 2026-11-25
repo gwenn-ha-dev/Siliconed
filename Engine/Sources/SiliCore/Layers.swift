@@ -174,8 +174,7 @@ extension Block {
             given[name] = value
         }
         let left = try Run.encode(functions[f]!, stage.stream, inputs: [:], chained: given, outputs: io.outputs)
-        nonisolated(unsafe) let stream = stage.stream!
-        let done = Task { await stream.currentWorkCompleted(); return DispatchTime.now().uptimeNanoseconds }
+        let done = stage.stream.done()
         (marks[f], last) = (done, done)
         return left
     }

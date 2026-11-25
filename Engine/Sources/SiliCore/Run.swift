@@ -25,7 +25,7 @@ public enum Run {
 
     /// One call of `function`, waited for: one invocation in flight per function (Apple's doc: a function called
     /// concurrently allocates other intermediate buffers). Its outputs each written in place in its view.
-    public static func call(_ function: InferenceFunction, _ stream: ComputeStream, inputs: [String: View], outputs: [(String, View)]) async throws {
+    public static func call(_ function: InferenceFunction, _ stream: SerialStream, inputs: [String: View], outputs: [(String, View)]) async throws {
         let left = try encode(function, stream, inputs: inputs, outputs: outputs)
         guard left.isEmpty else { throw Failure("outputs no view holds: \(left.keys.sorted())") }
         await finish(stream)
@@ -36,12 +36,12 @@ public enum Run {
     /// buffers they lie in: a call reading, as a view of our buffer, what the call before writes there may read it before
     /// it is written (a transformer's layers chained through the arena's views gave wrong values, 18/11; chained through
     /// the returned values, right). `finish` waits for the stream. A stage's stream: the stage called (`Stage.keep`).
-    public static func encode(_ function: InferenceFunction, _ stream: ComputeStream, inputs: [String: View],
+    public static func encode(_ function: InferenceFunction, _ stream: SerialStream, inputs: [String: View],
                               chained: [String: InferenceFunction.AsyncValue] = [:],
                               outputs: [(String, View)]) throws -> [String: InferenceFunction.AsyncValue] {
         var ins = chained
         for (name, v) in inputs { ins[name] = value(v) }
-        let values = try bind(function, stream, ins, outputs[...], InferenceFunction.AsyncMutableViews())
+        let values = try stream.encode { try bind(function, $0, ins, outputs[...], InferenceFunction.AsyncMutableViews()) }
         Stage.call(on: stream)
         return values
     }
@@ -63,10 +63,7 @@ public enum Run {
     }
 
     /// The work put on `stream` so far, waited for.
-    public static func finish(_ stream: ComputeStream) async {
-        nonisolated(unsafe) let s = stream
-        await s.currentWorkCompleted()
-    }
+    public static func finish(_ stream: SerialStream) async { _ = await stream.done().value }
 
     /// One call of the ANE's, waited for: every operand a surface of the arena at its exact shape, from its byte `offset`
     /// (a unit of `Arena.take(units:)`; on buffers, `encode` holds a call in 17 to 33 for ~600 ms).

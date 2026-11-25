@@ -168,7 +168,7 @@ public enum Functions {
             m.outputs = [("y", m.body.binary(.add, m.argument("x"), m.argument("x")))]
             let asset = folder.appendingPathComponent("\(try named(m, prefix: "witness")).aimodel")
             guard let queue = device.makeCommandQueue() else { throw Failure("no command queue") }
-            let stream = ComputeStream(commandQueue: queue)
+            let stream = SerialStream(commandQueue: queue)
             // The GPU's operands on the heap, the ANE's surfaces of their own (`Arena.take(surface:)`).
             let arena = try Arena(device, bytes: 4 * Arena.aligned(bytes), apart: 2 * Arena.aligned(bytes))
             let (x, y) = (arena.take(bytes), arena.take(bytes))
