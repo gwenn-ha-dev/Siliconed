@@ -121,7 +121,8 @@ extension FamilyTraits {
             BaseCheckpoint("circlestone-labs/Anima anima-preview3-base", 4182218360, "14fffe8ad5116cd73b9a4696f6a89d7e5f6efdd24b2e4785603aa891a9b2295b"),
         ],
         model: { try Model.anima(in: $0, card: $1, dit: $2) },
-        render: RenderLoop.render(AnimaRender.Parts.self))
+        render: RenderLoop.render(AnimaRender.Parts.self),
+        prepare: RenderLoop.preparation(AnimaRender.Parts.self))
 }
 
 extension Qwen3Encoder.Config {

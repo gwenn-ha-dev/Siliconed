@@ -292,11 +292,12 @@ extension AppState {
         return max(0, planned - date.timeIntervalSince(begin))
     }
 
-    /// **The render under way waits for Core AI to compile** a function its cache does not hold (`Engine.Held.compiling`):
-    /// a model's first render, a new size, another share of the Neural Engine. What it waits for then is paid once, and no
+    /// **Core AI compiles**: a function the cache of the render under way does not hold (`Engine.Held.compiling`) — a
+    /// model's first render, a new size, another share of the Neural Engine —, or what a preparation compiles ahead
+    /// (`preparingCoreAI`), which a render asked meanwhile waits for. What it waits for then is paid once, and no
     /// countdown says it.
     var compilingCoreAI: Bool {
-        inProgress && measurements.compiling()
+        preparingCoreAI || inProgress && measurements.compiling()
     }
 
     /// **The time remaining before the queue is empty**, and whether it is complete: the running render

@@ -116,6 +116,12 @@ package struct Qwen3Encoder {
         return out
     }
 
+    /// **What `states` would specialize** over `tokens` identifiers, nothing allocated: the layers at their palier.
+    package func prepare(tokens: Int) throws -> [Functions.Specialization] {
+        let file = try Self.file(path)
+        return try prepare(file, try Qwen3Arithmetic(file, prefix: prefix), rows: try Qwen3Encoder.palier(tokens))
+    }
+
     /// The paliers a sequence is padded to: one function each, specialized once. Z's longest prompt (1024 tokens of its
     /// own and the template's) holds in 1088; an edit's pictures take up to a few thousand rows.
     static let paliers = [64, 128, 256, 512, 1088, 2048, 4096]

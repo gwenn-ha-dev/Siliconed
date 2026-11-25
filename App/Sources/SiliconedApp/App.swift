@@ -209,6 +209,8 @@ final class Delegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         // What older engines left, and another installation's compilations, erased before the engine's first work.
         MainWindow.shared.local.compiledAtLaunch()
+        // Then what renders compile, compiled ahead: every model after an update, the form's key as it changes.
+        MainWindow.shared.local.prepareAtLaunch()
         // **Incognito**: nothing of the user's survives the session. The render cache (prompts'
         // conditionings) lives in the engine's process (`EngineWorker`), in memory only, and ends with it: the worker
         // exits when the app closes its standard input, at exit or at a crash alike.

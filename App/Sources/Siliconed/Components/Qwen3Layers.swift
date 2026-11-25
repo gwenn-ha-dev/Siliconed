@@ -57,6 +57,11 @@ extension Qwen3Encoder {
     /// Layer `i`'s group.
     static func layer(_ i: Int) -> String { "layer\(i)" }
 
+    /// **What `open` would specialize** over `rows` (a palier), nothing allocated (`Layers.prepare`).
+    func prepare(_ file: SafeTensors, _ a: Qwen3Arithmetic, rows: Int) throws -> [Functions.Specialization] {
+        try Layers.prepare(declaration(a, rows: rows, writing: nil, head: nil), files: [file], budget: MemoryBudget.machineCeiling())
+    }
+
     /// **The layers opened** under B (`MemoryBudget.machineCeiling()`, the footprint now its floor).
     func open(_ file: SafeTensors, _ a: Qwen3Arithmetic, rows: Int, writing: Writing? = nil, head: Qwen3Head.Shape? = nil) async throws -> Layers {
         guard let device = MTLCreateSystemDefaultDevice() else { throw ProgramError("no Metal device") }

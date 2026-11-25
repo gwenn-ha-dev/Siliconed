@@ -116,6 +116,15 @@ package final class AnimaEvaluation {
         return dit
     }
 
+    /// **What `open` would specialize** (`Arithmetic.prepare`): the same declaration, nothing allocated.
+    package static func prepare(_ path: String, geometry: Geometry, loras: LoRAStack = .none, budget: Int) throws -> [Functions.Specialization] {
+        let file = try Self.file(path)
+        let quantized = blocks.indices.map { Self.quantized($0, in: file) }, ranks = ranks(loras)
+        return try Arithmetic.prepare(file: file, codes: codesMarker, budget: budget) {
+            declaration(geometry, $0, quantized: quantized, taps: false, ranks: ranks)
+        }
+    }
+
     /// What the DiT is: its arithmetic and its plan under B.
     package var described: String { "\(arithmetic), " + block.stage.plan.line }
 

@@ -48,6 +48,17 @@ public final class BandStage: @unchecked Sendable {
                          signatures: c.assets.mapValues { Block.Signature(c.modules[$0]!) }, assets: c.assets)
     }
 
+    /// **What `open` would specialize**, its assets written: the candidates the same code plans from the files' headers,
+    /// nothing allocated or read (`Stage.specializations`). Every one that holds, not the one taken alone: with nothing of
+    /// its kin read on this Mac `open` takes the finest (`Stage.choose`), once read a taller one; and it opens later on a
+    /// higher floor — a candidate refused here is refused there (25/11/2026, the M1 Pro, a stage of 4 candidates: opened at
+    /// the finest the first time, prepared, at the tallest the next, never prepared, and compiled it).
+    public static func prepare(_ name: String, prefix: String, candidates: [Int], files: [SafeTensors], residents: [Weights.Entry], budget: Int,
+                               plan: (Int) -> Bands) throws -> [Functions.Specialization] {
+        let c = try choice(name, prefix: prefix, candidates: candidates, files: files, residents: residents, budget: budget, floor: Memory.floor(), plan: plan)
+        return try Stage.specializations(c.holding.flatMap(\.declaration.functions.values))
+    }
+
     /// **Whether a stage `open` would open holds under `budget` over `floor`**, nothing allocated: the candidate it would
     /// take, or `OverBudget` with the number — what a client judges before the computation whose result the stage reads
     /// (refused after it, that computation's minutes were paid for nothing). `floor`: the footprint the
@@ -61,6 +72,8 @@ public final class BandStage: @unchecked Sendable {
     private struct Choice {
         let rank: Int, bands: Bands, plan: Stage.Plan, narrowed: Bool
         let assets: [Bands.Shaped: String], modules: [String: Aicode.Module]
+        /// The plan of every candidate that holds, the chosen among them.
+        let holding: [Stage.Plan]
     }
 
     /// The candidate `open` takes and `admit` judges, its plan and its functions.
@@ -100,7 +113,7 @@ public final class BandStage: @unchecked Sendable {
         let chosen = holding[try Stage.choose(holding.map(\.plan), estimates)].rank
         let unread = holding.count == declarations.count && estimates.allSatisfy { $0 == .unknown }
         return Choice(rank: chosen, bands: plans[chosen], plan: holding.first { $0.rank == chosen }!.plan, narrowed: chosen > 0 && !unread,
-                      assets: named[chosen], modules: modules)
+                      assets: named[chosen], modules: modules, holding: holding.map(\.plan))
     }
 
     private func view(_ s: Bands.Spot) -> View {

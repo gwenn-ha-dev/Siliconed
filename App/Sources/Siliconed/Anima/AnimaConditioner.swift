@@ -161,6 +161,27 @@ package struct AnimaConditioner {
         return m
     }
 
+    /// **What `context` would specialize** for `targetLength` T5 identifiers over `sourceLength` of Qwen's states, nothing
+    /// allocated (`Stage.prepare`).
+    package static func prepare(targetLength: Int, sourceLength: Int, path: String, budget: Int) throws -> [Functions.Specialization] {
+        let c = AnimaConditioner(targetLength: targetLength, sourceLength: sourceLength)
+        return try SiliCore.Stage.prepare(declaration(c, taps: false).declaration, files: [try AnimaEvaluation.file(path)], budget: budget)
+    }
+
+    /// The stage `context` opens and `prepare` specializes, and the outputs it writes.
+    private static func declaration(_ c: AnimaConditioner, taps: Bool) -> (declaration: SiliCore.Stage.Declaration, outputs: [String]) {
+        let (t, s, d) = (c.targetRows, c.sourceRows, c.dim)
+        let outputs = ["context"] + (taps ? ["cond_block0_out", "cond_block\(c.layers - 1)_out"] : [])
+        var declaration = SiliCore.Stage.Declaration("anima conditioner")
+        declaration.tensors = [.init("h", bytes: t * d * 2), .init("source", bytes: s * d * 2), .init("t_mask", bytes: t * 2), .init("s_mask", bytes: s * 2)]
+            + ["cos_t", "sin_t"].map { .init($0, bytes: t * c.headDim * 2) } + ["cos_s", "sin_s"].map { .init($0, bytes: s * c.headDim * 2) }
+            + outputs.map { .init($0, bytes: t * d * 4, .apart) }
+        declaration.residents = entries()
+        let asset = c.asset(taps: taps)
+        declaration.functions = ["conditioner": SiliCore.Stage.Function(asset, unit: .gpu) { c.module(taps: taps) }]
+        return (declaration, outputs)
+    }
+
     /// **The context for a prompt**: Qwen's states `source` `[Lq, 1024]` and the T5 identifiers through the conditioner,
     /// on a stage of its own (the adapter's weights resident), let go after; `[max(Lt, 512), 1024]`, zero rows past Lt.
     /// `taps`: the first and last blocks' outputs besides, `[Lt, 1024]`, by the oracle's names.
@@ -170,14 +191,7 @@ package struct AnimaConditioner {
         let c = AnimaConditioner(targetLength: t5Ids.count, sourceLength: source.shape[0])
         let file = try AnimaEvaluation.file(path)
         let (t, s, lt, lq, d) = (c.targetRows, c.sourceRows, t5Ids.count, source.shape[0], c.dim)
-        let outputs = ["context"] + (taps ? ["cond_block0_out", "cond_block\(c.layers - 1)_out"] : [])
-        var declaration = SiliCore.Stage.Declaration("anima conditioner")
-        declaration.tensors = [.init("h", bytes: t * d * 2), .init("source", bytes: s * d * 2), .init("t_mask", bytes: t * 2), .init("s_mask", bytes: s * 2)]
-            + ["cos_t", "sin_t"].map { .init($0, bytes: t * c.headDim * 2) } + ["cos_s", "sin_s"].map { .init($0, bytes: s * c.headDim * 2) }
-            + outputs.map { .init($0, bytes: t * d * 4, .apart) }
-        declaration.residents = entries()
-        let asset = c.asset(taps: taps)
-        declaration.functions = ["conditioner": SiliCore.Stage.Function(asset, unit: .gpu) { c.module(taps: taps) }]
+        let (declaration, outputs) = Self.declaration(c, taps: taps)
         func bf16(_ x: Float) -> UInt16 { UInt16(BFloat.round(x).bitPattern >> 16) }
         func fill(_ stage: SiliCore.Stage) throws {
             let h = stage.pointer("h").assumingMemoryBound(to: UInt16.self)

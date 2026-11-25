@@ -1,4 +1,5 @@
 import Foundation
+import SiliCore
 import XCTest
 @testable import Siliconed
 
@@ -6,7 +7,8 @@ import XCTest
 /// fakes — the DiT's derivative zero, or NaN for the evaluations a test says, the decoder's picture zero or NaN. What is
 /// judged is the loop's: a latent gone non-finite is said `.unusable` at the denoising and never decoded, the images
 /// keep their index in the batch, image 0's times hold the text and the DiT's opening and the others' do not, a
-/// cancellation stops the loop, and a batch left with no image fails at the stage where it was lost.
+/// cancellation stops the loop, and a batch left with no image fails at the stage where it was lost. Its preparation
+/// (`preparation`): the part's specializations after its tokens, then the decoder's, at the shapes the render opens them.
 final class RenderLoopTests: XCTestCase {
     /// What the fakes do, set by each test before it runs the loop.
     fileprivate struct Script {
@@ -22,6 +24,9 @@ final class RenderLoopTests: XCTestCase {
         var told: [Int] = []
         var decoderOpened = 0
         var decoded = 0
+        var tokenized = 0
+        /// The shapes each preparation was asked at, the part's then the decoder's.
+        var prepared: [String] = []
     }
     nonisolated(unsafe) fileprivate static var script = Script()
 
@@ -104,6 +109,18 @@ final class RenderLoopTests: XCTestCase {
         XCTAssertEqual(Self.script.decoderOpened, 0)
     }
 
+    /// **A preparation** (`RenderLoop.preparation`): the prompt tokenized first, the part's specializations then the
+    /// decoder's, each at the latent's shape the render opens it; nothing opened, nothing evaluated.
+    func testAPreparationIsThePartsThenTheDecoders() throws {
+        let model = try model(), request = Request("a prompt", width: 64, height: 128, steps: 2)
+        let admitted = try Admission.judge(request, chain: model.chain)
+        let all = try RenderLoop.preparation(LoopParts.self)(request, admitted, model)
+        XCTAssertEqual(Self.script.tokenized, 1)
+        XCTAssertEqual(all.map(\.asset.lastPathComponent), ["part", "decoder"])
+        XCTAssertEqual(Self.script.prepared, ["part \(admitted.height)×\(admitted.width)", "decoder \(admitted.height)×\(admitted.width)"])
+        XCTAssertEqual(Self.script.decoderOpened + Self.script.evaluations, 0)
+    }
+
     /// Every picture lost at the decoder: each said unusable there, the batch failing at the decoding.
     func testABatchLostAtTheDecoderFailsThere() throws {
         Self.script.decodesNaN = true
@@ -142,6 +159,7 @@ private struct LoopParts: RenderParts {
     var encodes: Bool { false }
     mutating func tokens() throws -> Int {
         Thread.sleep(forTimeInterval: RenderLoopTests.pause)
+        RenderLoopTests.script.tokenized += 1
         return 3
     }
     mutating func encode() throws -> Bool { false }
@@ -149,6 +167,11 @@ private struct LoopParts: RenderParts {
     func denoiser(height: Int, width: Int) throws -> any RenderDenoiser {
         Thread.sleep(forTimeInterval: RenderLoopTests.pause)
         return LoopDiT()
+    }
+    func prepare(height: Int, width: Int) throws -> [Functions.Specialization] {
+        XCTAssertEqual(RenderLoopTests.script.tokenized, 1, "prepared after its tokens")
+        RenderLoopTests.script.prepared.append("part \(height)×\(width)")
+        return [Functions.Specialization(URL(fileURLWithPath: "/part"), unit: .gpu)]
     }
     var decoderPath: String { "" }
 }
@@ -171,6 +194,10 @@ private struct LoopDecoder: LatentDecoder {
         return LoopDecoder(pixels: 3 * factor * latentHeight * factor * latentWidth)
     }
     static func admit(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws {}
+    static func prepare(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> [Functions.Specialization] {
+        RenderLoopTests.script.prepared.append("decoder \(latentHeight)×\(latentWidth)")
+        return [Functions.Specialization(URL(fileURLWithPath: "/decoder"), unit: .gpu)]
+    }
     func pixels(_ latent: [Float]) async throws -> [Float] {
         RenderLoopTests.script.decoded += 1
         return [Float](repeating: RenderLoopTests.script.decodesNaN ? .nan : 0, count: pixels)

@@ -31,6 +31,21 @@ extension Engine {
         }
     }
 
+    /// **What a render of `request` on `model` would specialize**, its assets written (`FamilyTraits.prepare`): the
+    /// request's own refusals first (`Admission`), then the family's stages at the shapes its render opens them, nothing
+    /// allocated, nothing computed; the ANE's functions first, the longest to compile, each stage's order kept. On the
+    /// engine queue, as a render: no asset is written while a render loads it.
+    package func prepare(_ request: Request, model: Model) throws(EngineError) -> [Functions.Specialization] {
+        dispatchPrecondition(condition: .notOnQueue(Engine.file))
+        let all = try EngineError.boundary {
+            try Engine.file.sync {
+                let admitted = try Admission.judge(request, chain: model.chain)
+                return try CoreAI.under { try model.card.family.traits.prepare(request, admitted, model) }
+            }
+        }
+        return all.filter { $0.unit == .neuralEngine } + all.filter { $0.unit != .neuralEngine }
+    }
+
     /// **The render, on the engine queue**, in this order: the request's own refusals (`Admission`, pure: a request the model
     /// cannot render is refused for what it is), the preflights (`Preflight`: installed, license, format, no other render,
     /// the shared files hashed once) — all before any computation. Then the family's render runs — one line here, the rest in the family's folder — and

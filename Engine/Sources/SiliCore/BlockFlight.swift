@@ -27,7 +27,7 @@ extension Block {
                   stage.rekey(forms[i].key, expects: estimate - share, extent: forms[i].extent) else { continue }
             (height, turns) = (i, 1)
             let t = DispatchTime.now().uptimeNanoseconds
-            try await stage.loading { try await load() }
+            _ = try await stage.loading { try await load() }
             return Functions.seconds(since: t)
         }
         return nil
@@ -110,12 +110,14 @@ extension Block {
 
     /// **The cycle before, observed** at the next one's start: the noise, the difference
     /// between two warm cycles at one share, smoothed; the first cycle's own seconds, and the cold cost the second tells —
-    /// what a move costs before any was measured (the functions of a share met first specialize as the first cycle's did).
+    /// what a move costs before any was measured (the functions of a share met first are called first as the first
+    /// cycle's were) —, unless the stage's opening compiled: what a compilation costs is not what a move costs (decided
+    /// 24/11/2026, `prepare` specializes them before).
     func observe(last: Double?, warm: Bool) {
         guard let last else { return }
         let rows = units * unit
         if let p = previous, p.rows == rows, p.warm, warm { noise = Self.smoothing(noise, abs(last - p.seconds)) }
-        if firstCycle == nil { firstCycle = last } else if cost == nil, warm, previous?.rows == rows { cost = max((firstCycle ?? last) - last, 0) }
+        if firstCycle == nil { firstCycle = last } else if cost == nil, warm, previous?.rows == rows, !stage.compiled { cost = max((firstCycle ?? last) - last, 0) }
         previous = (last, rows, warm)
     }
 
@@ -247,9 +249,10 @@ extension Block {
         }
         units = n
         let t = DispatchTime.now().uptimeNanoseconds
-        try await stage.loading { try await load() }
+        let compiled = try await stage.loading { try await load() }
         let loaded = Functions.seconds(since: t)
-        cost = Self.smoothing(cost, loaded)
+        // A load that compiled says what a compilation costs, not a move.
+        if !compiled { cost = Self.smoothing(cost, loaded) }
         told()
         let blockKey = key
         if keep { try? ThisMac.update { $0.flight = ($0.flight ?? [:]).merging([blockKey: rows]) { $1 } } }
@@ -337,19 +340,23 @@ extension Block {
     }
 
     /// **The GPU's functions of the share now**, each built, named and loaded where it is not, the others let go once
-    /// their calls are done. Their shares are no larger than those P counts, at the tallest calls.
-    private func load() async throws {
+    /// their calls are done. Their shares are no larger than those P counts, at the tallest calls. Whether one compiled.
+    private func load() async throws -> Bool {
         let need = Self.steps(declaration, declaration.used, neural: units * unit, cut: cut)
+        var compiled = false
         for (name, spec) in need.sorted(by: { $0.key < $1.key }) where functions[name] == nil {
             let m = try Self.module(spec)
             let asset = try Functions.named(m, prefix: "block")
             signatures[name] = Signature(m)
-            functions[name] = try await Functions.load(try Functions.asset(asset) { m }, unit: .gpu)
+            let l = try await Functions.loaded(try Functions.asset(asset) { m }, unit: .gpu)
+            functions[name] = l.function
+            compiled = compiled || l.compiled
         }
         let gone = functions.keys.filter { !$0.hasPrefix("edge-") && !$0.hasPrefix("ane-") && need[$0] == nil }
-        guard !gone.isEmpty else { return }
+        guard !gone.isEmpty else { return compiled }
         await settled()
         for n in gone { functions[n] = nil; marks[n] = nil }
         stage.drop(gone)
+        return compiled
     }
 }

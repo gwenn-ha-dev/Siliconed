@@ -123,12 +123,44 @@ public enum Functions {
     /// one loads in milliseconds. What its first call still pays is not counted: 47 ms against 0.5 for a trivial function
     /// on 4096 values, its later calls and a cached one's first alike (20/11, the mini).
     public static func load(_ url: URL, unit: ComputeUnitKind? = .gpu) async throws -> InferenceFunction {
-        let options = unit.map { SpecializationOptions(preferredComputeUnitKind: $0) } ?? .default
-        if let cached = try? AIModelCache.default.model(for: url, options: options) { return try main(cached, url) }
+        try await loaded(url, unit: unit).function
+    }
+
+    /// **`load`, and whether Core AI specialized the function here** rather than handing it from its cache: a load that
+    /// compiled is no measure of what loading costs (`Block.move`).
+    public static func loaded(_ url: URL, unit: ComputeUnitKind? = .gpu) async throws -> (function: InferenceFunction, compiled: Bool) {
+        let options = options(unit)
+        if let cached = try? AIModelCache.default.model(for: url, options: options) { return (try main(cached, url), false) }
         let t = DispatchTime.now().uptimeNanoseconds
         Stages.tell(.compiling)
         defer { Stages.tell(.compiled(seconds: seconds(since: t))) }
-        return try main(try await AIModel(contentsOf: url, options: options), url)
+        return (try main(try await AIModel(contentsOf: url, options: options), url), true)
+    }
+
+    /// **A function to specialize before its stage opens** (`Stage.prepare`): its asset, written, and the unit its stage
+    /// loads it for.
+    public struct Specialization: Hashable, Sendable {
+        public let asset: URL
+        public let unit: ComputeUnitKind?
+        public init(_ asset: URL, unit: ComputeUnitKind?) { (self.asset, self.unit) = (asset, unit) }
+    }
+
+    /// **`s` specialized ahead of its load, nothing kept** (`AIModel.specialize`): its load then finds it in Core AI's
+    /// cache, as any function specialized before; a compilation told as `load` tells one, a function the cache holds a
+    /// lookup. The ANE's program is compiled here, not at the load: measured 25/11/2026 on the M1 Pro, four ANE functions
+    /// never compiled on that Mac specialized in 5.55 s, then loaded by another process in 0.017 s, against 4.92 s for
+    /// four never specialized.
+    public static func specialize(_ s: Specialization) async throws {
+        let options = options(s.unit)
+        if (try? AIModelCache.default.model(for: s.asset, options: options)) != nil { return }
+        let t = DispatchTime.now().uptimeNanoseconds
+        Stages.tell(.compiling)
+        defer { Stages.tell(.compiled(seconds: seconds(since: t))) }
+        _ = try await AIModel.specialize(contentsOf: s.asset, options: options)
+    }
+
+    private static func options(_ unit: ComputeUnitKind?) -> SpecializationOptions {
+        unit.map { SpecializationOptions(preferredComputeUnitKind: $0) } ?? .default
     }
 
     private static func main(_ model: AIModel, _ url: URL) throws -> InferenceFunction {

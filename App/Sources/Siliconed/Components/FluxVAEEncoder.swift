@@ -28,6 +28,11 @@ package enum FluxVAEEncoder {
         return latent.map { BFloat.round(BFloat.round(BFloat.round($0) - shift) * scale) }
     }
 
+    /// **What `latent` would specialize** for a picture `height × width`, nothing allocated (`BandStage.prepare`).
+    package static func prepare(height: Int, width: Int, path: String) throws -> [Functions.Specialization] {
+        try FluxVAEDecoder.vae.prepare(.encode, path: path, height: height, width: width, budget: MemoryBudget.machineCeiling())
+    }
+
     /// **A picture's latent as the denoiser reads it**, `[16, H/8, W/8]`: the encoder's mean, `normalized`. `image` is
     /// `[3, H, W]` in [−1, 1], each side a multiple of 8.
     package static func latent(of image: ImageRGB, path: String) throws -> [Float] {

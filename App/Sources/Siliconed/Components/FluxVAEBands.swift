@@ -158,6 +158,12 @@ extension FluxVAE {
         try BandStage.admit(s.name, prefix: s.prefix, candidates: s.candidates, files: [s.file], residents: s.residents, budget: budget, plan: s.bands)
     }
 
+    /// What `open` would specialize, nothing allocated (`BandStage.prepare`).
+    package func prepare(_ direction: FluxVAEPlan.Direction, path: String, height: Int, width: Int, budget: Int) throws -> [Functions.Specialization] {
+        let s = try staged(direction, path: path, height: height, width: width, candidates: Self.candidates)
+        return try BandStage.prepare(s.name, prefix: s.prefix, candidates: s.candidates, files: [s.file], residents: s.residents, budget: budget, plan: s.bands)
+    }
+
     /// **What `open` opens and `admit` judges, written once**: the stage's name, its plans among `candidates`, its
     /// residents — so that what a render judges before its DiT is what it opens after.
     private func staged(_ direction: FluxVAEPlan.Direction, path: String, height: Int, width: Int, candidates: [Int]) throws -> Staged {

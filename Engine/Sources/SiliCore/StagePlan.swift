@@ -220,8 +220,33 @@ extension Stage {
     /// refused too); never read, opened, the fuse behind.
     public static func open(_ device: MTLDevice, _ declaration: Declaration, files: [SafeTensors], budget: Int, depth: Int = 2,
                             measured: ThisMac = .current) async throws -> Stage {
+        let p = try chosen(declaration, files: files, budget: budget, depth: depth, measured: measured)
+        return try await Stage(device, plan: p, files: files, measured: measured)
+    }
+
+    /// **What `open` would specialize**, its assets written: the same plan and choice, from the files' headers, nothing
+    /// allocated or read (`specializations`).
+    public static func prepare(_ declaration: Declaration, files: [SafeTensors], budget: Int, depth: Int = 2,
+                               measured: ThisMac = .current) throws -> [Functions.Specialization] {
+        try specializations(chosen(declaration, files: files, budget: budget, depth: depth, measured: measured).declaration.functions.values)
+    }
+
+    private static func chosen(_ declaration: Declaration, files: [SafeTensors], budget: Int, depth: Int, measured: ThisMac) throws -> Plan {
         let p = try plan(declaration, files: files, budget: budget, floor: Memory.floor(), depth: depth)
         _ = try choose([p], estimates(extents: [(key(p.declaration), p.declaration.extent)], measured: measured, budget: p.budget))
-        return try await Stage(device, plan: p, files: files, measured: measured)
+        return p
+    }
+
+    /// **`functions` as a stage loads them, to specialize before it opens** (`Functions.specialize`): each asset written,
+    /// each function once, the ANE's first — 0.4 to 2.3 s each to compile on the M1 Pro (25/11/2026), 0.3 to 1.1 on the
+    /// M5 Pro, a GPU's ≈ 35 ms (24/11): a preparation cut short has done the most of it.
+    public static func specializations(_ functions: some Sequence<Function>) throws -> [Functions.Specialization] {
+        // Once by its name and unit: an asset's URL ends in a slash once its folder exists, so the same function met
+        // before and after it was written would give two.
+        var seen = Set<String>(), all: [(name: String, s: Functions.Specialization)] = []
+        for f in functions where seen.insert(ThisMac.shareKey(asset: f.asset, unit: f.unit)).inserted {
+            all.append((f.asset, Functions.Specialization(try Functions.asset(f.asset, f.build), unit: f.unit)))
+        }
+        return all.sorted { ($0.s.unit == .neuralEngine ? 0 : 1, $0.name) < ($1.s.unit == .neuralEngine ? 0 : 1, $1.name) }.map(\.s)
     }
 }

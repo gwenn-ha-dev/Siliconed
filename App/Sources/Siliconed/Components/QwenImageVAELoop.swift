@@ -176,6 +176,12 @@ final class QwenImageVAERun {
                             residents: plans.residents, budget: budget, plan: plans.bands)
     }
 
+    /// What `open` would specialize, nothing allocated (`BandStage.prepare`).
+    static func prepare(_ plans: Plans, budget: Int) throws -> [Functions.Specialization] {
+        try BandStage.prepare(plans.network, prefix: plans.network, candidates: QwenImageVAE.positions, files: [plans.file],
+                              residents: plans.residents, budget: budget, plan: plans.bands)
+    }
+
     /// What the run is given — the latent `[c, h, w]` f32, the picture `[c, H, W]` in [−1, 1] (f16 under factors of 1,
     /// its largest 1) — run, and what it gives back, `[C, H, W]` f32.
     func run(_ input: [Float]) async throws -> [Float] {

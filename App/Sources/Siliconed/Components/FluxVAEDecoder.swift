@@ -1,4 +1,5 @@
 import Foundation
+import SiliCore
 
 /// **The Flux VAE's decoder**: the latent to pixels, as diffusers' `AutoencoderKL`
 /// decodes in bf16 (`Decoder`, `UNetMidBlock2D`, `UpDecoderBlock2D`, `ResnetBlock2D`, `AttnProcessor2_0`).
@@ -40,6 +41,10 @@ package final class FluxVAEDecoder: LatentDecoder {
 
     package static func admit(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws {
         try vae.admit(.decode, path: path, height: latentHeight, width: latentWidth, budget: budget)
+    }
+
+    package static func prepare(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> [Functions.Specialization] {
+        try vae.prepare(.decode, path: path, height: latentHeight, width: latentWidth, budget: budget)
     }
 
     /// `[16, h, w]` f32 to `[3, 8h, 8w]` f32, around [−1, 1], not clamped.

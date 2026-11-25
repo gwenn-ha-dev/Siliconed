@@ -58,6 +58,17 @@ package enum Krea2Render {
             return try Denoiser(map: inputs.denoising.map, loras: inputs.loras, taps: taps, latentHeight: height, latentWidth: width)
         }
 
+        /// The text's rows past the template (`assemble`): what the fusion and the DiT read.
+        func prepare(height: Int, width: Int) throws -> [Functions.Specialization] {
+            let budget = MemoryBudget.machineCeiling(), rows = ids.count - Krea2Text.templateTokens
+            let file = try MapWeights.dit(inputs.denoising.map, marker: Krea2Session.marker)
+            let geometry = Krea2Session.Geometry(latentHeight: height, latentWidth: width, text: rows)
+            return try Qwen3Encoder(config: .krea2, path: inputs.text.map).prepare(tokens: ids.count)
+                + (inputs.start.map { try QwenImageVAEEncoder.prepare(height: $0.image.height, width: $0.image.width, path: $0.encoding.path) } ?? [])
+                + Krea2Fusion.prepare(rows: rows, file: file, loras: inputs.loras, budget: budget)
+                + Krea2Session.prepare(file: file, geometry: geometry, loras: inputs.loras, budget: budget)
+        }
+
         func decoderInput(_ latent: [Float]) -> [Float] { QwenImageVAEDecoder.normalized(latent) }
     }
 

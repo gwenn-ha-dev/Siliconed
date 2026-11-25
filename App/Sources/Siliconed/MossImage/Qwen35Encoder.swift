@@ -182,6 +182,14 @@ package struct Qwen35Encoder: Sendable {
         }
     }
 
+    /// **What `states` would specialize** over `tokens` identifiers (their template applied), nothing allocated: the
+    /// layers at their palier (`Layers.prepare`).
+    package func prepare(tokens: Int, map mapPath: String) throws -> [Functions.Specialization] {
+        let file = try SafeTensors(mapPath)
+        return try Layers.prepare(declaration(rows: try Self.palier(tokens), path: try Self.path(of: file)), files: [file],
+                                  budget: MemoryBudget.machineCeiling())
+    }
+
     /// `last_hidden_state`: what MOSS-Image's DiT reads.
     package static func encode(_ ids: [Int], map path: String) throws -> HostTensor {
         guard let hidden = try Qwen35Encoder().states(ids, map: path)["hidden"] else { throw ProgramError("the encoder gave no hidden states") }

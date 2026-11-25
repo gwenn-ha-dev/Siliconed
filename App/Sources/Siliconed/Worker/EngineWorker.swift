@@ -125,6 +125,36 @@ package final class EngineWorker: @unchecked Sendable {
         return stream
     }
 
+    /// **What a render of `request` would compile, compiled ahead** (`WorkerCall.prepare`): the worker queues its
+    /// specializations — the form's in place of what its last left, first; `background` ones after — and runs them while
+    /// no call is in hand: a render asked meanwhile waits for the one under way at most. Nothing to wait for here: a
+    /// refusal is said on the standard error, and the render compiles what it needs as it loads it.
+    package func prepare(_ request: Request, model: String, library: Library, background: Bool = false) {
+        let id = register { reply, _ in
+            if case .failed(_, let f) = reply {
+                FileHandle.standardError.write(Data("siliconed: \(model) not prepared: \(f.error)\n".utf8))
+            }
+        } stopped: { _ in }
+        let neuralEngine = CoreAI.neuralEngine
+        sending.async { [self] in
+            let first = lock.withLock { () -> UInt32 in
+                let f = lastBlob &+ 1
+                lastBlob &+= UInt32(1 + request.references.count)
+                return f
+            }
+            let (order, blobs) = RenderOrder.of(request, seeds: [], model: model, library: library, neuralEngine: neuralEngine, firstBlob: first)
+            send(id, .prepare(id: id, order, background: background), blobs: blobs)
+        }
+    }
+
+    /// **Whether a preparation compiles now** (`WorkerReply.preparing`), told on the worker's reading thread: it must
+    /// return at once. A worker that stops ends it.
+    package var preparing: (@Sendable (Bool) -> Void)? {
+        get { lock.withLock { _preparing } }
+        set { lock.withLock { _preparing = newValue } }
+    }
+    private var _preparing: (@Sendable (Bool) -> Void)?
+
     /// **The compilations erased by the worker** (`CoreAI.erase`), between two pieces of work: sent now, in the order of
     /// the calls — after what was asked before, before what is asked after, which compiles again what it needs. `done`
     /// is handed what it freed, in bytes, or why it failed.

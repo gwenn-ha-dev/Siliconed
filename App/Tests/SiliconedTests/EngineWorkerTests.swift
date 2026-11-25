@@ -89,6 +89,32 @@ final class EngineWorkerTests: XCTestCase {
         XCTAssertEqual(again, request)
     }
 
+    /// **A preparation's order** (`WorkerCall.prepare`): its request and its images as a render's, no seed, whether it
+    /// goes after the form's; and the compilation it tells outside any call (`WorkerReply.preparing`).
+    func testAPreparationComesBackAsItLeft() throws {
+        var request = Request("a lighthouse", width: 64, height: 48, loras: [LoRAEntry("/a/flat.safetensors", strength: 0.8)],
+                              image: image(64, 48, alpha: false, seed: 1), strength: 0.55)
+        request.references = [image(32, 40, alpha: true, seed: 2)]
+        let library = Library(root: URL(fileURLWithPath: "/tmp/models"), local: URL(fileURLWithPath: "/tmp/mac"))
+        let (order, blobs) = RenderOrder.of(request, seeds: [], model: "some-model", library: library, neuralEngine: true, firstBlob: 7)
+        for background in [false, true] {
+            let (call, received) = try through(WorkerCall.prepare(id: 4, order, background: background), blobs: blobs, as: WorkerCall.self) {
+                if case .prepare(_, let o, _) = $0 { return o.blobs }
+                return []
+            }
+            guard case let .prepare(id, back, later) = call else { return XCTFail("\(call)") }
+            XCTAssertEqual(id, 4)
+            XCTAssertEqual(later, background)
+            XCTAssertEqual(back, order)
+            XCTAssertEqual(try back.request(received), request)
+        }
+        for compiling in [true, false] {
+            let back = try WireJSON.decode(WorkerReply.self, from: WireJSON.encode(WorkerReply.preparing(compiling: compiling)))
+            guard case .preparing(let c) = back else { return XCTFail("\(back)") }
+            XCTAssertEqual(c, compiling)
+        }
+    }
+
     func testEveryEventComesBackAsItLeft() throws {
         let rendered = Engine.Render(
             model: "m", prompt: "p", seed: 42, steps: 8, loras: [LoRAEntry("x.safetensors", strength: 0.5)],

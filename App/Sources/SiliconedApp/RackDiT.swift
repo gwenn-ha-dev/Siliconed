@@ -73,6 +73,9 @@ struct DiTBox: View {
             }
             if app.state(of: .denoising) == .active, app.totalSteps > 0, app.currentJob?.settings.identifier == app.identifier {
                 progress
+            } else if app.preparingCoreAI, !app.inProgress {
+                // A preparation (`AppState+Prepare.swift`): what the next render would compile, compiled now.
+                Text("Core AI compilation…").font(.caption).foregroundStyle(Palette.secondary)
             } else {
                 Cost(app.stageCost(.denoising))
             }

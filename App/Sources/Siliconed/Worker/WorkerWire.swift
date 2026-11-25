@@ -6,20 +6,22 @@ import Foundation
 // names it**, written in that order by one writer (`WorkerPipe`): when the message arrives, its blobs are whole.
 //
 //     both ways      hello(protocol), first: an app and a worker of two builds refuse each other there
-//     app → worker   render(id, order) · write(id, order) · erase(id) · cancel(id)
+//     app → worker   render(id, order) · write(id, order) · prepare(id, order, background) · erase(id) · cancel(id)
 //                    the images: blobs, before their call
 //     worker → app   event(id, …) · written(id, …) · erased(id, bytes) · finished(id) · failed(id, error)
+//                    preparing(compiling), outside any call
 //                    an image or a preview: a blob, before its event
 //
 // **One piece of work at a time**: the worker runs its calls in their order, a call waiting for the one before it. A
 // cancelled call still ends with `finished` or `failed`: until then the worker computes, and the app's fuse watches.
+// **A preparation's specializations run between the calls**, one at a time while no call is in hand.
 
 /// **The first message each way: the protocol its writer speaks** (`version`). The app refuses a worker of another
 /// version (`EngineError.engineMismatch`), the worker an app of another by exiting (status 66), before any call.
 /// `version` goes up with any change to what crosses below; the hello's own shape never changes — every build reads it
 /// first.
 package struct WorkerHello: Codable, Sendable, Equatable {
-    package static let version = 6
+    package static let version = 7
     package var protocolVersion: Int
 
     package init(protocolVersion: Int = WorkerHello.version) { self.protocolVersion = protocolVersion }
@@ -34,6 +36,10 @@ package struct WorkerHello: Codable, Sendable, Equatable {
 package enum WorkerCall: Codable, Sendable, Equatable {
     case render(id: UInt32, RenderOrder)
     case write(id: UInt32, WriteOrder)
+    /// **What a render of the order would specialize, compiled ahead** (`Engine.prepare`): ended once its specializations
+    /// are queued; they run one at a time while no call is in hand. The form's (`background` false) replace what the
+    /// form's before it left and go first; the others (an installation's, an update's) are added after them.
+    case prepare(id: UInt32, RenderOrder, background: Bool)
     /// The compilations erased (`CoreAI.erase`), in the order of the calls: after the work before it, before the work after.
     case erase(id: UInt32)
     case cancel(id: UInt32)
@@ -50,6 +56,8 @@ package enum WorkerReply: Codable, Sendable {
     /// The call is over, its last event sent.
     case finished(id: UInt32)
     case failed(id: UInt32, WorkerFailure)
+    /// A preparation's compilation begins (`true`) or ends, outside any call: what the app says while none renders.
+    case preparing(compiling: Bool)
 }
 
 /// What a call fails with: the engine's one error, or the writer's own refusals.

@@ -29,10 +29,61 @@ extension Block {
     /// wherever the ANE gains nothing.
     public static func open(_ device: MTLDevice, _ d: Declaration, files: [SafeTensors], budget: Int, share: Share,
                             measured: ThisMac = .current) async throws -> Block {
+        let began = DispatchTime.now().uptimeNanoseconds
+        let o = try opening(d, files: files, budget: budget, share: share, measured: measured)
+        let named = Functions.seconds(since: began)
+        let stage = try await Stage(device, plan: o.plans[o.height], files: files, measured: measured)
+        let block = Block(d, stage: stage, heights: o.heights, height: o.height, unit: o.unit, total: o.total, units: o.units, share: share,
+                          key: o.key, arithmetic: o.arithmetic,
+                          zero: o.inFlight && o.units > 0 && measured.zeros?[o.key] == nil,
+                          shareable: d.shareable, neuralRows: o.neuralRows,
+                          copies: o.copies, named: named, signatures: o.signatures, forms: o.forms, groups: o.groups, resolver: o.resolver)
+        block.told()
+        return block
+    }
+
+    /// **What `open` would specialize**, its assets written: the same unit and share, chosen by the same code from the
+    /// files' headers, nothing allocated or read (`Stage.specializations`, the ANE's first). Every height planned, not the
+    /// one taken alone: with nothing of its kin read `open` takes the soberest (`Stage.choose`) and a climb a taller one
+    /// at its second turn (`climb`), once read the opening a taller one; and the block opens later on a floor higher than
+    /// the preparation's, which may leave it a lower one — a height refused here is refused there (25/11/2026, the M1 Pro:
+    /// a block of 4096 rows, the ANE on, prepared at 2048 rows a call, climbed to a call a pass and compiled it, 1.06 s).
+    /// In flight, at every height, the GPU's functions also at the shares a move takes first — the two beside the start
+    /// and the share of none (`zero`). A share met later is specialized as it loads, as any function the cache does not
+    /// hold.
+    public static func prepare(_ d: Declaration, files: [SafeTensors], budget: Int, share: Share,
+                               measured: ThisMac = .current) throws -> [Functions.Specialization] {
+        let o = try opening(d, files: files, budget: budget, share: share, measured: measured)
+        var functions = o.plans.flatMap { Array($0.declaration.functions.values) }
+        if o.inFlight && o.units > 0 {
+            for cut in o.heights.map(\.cut) {
+                for n in [0, o.units - 1, o.units + 1] where n == 0 || (n >= 1 && n < o.total) {
+                    for (_, spec) in steps(d, d.used, neural: n * o.unit, cut: cut) {
+                        nonisolated(unsafe) let m = try module(spec)
+                        functions.append(Stage.Function(Functions.name(m, prefix: "block"), unit: .gpu) { m })
+                    }
+                }
+            }
+        }
+        return try Stage.specializations(functions)
+    }
+
+    /// **`open`'s choices, before anything is allocated**: the unit and the share, the functions built and named, every
+    /// height planned and the one taken (`Stage.choose`); the edges' and the ANE's assets written.
+    private struct Opening {
+        let forms: [String: Form], groups: [String: Group]
+        let key: String, arithmetic: String
+        let unit: Int, units: Int, total: Int, inFlight: Bool
+        let heights: [Height], plans: [Stage.Plan], height: Int
+        let signatures: [String: Signature]
+        let copies: Set<String>, neuralRows: Set<String>
+        let resolver: Resolver
+    }
+
+    private static func opening(_ d: Declaration, files: [SafeTensors], budget: Int, share: Share, measured: ThisMac) throws -> Opening {
         let forms = Dictionary(uniqueKeysWithValues: d.forms.map { ($0.name, $0) })
         let used = d.used, shareable = d.shareable
         let surfaces = used.contains(where: \.shared) || !d.neuralEdges.isEmpty
-        let began = DispatchTime.now().uptimeNanoseconds
 
         // The unit and the share.
         let key = shareable > 0 ? try Self.key(used, shareable: shareable) : ""
@@ -120,15 +171,9 @@ extension Block {
         let estimates = Stage.estimates(extents: heights.map { ($0.key, $0.extent) }, measured: measured, budget: budget)
         let height = try Stage.choose(plans, estimates)
         signatures = modules.mapValues { Signature($0.module) }
-        let named = Functions.seconds(since: began)
-        let stage = try await Stage(device, plan: plans[height], files: files, measured: measured)
-        let block = Block(d, stage: stage, heights: heights, height: height, unit: unit, total: total, units: units, share: share, key: key,
-                          arithmetic: arithmetic,
-                          zero: inFlight && units > 0 && measured.zeros?[key] == nil,
-                          shareable: shareable, neuralRows: neuralRows,
-                          copies: copies, named: named, signatures: signatures, forms: forms, groups: groups, resolver: resolver)
-        block.told()
-        return block
+        return Opening(forms: forms, groups: groups, key: key, arithmetic: arithmetic, unit: unit, units: units, total: total,
+                       inFlight: inFlight, heights: heights, plans: plans, height: height, signatures: signatures,
+                       copies: copies, neuralRows: neuralRows, resolver: resolver)
     }
 
     /// **A height of the calls**: the tallest a call may be (nil, a call a pass), the key of its functions on this Mac

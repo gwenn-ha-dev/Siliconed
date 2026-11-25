@@ -170,7 +170,8 @@ extension FamilyTraits {
             return PromptWriter.Source(map: map, tokenizer: try library.component(.qwenImage21, "tokenizer"), config: .qwenImage21)
         },
         model: { try Model.qwenImage21(in: $0, card: $1, dit: $2) },
-        render: RenderLoop.render(QwenImage21Render.Parts.self))
+        render: RenderLoop.render(QwenImage21Render.Parts.self),
+        prepare: RenderLoop.preparation(QwenImage21Render.Parts.self))
 }
 
 extension Model {

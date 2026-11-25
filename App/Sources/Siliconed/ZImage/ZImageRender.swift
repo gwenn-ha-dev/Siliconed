@@ -58,6 +58,13 @@ package enum ZImageRender {
             dit.caps = caps
             return dit
         }
+
+        func prepare(height: Int, width: Int) throws -> [Functions.Specialization] {
+            let geometry = try ZImageTransformer.Geometry(latentHeight: height, latentWidth: width, capLength: ids.count)
+            return try Qwen3Encoder(config: .zImage, path: inputs.text.map).prepare(tokens: ids.count)
+                + (inputs.start.map { try FluxVAEEncoder.prepare(height: $0.image.height, width: $0.image.width, path: $0.encoding.path) } ?? [])
+                + ZImageTransformer.prepare(file: try ZImageDiT.file(inputs.denoising.map), geometry: geometry, loras: inputs.loras)
+        }
     }
 
     /// **What the DiT is told**: the inverted time `(1000 − σ·1000)/1000` in f32 (`FlowMatchSchedule.modelTime`), or the

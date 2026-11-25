@@ -361,7 +361,7 @@ extension RemoteControlHelp {
                           "received_bytes": 5170000000, "total_bytes": 12310000000} | null,
            "queue_remaining_s": 66.5, "remaining_complete": true,
            "history_images": 12, "library": "/Users/…/Siliconed",
-           "beta": {"more_solvers": false, "steps": false, …}, "neural_engine": true,
+           "beta": {"more_solvers": false, "steps": false, …}, "neural_engine": true, "compiling": false,
            "writer": {"state": "ready"}, "start_image": {…} | null, "computing_on": "Mac mini" | null,
            "memory": {"budget_bytes": 10737418240, "chosen": false, "default_bytes": 10737418240,
                       "range_bytes": [4294967296, 12884901888]}}
@@ -376,7 +376,9 @@ extension RemoteControlHelp {
                              less 2 GB), and the range it may be set in.
         stage              : text, image (encoding a reference), denoising, decoding.
         compiling          : true while Core AI compiles a function its cache does not hold (a model's first render, a new
-                             size): what the render waits for then is paid once, and remaining_s does not count it.
+                             size): what the render waits for then is paid once, and remaining_s does not count it. At the
+                             top, also while no render runs: the app compiles ahead what the form's next render needs (its
+                             model, size, LoRA, Neural Engine), and every installed model after an update.
         calibrating        : true while the engine looks for this Mac's Neural Engine share (a model's first render here);
                              the Chain inspector shows each step's share and seconds.
         steps_total        : the model's evaluations, not the requested steps.
@@ -408,7 +410,7 @@ extension RemoteControlHelp {
                           "received_bytes": 5170000000, "total_bytes": 12310000000} | null,
            "queue_remaining_s": 66.5, "remaining_complete": true,
            "history_images": 12, "library": "/Users/…/Siliconed",
-           "beta": {"more_solvers": false, "steps": false, …}, "neural_engine": true,
+           "beta": {"more_solvers": false, "steps": false, …}, "neural_engine": true, "compiling": false,
            "writer": {"state": "ready"}, "start_image": {…} | null, "computing_on": "Mac mini" | null,
            "memory": {"budget_bytes": 10737418240, "chosen": false, "default_bytes": 10737418240,
                       "range_bytes": [4294967296, 12884901888]}}
@@ -424,6 +426,9 @@ extension RemoteControlHelp {
         stage              : text, image (encodage d'une référence), denoising, decoding.
         compiling          : true tant que Core AI compile une fonction que son cache n'a pas (le premier rendu d'un
                              modèle, une taille neuve) : ce que le rendu attend alors se paie une fois, remaining_s ne le compte pas.
+                             En tête, aussi quand aucun rendu ne tourne : l'app compile d'avance ce dont le prochain rendu du
+                             formulaire a besoin (son modèle, sa taille, son LoRA, le Neural Engine), et chaque modèle installé
+                             après une mise à jour.
         calibrating        : true tant que le moteur cherche la part du Neural Engine de ce Mac (le premier rendu d'un
                              modèle ici) ; l'inspecteur Chaîne montre la part et les secondes de chaque pas.
         steps_total        : les évaluations du modèle, pas les pas demandés.

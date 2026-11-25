@@ -1,4 +1,5 @@
 import Foundation
+import SiliCore
 
 /// **A family's part of a render**: what differs from one family to the other — its text, its image stage, its DiT
 /// and the time it is told, what its decoder reads and gives. Everything else is `RenderLoop`'s, the same for all.
@@ -21,6 +22,9 @@ package protocol RenderParts {
     mutating func image() throws -> Latent?
     /// The DiT for the batch, opened under B and given what it reads once (the text, an edit's references).
     func denoiser(height: Int, width: Int) throws -> any RenderDenoiser
+    /// **What its stages would specialize**, after `tokens`: the text, the image stage (`encodes`) and the DiT, each at
+    /// the shapes the render opens it (`SiliCore`'s `prepare`), nothing allocated, nothing computed.
+    func prepare(height: Int, width: Int) throws -> [Functions.Specialization]
     /// The VAE the decoder reads.
     var decoderPath: String { get }
     /// What the decoder reads of a final latent (the family's normalization).
@@ -89,6 +93,21 @@ package enum RenderLoop {
     ) -> @Sendable (Request, Admission, [UInt64], Model, Cancellation?, (Engine.Event) -> Void) throws -> [Engine.Render] {
         { request, admitted, seeds, model, cancellation, emit in
             try run(Parts.self, request, admitted, seeds: seeds, model: model, cancellation: cancellation, emit: emit)
+        }
+    }
+
+    /// **What a family's render of `request` would specialize** (`FamilyTraits.prepare`): its part made as the render
+    /// makes it, the prompt tokenized, then each stage at the shapes the render opens it — its own (`RenderParts.prepare`),
+    /// then the decoder.
+    package static func preparation<Parts: RenderParts & SendableMetatype>(
+        _ parts: Parts.Type
+    ) -> @Sendable (Request, Admission, Model) throws -> [Functions.Specialization] {
+        { request, admitted, model in
+            var parts = try Parts(request, admitted, model: model)
+            _ = try parts.tokens()
+            return try parts.prepare(height: admitted.height, width: admitted.width)
+                + Parts.Decoder.prepare(path: parts.decoderPath, latentHeight: admitted.height, latentWidth: admitted.width,
+                                        budget: MemoryBudget.machineCeiling())
         }
     }
 

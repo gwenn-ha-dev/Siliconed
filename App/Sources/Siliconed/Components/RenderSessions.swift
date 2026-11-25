@@ -1,4 +1,5 @@
 import Foundation
+import SiliCore
 
 // **What every render runs alike**: its decoder, and the check on what it hands back — pieces of `RenderLoop`, the
 // decoder's also opened alone by the checks.
@@ -12,6 +13,8 @@ package protocol LatentDecoder {
     /// **Whether `open` would hold under `budget`**, judged now, nothing allocated (`BandStage.admit`): `OverBudget`
     /// otherwise. A render asks it before its DiT, over the floor its DiT will give back.
     static func admit(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws
+    /// **What `open` would specialize** under `budget`, its assets written, nothing allocated (`BandStage.prepare`).
+    static func prepare(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> [Functions.Specialization]
     /// Whether B made its plan cut finer than the one it prefers (`bandDecodingNotice`).
     var narrowed: Bool { get }
     /// A latent, as the decoder reads it, to the picture's planes `[3, H, W]` in `[-1, 1]`.

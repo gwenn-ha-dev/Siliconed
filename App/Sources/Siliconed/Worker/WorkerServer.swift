@@ -1,4 +1,5 @@
 import Foundation
+import SiliCore
 
 /// **The engine's process, `silicore-worker`**: the app's renders and writer run here, never in the app (`EngineWorker`).
 /// It reads its calls on its standard input and answers on its standard output (`WorkerWire.swift`), one piece of work
@@ -10,6 +11,8 @@ import Foundation
 ///   renders — the render cache's conditionings, what Core AI loaded — goes with it.
 /// - **Its name is stable**: Core AI files its compilations by process name.
 /// - **Its first work is Core AI's first call** (`CoreAI.witness`): every stage's floor holds it.
+/// - **A preparation compiles between the calls** (`WorkerCall.prepare`): its specializations one at a time on the
+///   work's queue while no call is in hand — a call that comes waits for the one under way, the others after it.
 package enum WorkerServer {
     package static func run() -> Never {
         _ = MemoryBudget.machineCeiling()
@@ -29,6 +32,9 @@ private final class Server: @unchecked Sendable {
     private let lock = NSLock()
     private var calls: [UInt32: Call] = [:]
     private var blob: UInt32 = 0
+    /// Under `lock`: what the form's last preparation left to specialize, then the others' (`WorkerCall.prepare`), the
+    /// ANE's first in each; whether one is on the queue.
+    private var pending: [Functions.Specialization] = [], background: [Functions.Specialization] = [], queued = false
 
     /// A call in hand: its token, and what stops it once it runs (the writer's own cancel).
     final class Call: @unchecked Sendable {
@@ -87,6 +93,10 @@ private final class Server: @unchecked Sendable {
             let blobs = inbox.take(order.blobs), c = Call()
             lock.withLock { calls[id] = c }
             work.async { self.write(id, order, blobs, c) }
+        case let .prepare(id, order, background):
+            let blobs = inbox.take(order.blobs)
+            lock.withLock { calls[id] = Call() }
+            work.async { self.prepare(id, order, blobs, background: background) }
         case .erase(let id):
             lock.withLock { calls[id] = Call() }
             work.async {
@@ -109,6 +119,57 @@ private final class Server: @unchecked Sendable {
     private func ended(_ id: UInt32, _ failure: WorkerFailure?) {
         lock.withLock { calls[id] = nil }
         out.send(failure.map { WorkerReply.failed(id: id, $0) } ?? .finished(id: id))
+        specializeNext()
+    }
+
+    /// **What a render of `order` would specialize** (`Engine.prepare`): the form's in place of what its last left, the
+    /// others after theirs. The call ends there, the specializations come after it.
+    private func prepare(_ id: UInt32, _ order: RenderOrder, _ blobs: [UInt32: Data], background later: Bool) {
+        CoreAI.neuralEngine = order.neuralEngine
+        CoreAI.place(order.library.library)
+        do {
+            let request = try order.request(blobs)
+            let model = try Model.named(order.model, in: order.library.library)
+            let all = try Engine().prepare(request, model: model)
+            lock.withLock { if later { background += all } else { pending = all } }
+            ended(id, nil)
+        } catch {
+            ended(id, WorkerFailure(error))
+        }
+    }
+
+    /// **The next specialization put on the work's queue**, where no call is in hand and none is queued.
+    private func specializeNext() {
+        let go = lock.withLock { () -> Bool in
+            guard calls.isEmpty, !(pending.isEmpty && background.isEmpty), !queued else { return false }
+            queued = true
+            return true
+        }
+        if go { work.async { self.specialize() } }
+    }
+
+    /// **One specialization**, unless a call came since it was queued; its compilation told to the app
+    /// (`WorkerReply.preparing`), a failure on the standard error — the render that needs it compiles it, and says why.
+    private func specialize() {
+        let next = lock.withLock { () -> Functions.Specialization? in
+            queued = false
+            guard calls.isEmpty else { return nil }
+            return pending.isEmpty ? background.isEmpty ? nil : background.removeFirst() : pending.removeFirst()
+        }
+        guard let next else { return }
+        let out = out
+        let observation = Stages.observe { event in
+            switch event {
+            case .compiling: out.send(WorkerReply.preparing(compiling: true))
+            case .compiled: out.send(WorkerReply.preparing(compiling: false))
+            default: break
+            }
+        }
+        do { try blocking { try await Functions.specialize(next) } } catch {
+            FileHandle.standardError.write(Data("silicore-worker: \(next.asset.lastPathComponent) not prepared: \(error)\n".utf8))
+        }
+        observation.cancel()
+        specializeNext()
     }
 
     private func nextBlob() -> UInt32 { lock.withLock { blob &+= 1; return blob } }

@@ -73,6 +73,11 @@ public final class Layers: @unchecked Sendable {
         Layers(d, try await Block.open(device, block(d), files: files, budget: budget, share: .gpu))
     }
 
+    /// **What `open` would specialize**, its assets written (`Block.prepare`).
+    public static func prepare(_ d: Declaration, files: [SafeTensors], budget: Int) throws -> [Functions.Specialization] {
+        try Block.prepare(block(d), files: files, budget: budget, share: .gpu)
+    }
+
     private init(_ d: Declaration, _ block: Block) { (declaration, self.block) = (d, block) }
 
     // MARK: - The loop

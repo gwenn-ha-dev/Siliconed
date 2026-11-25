@@ -159,6 +159,13 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
         return (block, arithmetic)
     }
 
+    /// **What `block` would specialize** (`Block.prepare`): the same arithmetic and declaration, nothing allocated.
+    package static func prepare(file: SafeTensors, codes marker: String, budget: Int,
+                                _ declaration: (Arithmetic) -> Block.Declaration) throws -> [Functions.Specialization] {
+        let arithmetic = of(codes: Self.codes(file, marker: marker), neuralEngine: CoreAI.neuralEngineInForce)
+        return try Block.prepare(declaration(arithmetic), files: [file], budget: budget, share: arithmetic.share)
+    }
+
     /// The shared forms, or the Standard's bf16.
     package var shared: Bool { self != .standard }
     /// The shared forms' weights (the Standard's: none, `codes` said).
@@ -322,8 +329,27 @@ package enum CoreAI {
         try? installed.write(to: mark(folder), atomically: true, encoding: .utf8)
     }
 
+    /// **This app on this macOS**, as the preparations' mark names it (`preparationDue`): Core AI files what it specialized
+    /// under macOS's build (`coreai-cache/<build>`), so an update of either compiles every function again.
+    package static var preparedFor: String { "\(thisApp) · \(ProcessInfo.processInfo.operatingSystemVersionString)" }
+
+    /// **Whether every installed model's render is to be prepared again** (`AppState.prepareAtLaunch`): this app or this
+    /// macOS is not the one it was last prepared for.
+    package static func preparationDue(folder: URL = functions) -> Bool {
+        (try? String(contentsOf: mark(folder, "prepared-for"), encoding: .utf8)) != preparedFor
+    }
+
+    /// The preparation for `preparedFor` sent: written as it is, not once its compilations end — an app quit meanwhile
+    /// leaves the rest to the renders, which compile what they load.
+    package static func markPrepared(folder: URL = functions) {
+        try? FileManager.default.createDirectory(at: folder.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? preparedFor.write(to: mark(folder, "prepared-for"), atomically: true, encoding: .utf8)
+    }
+
     /// Beside the functions' folder, not in it: erased with them, it would say nothing.
-    private static func mark(_ folder: URL) -> URL { folder.deletingLastPathComponent().appendingPathComponent("compiled-for") }
+    private static func mark(_ folder: URL, _ name: String = "compiled-for") -> URL {
+        folder.deletingLastPathComponent().appendingPathComponent(name)
+    }
 }
 
 /// **A tensor handed from one piece of a render to the next on the CPU** (a text's conditioning, a latent): its shape

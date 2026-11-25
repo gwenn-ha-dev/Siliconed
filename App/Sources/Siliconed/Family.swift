@@ -1,4 +1,5 @@
 import Foundation
+import SiliCore
 
 /// A family of models. **Everything a family is lives in its folder**; the rest of the app reads only its `traits`.
 /// Adding one: its folder, a case here and its line in `traits`, its stages in `Verification`'s registry.
@@ -87,6 +88,8 @@ package struct FamilyTraits: Sendable {
     package let model: @Sendable (_ library: Library, _ card: ModelCard, _ dit: String) throws -> Model
     package let render: @Sendable (_ request: Request, _ admitted: Admission, _ seeds: [UInt64], _ model: Model,
                                    _ cancellation: Cancellation?, _ emit: (Engine.Event) -> Void) throws -> [Engine.Render]
+    /// **What its render of a request would specialize** (`RenderLoop.preparation`), compiled before the render comes.
+    package let prepare: @Sendable (_ request: Request, _ admitted: Admission, _ model: Model) throws -> [Functions.Specialization]
 }
 
 /// **What the interface says of a family**, declared in its folder: English sentences, the keys of the app's catalog

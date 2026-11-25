@@ -15,7 +15,9 @@ extension AppState {
         // A mirror's library is the other Mac's, published (`receiveLibrary`); this disk is not its.
         guard mirror == nil else { return }
         cards = library.cards()
+        let before = readySet
         readySet = Set(library.models().map(\.id))
+        prepareInBackground(cards.map(\.id).filter { readySet.contains($0) && !before.contains($0) })
         readOccupancy()
         installedLoRAs = library.loras().map { ($0, Library.fileSize($0.path) ?? 0) }
         libraryRead += 1

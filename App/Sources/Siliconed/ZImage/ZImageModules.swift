@@ -123,7 +123,8 @@ extension FamilyTraits {
             BaseCheckpoint("Comfy-Org/Z-Image@94d47a46 z_image_int8_convrot", 6201001296, "eb2b470694fbd9778f15efd309000ea0091312c018c10a352c120b1da9bf4279"),
         ],
         model: { try Model.zImage(in: $0, card: $1, dit: $2) },
-        render: RenderLoop.render(ZImageRender.Parts.self))
+        render: RenderLoop.render(ZImageRender.Parts.self),
+        prepare: RenderLoop.preparation(ZImageRender.Parts.self))
 }
 
 extension Model {

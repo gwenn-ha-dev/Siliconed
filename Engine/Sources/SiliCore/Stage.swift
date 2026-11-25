@@ -29,6 +29,9 @@ public final class Stage: @unchecked Sendable {
     public private(set) var arena: Arena!
     /// The functions loaded, by the declaration's names.
     public private(set) var functions: [String: InferenceFunction] = [:]
+    /// **Whether its opening compiled**: a function Core AI's cache did not hold, specialized as it loaded (`prepare`
+    /// specializes them before).
+    public private(set) var compiled = false
     /// The residents, by their arguments' names.
     public private(set) var residents: [String: Placed] = [:]
 
@@ -153,7 +156,9 @@ public final class Stage: @unchecked Sendable {
         let floor = plan.floor
         watch = FootprintWatch { [weak arena] in footprint() - floor - (arena?.allocated ?? 0) }
         for (name, f) in d.functions.sorted(by: { $0.key < $1.key }) {
-            functions[name] = try await Functions.load(try Functions.asset(f.asset, f.build), unit: f.unit)
+            let l = try await Functions.loaded(try Functions.asset(f.asset, f.build), unit: f.unit)
+            functions[name] = l.function
+            compiled = compiled || l.compiled
         }
         watch?.reset()
         lock.withLock { ready = true }

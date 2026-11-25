@@ -144,7 +144,8 @@ extension FamilyTraits {
         loraModules: { MossImageDiTProgram.loraModules() },
         ditTensors: { MossImageDiTProgram.tensors() },
         model: { try Model.mossImage(in: $0, card: $1, dit: $2) },
-        render: RenderLoop.render(MossImageRender.Parts.self))
+        render: RenderLoop.render(MossImageRender.Parts.self),
+        prepare: RenderLoop.preparation(MossImageRender.Parts.self))
 }
 
 extension Model {

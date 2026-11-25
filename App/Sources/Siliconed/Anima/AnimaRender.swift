@@ -1,4 +1,5 @@
 import Foundation
+import SiliCore
 
 /// **Anima Turbo's render**: `AnimaModularPipeline` translated into four stages, the sampler Siliconed's own.
 ///
@@ -57,6 +58,16 @@ package enum AnimaRender {
             let dit = try Denoiser(map: inputs.denoising.map, loras: inputs.loras, latentHeight: height, latentWidth: width, textLength: context.shape[0])
             try dit.give(context)
             return dit
+        }
+
+        func prepare(height: Int, width: Int) throws -> [Functions.Specialization] {
+            let budget = MemoryBudget.machineCeiling(), text = inputs.text
+            let c = AnimaConditioner(targetLength: t5Ids.count, sourceLength: qwenIds.count)
+            let geometry = AnimaEvaluation.Geometry(height: height, width: width, context: c.rows)
+            return try Qwen3Encoder(config: .anima, path: text.map).prepare(tokens: qwenIds.count)
+                + AnimaConditioner.prepare(targetLength: t5Ids.count, sourceLength: qwenIds.count, path: text.adapter, budget: budget)
+                + (inputs.start.map { try QwenImageVAEEncoder.prepare(height: $0.image.height, width: $0.image.width, path: $0.encoding.path) } ?? [])
+                + AnimaEvaluation.prepare(inputs.denoising.map, geometry: geometry, loras: inputs.loras, budget: budget)
         }
 
         func decoderInput(_ latent: [Float]) -> [Float] { QwenImageVAEDecoder.normalized(latent) }

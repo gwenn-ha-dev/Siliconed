@@ -1,4 +1,5 @@
 import Foundation
+import SiliCore
 
 /// **Qwen-Image-2.1 Turbo's render**: `QwenImage21Pipeline` translated into sessions, the sampler
 /// Siliconed's own.
@@ -103,6 +104,14 @@ package enum QwenImage21Render {
             let sequence = try QwenImage21DiT.Sequence(slots: slots, references: grids, height: height, width: width)
             return try Denoiser(map: denoising.map, loras: loras, sequence: sequence, text: states,
                                 references: referenceTokens.isEmpty ? nil : HostTensor([sequence.referenceRows, denoising.space.channels], floats: referenceTokens))
+        }
+
+        /// An edit's vision tower is not prepared: it compiles as it loads, as any function the cache does not hold.
+        func prepare(height: Int, width: Int) throws -> [Functions.Specialization] {
+            let sequence = try QwenImage21DiT.Sequence(slots: Array(rows.dropFirst(dropped)), references: grids, height: height, width: width)
+            return try Qwen3Encoder(config: .qwenImage21, path: text.map).prepare(tokens: ids.count)
+                + (encoding.map { e in try references.flatMap { try QwenImage21VAEEncoder.prepare(height: $0.height, width: $0.width, path: e.path) } } ?? [])
+                + QwenImage21Loop.prepare(map: denoising.map, sequence: sequence, loras: loras)
         }
 
         func decoderInput(_ latent: [Float]) -> [Float] { QwenImage21VAEDecoder.denormalized(latent) }

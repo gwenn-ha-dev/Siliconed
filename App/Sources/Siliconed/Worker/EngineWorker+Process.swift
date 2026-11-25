@@ -147,6 +147,9 @@ extension EngineWorker {
             return
         case .written(let i, _), .erased(let i, _): id = i; last = false
         case .finished(let i), .failed(let i, _): id = i; last = true
+        case .preparing(let compiling):
+            preparing?(compiling)
+            return
         }
         let p = lock.withLock { last ? calls.removeValue(forKey: id) : calls[id] }
         if last { p?.ended() }
@@ -158,6 +161,7 @@ extension EngineWorker {
     /// worker instead (`Pending.handedOn`) —, and the next call starts another.
     private func died(_ worker: Live) {
         let error = worker.why()
+        preparing?(false)
         let (ended, again) = lock.withLock { () -> ([Pending], [@Sendable () -> Void]) in
             let mine: [UInt32: Pending]
             if live === worker || live == nil {

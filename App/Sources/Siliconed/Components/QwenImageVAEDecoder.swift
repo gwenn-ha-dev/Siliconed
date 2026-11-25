@@ -90,6 +90,10 @@ package final class QwenImageVAEDecoder: BandedDecoder {
         try QwenImageVAERun.admit(try plans(path: path, latentHeight: latentHeight, latentWidth: latentWidth), budget: budget)
     }
 
+    package static func prepare(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> [Functions.Specialization] {
+        try QwenImageVAERun.prepare(try plans(path: path, latentHeight: latentHeight, latentWidth: latentWidth), budget: budget)
+    }
+
     /// The plans `open` opens among and `admit` judges, one function for both.
     private static func plans(path: String, latentHeight: Int, latentWidth: Int) throws -> QwenImageVAERun.Plans {
         QwenImageVAERun.Plans("qwen-image-vae-decoder", file: try SafeTensors(path)) { plan(h: latentHeight, w: latentWidth, positions: $0) }

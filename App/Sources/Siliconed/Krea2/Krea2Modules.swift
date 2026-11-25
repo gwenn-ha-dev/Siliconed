@@ -119,7 +119,8 @@ extension FamilyTraits {
             BaseCheckpoint("Comfy-Org/Krea-2@588feaf9 krea2_raw_int8_convrot", 13492686496, "5585a4a38c4bcfb6fde2d480a4aa6edf7f665721ebde56d30662c35a45f5fa5c"),
         ],
         model: { try Model.krea2(in: $0, card: $1, dit: $2) },
-        render: RenderLoop.render(Krea2Render.Parts.self))
+        render: RenderLoop.render(Krea2Render.Parts.self),
+        prepare: RenderLoop.preparation(Krea2Render.Parts.self))
 }
 
 extension Model {

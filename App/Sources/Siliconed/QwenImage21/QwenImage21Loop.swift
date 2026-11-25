@@ -164,17 +164,32 @@ package final class QwenImage21Loop {
     /// Standard. Under `loras`, their factors written before the first call.
     package static func open(map: String, sequence: QwenImage21DiT.Sequence, loras: LoRAStack = .none, tapped: Bool = false,
                              budget: Int = MemoryBudget.machineCeiling()) async throws -> QwenImage21Loop {
-        let file = try MapWeights.dit(map, marker: "img_in.weight")
-        let marker = "transformer_blocks.0.attn.to_q.weight"
-        guard let probe = file.tensors[marker] else { throw ProgramError("\(map): not Qwen-Image-2.1's DiT") }
-        guard ["I8", "BF16", "F32"].contains(probe.dtype) else {
-            throw ProgramError("\(map): its products are \(probe.dtype), which no path of the DiT reads")
-        }
+        let file = try Self.file(map)
         let g = Geometry(sequence), ranks = QwenImage21Functions.ranks(loras)
         let (block, arithmetic) = try await Arithmetic.block(file: file, codes: marker, budget: budget) { declaration(g, $0, ranks: ranks, tapped: tapped) }
         let loop = QwenImage21Loop(block, g, arithmetic, ranks: ranks)
         try loop.write(loras)
         return loop
+    }
+
+    /// **What `open` would specialize** (`Arithmetic.prepare`): the same declaration, nothing allocated.
+    package static func prepare(map: String, sequence: QwenImage21DiT.Sequence, loras: LoRAStack = .none,
+                                budget: Int = MemoryBudget.machineCeiling()) throws -> [Functions.Specialization] {
+        let g = Geometry(sequence), ranks = QwenImage21Functions.ranks(loras)
+        return try Arithmetic.prepare(file: try Self.file(map), codes: marker, budget: budget) { declaration(g, $0, ranks: ranks, tapped: false) }
+    }
+
+    /// The product whose element says the Compact (`Arithmetic.codes`).
+    private static let marker = "transformer_blocks.0.attn.to_q.weight"
+
+    /// The DiT's file in the map, its products of an element a path reads.
+    private static func file(_ map: String) throws -> SafeTensors {
+        let file = try MapWeights.dit(map, marker: "img_in.weight")
+        guard let probe = file.tensors[marker] else { throw ProgramError("\(map): not Qwen-Image-2.1's DiT") }
+        guard ["I8", "BF16", "F32"].contains(probe.dtype) else {
+            throw ProgramError("\(map): its products are \(probe.dtype), which no path of the DiT reads")
+        }
+        return file
     }
 
     private init(_ block: Block, _ g: Geometry, _ arithmetic: Arithmetic, ranks: Ranks) {

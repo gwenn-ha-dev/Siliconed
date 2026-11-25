@@ -55,6 +55,14 @@ package enum MossImageRender {
             dit.text = caps
             return dit
         }
+
+        func prepare(height: Int, width: Int) throws -> [Functions.Specialization] {
+            let geometry = MossDiT.Geometry(height: height, width: width, text: ids.count)
+            return try Qwen35Encoder().prepare(tokens: ids.count, map: inputs.text.map)
+                + (inputs.start.map { try Flux2VAEEncoder.prepare(height: $0.image.height, width: $0.image.width, path: $0.encoding.path) } ?? [])
+                + MossDiT.prepare(file: try MossDiT.file(inputs.denoising.map), geometry: geometry, budget: MemoryBudget.machineCeiling(),
+                                  loras: try MossImageRender.recipe(inputs.denoising.turbo, then: inputs.loras))
+        }
     }
 
     // MARK: - The three sessions

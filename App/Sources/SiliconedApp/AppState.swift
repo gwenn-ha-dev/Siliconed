@@ -274,6 +274,13 @@ final class AppState {
     var sessionSeconds = 0.0
     var file: [Job] = []
     var inProgress: Bool { currentJob != nil }
+    /// **A preparation compiles now** (`AppState+Prepare.swift`): outside any render, or before the render that waits for it.
+    var preparingCoreAI = false
+    /// The form's key last prepared, and its pause under way (`AppState+Prepare.swift`).
+    @ObservationIgnored var preparedKey: PreparationKey?
+    @ObservationIgnored var preparation: Task<Void, Never>?
+    /// The end of a preparation's burst, said once it lasted (`preparationTold`).
+    @ObservationIgnored var preparationEnd: Task<Void, Never>?
     /// A render is running or waiting: installations (several GB) and removing a model wait.
     var busy: Bool { inProgress || !file.isEmpty }
     var fraction = 0.0
