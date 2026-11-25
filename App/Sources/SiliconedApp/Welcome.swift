@@ -137,8 +137,9 @@ struct ProgressIndicator: View {
                     Text(label).font(.callout).lineLimit(1)
                     Spacer(minLength: 12)
                     TimelineView(.periodic(from: .now, by: 1)) { context in
+                        // What compiles is said once, in the window's band (`CompilationMark`); here, why no time is said.
                         if app.compilingCoreAI {
-                            Text("Core AI compilation…").font(.callout).foregroundStyle(Palette.secondary)
+                            Text("Estimate after compilation").font(.callout).foregroundStyle(Palette.secondary)
                         } else if let r = app.remaining(at: context.date) {
                             Text("\(Figures.duration(r)) left")
                                 .font(.callout).monospacedDigit().foregroundStyle(Palette.secondary)

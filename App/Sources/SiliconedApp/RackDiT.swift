@@ -73,9 +73,6 @@ struct DiTBox: View {
             }
             if app.state(of: .denoising) == .active, app.totalSteps > 0, app.currentJob?.settings.identifier == app.identifier {
                 progress
-            } else if app.preparingCoreAI, !app.inProgress {
-                // A preparation (`AppState+Prepare.swift`): what the next render would compile, compiled now.
-                Text("Core AI compilation…").font(.caption).foregroundStyle(Palette.secondary)
             } else {
                 Cost(app.stageCost(.denoising))
             }
@@ -346,8 +343,9 @@ struct DiTBox: View {
                 Text("step \(app.currentStep)/\(app.totalSteps)").monospacedDigit()
                 Spacer()
                 TimelineView(.periodic(from: .now, by: 1)) { context in
+                    // What compiles is said once, in the window's band (`CompilationMark`); here, why no time is said.
                     if app.compilingCoreAI {
-                        Text("Core AI compilation…").foregroundStyle(Palette.secondary)
+                        Text("Estimate after compilation").foregroundStyle(Palette.secondary)
                     } else if let r = app.remaining(at: context.date) {
                         Text("\(Figures.duration(r)) left").monospacedDigit().foregroundStyle(Palette.secondary)
                     }

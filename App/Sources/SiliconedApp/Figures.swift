@@ -31,6 +31,9 @@ enum Figures {
 
     static func strength(_ f: Double) -> String { f.formatted(.number.precision(.fractionLength(2))) }
 
+    /// `6.1`, `0.84` — TFLOP/s, the unit said by its column or its sentence: a tenth from 1, a hundredth under.
+    static func tflops(_ x: Double) -> String { x.formatted(.number.precision(.fractionLength(x < 1 ? 2 : 1))) }
+
     /// `40 %` in French, `40%` in English — `n` out of 100.
     static func percent(_ n: Int) -> String { (Double(n) / 100).formatted(.percent.precision(.fractionLength(0))) }
 

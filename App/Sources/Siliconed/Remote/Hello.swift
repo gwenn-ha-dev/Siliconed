@@ -13,8 +13,9 @@ package struct Hello: Codable, Equatable, Sendable {
     /// job carries no margin, and a render gone wrong says its stage, `EngineError.nonFiniteImage(stage:)`; 10: an installation's
     /// plan says what is left to download apart from the room it takes, `RemotePlan.toDownload`, and a job carries its starting
     /// image, `RemoteJob.start`; a model deeper than its family is refused by name, `EngineError.importDeeperModel`; 11: a stage's
-    /// footprint carries the Neural Engine's share looked for in a model's first render, `Engine.Calibration`).
-    package static let protocolVersion = 11
+    /// footprint carries the Neural Engine's share looked for in a model's first render, `Engine.Calibration`; 12: it carries its
+    /// block's cycles in every render, with their TFLOP/s, `Engine.Cycle`, in its place).
+    package static let protocolVersion = 12
 
     package let protocolVersion: Int
     /// The Mac's name, as the user knows it ("Mac mini de Gwenn").

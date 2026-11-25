@@ -1,7 +1,8 @@
-// **The « Chain » inspector**: a floating panel (`Inspectors.swift`) that says where the render stands, then the
-// chain stage by stage — its module, its weights, its time, what Core AI compiled for it, the Neural Engine's share
-// where it computed — and the memory of the render in one small graph, in time (the footprint's min and max, the limit), what remains for the queue,
-// and the session.
+// **The « Chain » inspector**: a floating panel (`Inspectors.swift`) that says where the render stands, what Core AI
+// compiles — ahead of a render (a preparation: its model, its size, how far) or in it, stage by stage —, then the chain
+// stage by stage — its module, its weights, its time, the Neural Engine's share where it computed; the DiT step by step,
+// each step's TFLOP/s, the block's and each unit's, and where the share moved — and the memory of the render in one
+// small graph, in time (the footprint's min and max, the limit), what remains for the queue, and the session.
 //
 // Its lines keep their number while a render runs: a model's first render compiles in bursts up to its last band of
 // decoding, and a line that came and went with each compilation moved everything under it, several times a second.
@@ -27,6 +28,7 @@ struct ChainInspector: View {
                     // sections that read it are drawn again with it, and only while it says something — at rest, with
                     // nothing waiting, it stops (a panel left open redrew both sections every second for nothing).
                     TimelineView(.animation(minimumInterval: 1, paused: !app.inProgress)) { context in inProgress(now: context.date) }
+                    TimelineView(.animation(minimumInterval: 1, paused: !app.inProgress)) { context in coreAI(now: context.date) }
                     stages
                     TimelineView(.animation(minimumInterval: 1, paused: !app.inProgress && app.file.isEmpty)) { context in
                         waitingQueue(now: context.date)
@@ -55,7 +57,7 @@ struct ChainInspector: View {
                 ProgressView(value: app.fraction).tint(Palette.live)
                 StatLine("elapsed", Figures.duration(now.timeIntervalSince(begin)))
                 let remaining = app.compilingCoreAI ? nil : app.remaining(at: now)
-                StatLine("remaining", app.compilingCoreAI ? String(localized: "Core AI compilation…")
+                StatLine("remaining", app.compilingCoreAI ? String(localized: "after the compilation")
                                       : remaining.map { "≈ " + Figures.duration($0) } ?? String(localized: "after the first step"))
                 StatLine("expected end", remaining.map { Figures.hour(now.addingTimeInterval($0)) } ?? "—")
                 if app.batchSize > 1 {
@@ -64,6 +66,29 @@ struct ChainInspector: View {
             } else {
                 Text(app.history.isEmpty ? "No renders yet." : "Nothing is running.")
                     .font(.callout).foregroundStyle(Palette.secondary)
+            }
+        }
+    }
+
+    // ── Core AI: what it compiles, ahead of a render or in it ──
+
+    /// **What Core AI compiles**: a preparation under way (`AppState.compilingAhead`) — its model, its size, the
+    /// specialization it is at of its key's, the models after it —; the render's, under way or the last, stage by stage
+    /// (`Engine.Held.compilation`).
+    @ViewBuilder private func coreAI(now: Date) -> some View {
+        Section(title: "Core AI", right: app.compilingCoreAI ? String(localized: "compiling") : nil) {
+            if let p = app.compilingAhead {
+                StatLine("preparing", "\(app.modelName(p.model)) · \(Figures.size(p.width, p.height)) · \(p.at)/\(p.of)",
+                         detail: p.next.isEmpty ? nil : String(localized: "then \(p.next.map(app.modelName).formatted(.list(type: .and)))"))
+            }
+            if m.job != nil {
+                let compiled = m.held.filter { $0.compilation > 0 }, total = compiled.map(\.compilation).reduce(0, +)
+                StatLine(app.inProgress ? "this render" : "last render",
+                         app.inProgress && m.compiling(at: now) ? String(localized: "compiling…")
+                             : total > 0 ? String(localized: "\(Figures.seconds(total)) compiled") : String(localized: "nothing compiled"),
+                         detail: compiled.isEmpty ? nil : compiled.map { "\(name($0.stage)) \(Figures.seconds($0.compilation))" }.joined(separator: " · "))
+            } else if app.compilingAhead == nil {
+                Text("Nothing compiling.").font(.callout).foregroundStyle(Palette.secondary)
             }
         }
     }
@@ -86,13 +111,11 @@ struct ChainInspector: View {
         Section(title: "Chain") {
             ForEach(Array(shownStages.enumerated()), id: \.element) { n, stage in
                 if n > 0 { Divider() }
-                StageLine(title: title(stage), what: what(stage), time: time(stage), held: compiled(stage),
+                StageLine(title: title(stage), what: what(stage), time: time(stage),
+                          note: stage == .text && m.textCached ? String(localized: "read from the session’s cache") : nil,
                           units: m.held.first { $0.stage == stage }?.neuralEngine.flatMap { $0 > 0 ? $0 : nil },
                           highlighted: focus.stage == stage) {
-                    if stage == .denoising {
-                        bars
-                        calibration
-                    }
+                    if stage == .denoising { dit }
                 }
                 .id(stage)
             }
@@ -100,6 +123,16 @@ struct ChainInspector: View {
                 Divider()
                 MemoryChart(series: m.memory, held: m.held, label: short).padding(.horizontal, 6)
             }
+        }
+    }
+
+    /// The stage's short name, in a sentence.
+    private func name(_ stage: Engine.Stage) -> String {
+        switch stage {
+        case .text: String(localized: "Text")
+        case .image: String(localized: "Image")
+        case .denoising: String(localized: "DiT")
+        case .decoding: String(localized: "VAE")
         }
     }
 
@@ -137,8 +170,6 @@ struct ChainInspector: View {
 
     private func time(_ stage: Engine.Stage) -> String {
         guard m.job != nil else { return "—" }
-        // A function Core AI's cache does not hold: what the stage waits for, said rather than a count that stands still.
-        if app.inProgress, m.compiling(stage) { return String(localized: "Core AI compilation…") }
         switch stage {
         case .text:
             if let tokens = m.tokens, let t = m.tokenizer, let e = m.encoder {
@@ -156,43 +187,23 @@ struct ChainInspector: View {
         return app.stage == stage && app.inProgress ? inProgressOrNone : "—"
     }
 
-    /// **What Core AI compiled for the stage**, besides its time — its memory is the graph's (`MemoryChart`), who computed
-    /// the line's own bar (`UnitShare`).
-    private func compiled(_ stage: Engine.Stage) -> String? {
-        guard let h = m.held.first(where: { $0.stage == stage }) else {
-            return stage == .text && m.textCached ? String(localized: "read from the session’s cache") : nil
-        }
-        if app.inProgress, m.compiling(stage) { return String(localized: "Core AI compilation…") }
-        return h.compilation > 0 ? String(localized: "Core AI compilation: \(Figures.seconds(h.compilation))") : nil
-    }
-
-    /// The DiT's steps as bars: each one's duration, the first re-reading the map, a slow one showing.
-    @ViewBuilder private var bars: some View {
+    /// **The DiT step by step** (`Engine.Cycle`, the image under way's in a batch): each step's TFLOP/s as a bar — those to
+    /// come hollow —, the most reached, then a line a step: where the Neural Engine's share stood, the TFLOP/s of the
+    /// block and of each unit, the seconds. Every render, not only a model's first: the share is followed at every step.
+    @ViewBuilder private var dit: some View {
         let image = min(app.batchImage, max(0, m.stepSeconds.count - 1))
-        let durations = m.stepSeconds.indices.contains(image) ? m.stepSeconds[image] : []
+        let cycles = Array(m.cycles(image: image))
         if m.planned > 0 {
-            if let speed = m.speed {
-                Text("average \(Figures.seconds(speed.full)) per step").font(.caption2).foregroundStyle(Palette.secondary)
+            HStack {
+                Text(verbatim: "TFLOP/s")
+                Spacer()
+                if let top = cycles.map(\.tflops).max(), top > 0 { Text("max \(Figures.tflops(top))") }
             }
-            Bars(durations: durations, plannedCount: m.planned, mean: m.speed?.full)
+            .font(.caption2).monospacedDigit().foregroundStyle(Palette.secondary)
+            .padding(.top, 2)
+            RateBars(rates: cycles.map(\.tflops), planned: m.planned)
                 .frame(height: 38)
-                .padding(.top, 2)
-        }
-    }
-
-    /// **The Neural Engine's share looked for**, in a model's first render on this Mac (`Engine.Calibration`): each cycle —
-    /// a DiT evaluation — at the share it ran, its seconds, the Neural Engine's calls and the GPU's; the cycles of the
-    /// share of none's trial marked. Shown only in the render that looked for it.
-    @ViewBuilder private var calibration: some View {
-        if let c = m.held.first(where: { $0.stage == .denoising })?.calibration {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(c.looking ? "Finding this Mac’s Neural Engine share…" : "Neural Engine share found for this Mac")
-                    .font(.caption).foregroundStyle(c.looking ? Palette.live : Palette.secondary)
-                ForEach(Array(c.cycles.enumerated()), id: \.offset) { n, cycle in
-                    CalibrationCycle(index: n + 1, cycle: cycle)
-                }
-            }
-            .padding(.top, 4)
+            if !cycles.isEmpty { CycleTable(cycles: cycles).padding(.top, 4) }
         }
     }
 
@@ -280,7 +291,7 @@ private struct StageLine<Extra: View>: View {
     let title: LocalizedStringKey
     let what: String
     let time: String
-    let held: String?
+    let note: String?
     /// The Neural Engine's share of the stage's arithmetic; `nil` when the stage ran no session.
     let units: Double?
     let highlighted: Bool
@@ -295,7 +306,7 @@ private struct StageLine<Extra: View>: View {
             }
             .font(.callout)
             if !what.isEmpty { Text(what).font(.caption).foregroundStyle(Palette.secondary) }
-            if let held { Text(held).font(.caption).monospacedDigit() }
+            if let note { Text(note).font(.caption).monospacedDigit() }
             if let units { UnitShare(neuralEngine: units) }
             extra
         }
@@ -330,45 +341,43 @@ private struct StatLine: View {
     }
 }
 
-/// **Who computed, GPU and Neural Engine**: the share of the arithmetic of the products by weights each unit ran — the
-/// engine's own count (`Ledger`), product by product, not an estimate. A bar split at the share, both figures under it;
-/// the Neural Engine's part in what runs, the GPU's neutral.
-/// **One cycle of the Neural Engine's share looked for** (`ChainInspector.calibration`): its number, its share as a bar,
-/// the share, its seconds; under it the Neural Engine's calls and the GPU's, the two the engine balances.
-private struct CalibrationCycle: View {
-    let index: Int
-    let cycle: Engine.Calibration.Cycle
+/// **The DiT's steps, a line each** (`Engine.Cycle`): its number; the Neural Engine's rows, of those it could take
+/// (« GPU only » at none), marked where the share moved; the block's TFLOP/s — what its calls executed over its own
+/// seconds — and each unit's over its calls (— where they were not timed: the GPU alone, a block's last step); its
+/// seconds.
+private struct CycleTable: View {
+    let cycles: [Engine.Cycle]
 
     var body: some View {
-        let share = cycle.shareable > 0 ? Double(cycle.rows) / Double(cycle.shareable) : 0
-        VStack(alignment: .leading, spacing: 1) {
-            HStack(spacing: 6) {
-                Text(verbatim: "\(index)").monospacedDigit().foregroundStyle(Palette.secondary).frame(width: 16, alignment: .trailing)
-                GeometryReader { g in
-                    HStack(spacing: share == 0 || share == 1 ? 0 : 1.5) {
-                        Rectangle().fill(Color.secondary.opacity(0.45)).frame(width: g.size.width * (1 - share))
-                        Rectangle().fill(Palette.live)
-                    }
-                }
-                .frame(width: 90, height: 5)
-                .clipShape(Capsule())
-                Text("ANE \(Figures.percent(Int((share * 100).rounded())))").monospacedDigit()
-                Spacer(minLength: 4)
-                if cycle.trying { Text("trial").foregroundStyle(Palette.secondary) }
-                Text(Figures.seconds(cycle.seconds)).monospacedDigit()
+        Grid(alignment: .trailing, horizontalSpacing: 10, verticalSpacing: 2) {
+            GridRow {
+                Text("step"); Text("ANE rows"); Text("all"); Text(verbatim: "ANE"); Text(verbatim: "GPU"); Text("time")
             }
-            if let ane = cycle.neuralEngine, let gpu = cycle.gpu {
-                HStack(spacing: 8) {
-                    Text("ANE \(Figures.seconds(ane))")
-                    Text("GPU \(Figures.seconds(gpu))")
+            .foregroundStyle(Palette.secondary)
+            ForEach(Array(cycles.enumerated()), id: \.offset) { n, c in
+                GridRow {
+                    Text(verbatim: "\(n + 1)").foregroundStyle(Palette.secondary)
+                    HStack(spacing: 3) {
+                        if n > 0, cycles[n - 1].rows != c.rows {
+                            Image(systemName: "arrowtriangle.right.fill").font(.system(size: 6)).foregroundStyle(Palette.live)
+                        }
+                        Text(c.rows > 0 ? String(c.rows) : String(localized: "GPU only"))
+                    }
+                    .help(String(localized: "\(c.rows) of \(c.shareable) rows on the Neural Engine, by \(c.unit)"))
+                    Text(Figures.tflops(c.tflops))
+                    Text(c.neuralEngine.map(Figures.tflops) ?? "—")
+                    Text(c.gpu.map(Figures.tflops) ?? "—")
+                    Text(Figures.seconds(c.seconds))
                 }
-                .monospacedDigit().foregroundStyle(Palette.secondary).padding(.leading, 22)
             }
         }
-        .font(.caption2)
+        .font(.caption2).monospacedDigit()
     }
 }
 
+/// **Who computed, GPU and Neural Engine**: the share of the arithmetic of the products by weights each unit ran — the
+/// engine's own count (`Ledger`), product by product, not an estimate. A bar split at the share, both figures under it;
+/// the Neural Engine's part in what runs, the GPU's neutral.
 struct UnitShare: View {
     let neuralEngine: Double
 
@@ -409,27 +418,25 @@ struct UnitShare: View {
     }
 }
 
-/// One bar per evaluation: full for those done (height = duration), hollow for those
-/// that remain (at the average of the steps done).
-private struct Bars: View {
-    let durations: [Double]
-    let plannedCount: Int
-    let mean: Double?
+/// **One bar per DiT step**: its TFLOP/s for those done (the block's: what its calls executed over its own seconds),
+/// hollow for those to come.
+private struct RateBars: View {
+    let rates: [Double]
+    let planned: Int
 
     var body: some View {
         GeometryReader { g in
-            let n = max(plannedCount, durations.count)
-            let ceiling = max(durations.max() ?? 0, mean ?? 0, 0.001)
+            let n = max(planned, rates.count)
+            let ceiling = max(rates.max() ?? 0, 0.001)
             let width = (g.size.width - CGFloat(n - 1) * 3) / CGFloat(max(n, 1))
             HStack(alignment: .bottom, spacing: 3) {
                 ForEach(0..<n, id: \.self) { i in
-                    let mergeDone = i < durations.count
-                    let value = mergeDone ? durations[i] : (mean ?? ceiling * 0.5)
+                    let done = i < rates.count
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(mergeDone ? Palette.live : Color.secondary.opacity(0.25))
-                        .frame(width: width, height: max(2, g.size.height * CGFloat(value / ceiling)))
-                        .help(mergeDone ? String(localized: "step \(i + 1): \(Figures.seconds(value))")
-                                    : String(localized: "step \(i + 1): pending"))
+                        .fill(done ? Palette.live : Color.secondary.opacity(0.25))
+                        .frame(width: max(1, width), height: done ? max(2, g.size.height * CGFloat(rates[i] / ceiling)) : 2)
+                        .help(done ? String(localized: "step \(i + 1): \(Figures.tflops(rates[i])) TFLOP/s")
+                                   : String(localized: "step \(i + 1): pending"))
                 }
             }
             .frame(maxHeight: .infinity, alignment: .bottom)

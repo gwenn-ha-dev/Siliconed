@@ -211,13 +211,22 @@ final class RemoteControl {
         var o: [String: Any] = ["ok": true, "library": app.library.root.path,
                                 "history_images": app.history.count,
                                 "beta": betaState(), "neural_engine": local.neuralEngine, "compiling": app.compilingCoreAI,
+                                "preparing": app.compilingAhead.map { p -> [String: Any] in
+                                    ["model": p.model, "width": p.width, "height": p.height, "at": p.at, "of": p.of, "next": p.next]
+                                } ?? NSNull(),
                                 "writer": writerState(),
                                 "start_image": startJSON() ?? NSNull()]
         if let t = app.currentJob {
             var e = json(t)
             e["stage"] = app.stage.map(Self.stageName) ?? NSNull()
             e["compiling"] = app.compilingCoreAI
-            e["calibrating"] = app.measurements.calibrating
+            // The DiT's last cycle, as the Chain inspector shows it.
+            if let c = app.measurements.cycles(image: app.batchImage).last {
+                e["cycle"] = ["ane_rows": c.rows, "rows": c.shareable, "seconds": Response.number(c.seconds, 3),
+                              "tflops": Response.number(c.tflops, 2),
+                              "ane_tflops": c.neuralEngine.map { Response.number($0, 2) } ?? NSNull(),
+                              "gpu_tflops": c.gpu.map { Response.number($0, 2) } ?? NSNull()] as [String: Any]
+            }
             // In a train (`AppState.train`) the engine counts the call's images; a job says its own.
             e["batch_image"] = min(app.batchImage, t.seeds.count - 1) + 1
             e["step"] = app.currentStep

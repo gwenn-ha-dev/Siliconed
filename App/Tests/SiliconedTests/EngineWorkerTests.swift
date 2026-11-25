@@ -108,10 +108,10 @@ final class EngineWorkerTests: XCTestCase {
             XCTAssertEqual(back, order)
             XCTAssertEqual(try back.request(received), request)
         }
-        for compiling in [true, false] {
-            let back = try WireJSON.decode(WorkerReply.self, from: WireJSON.encode(WorkerReply.preparing(compiling: compiling)))
+        for told in [WorkerPreparation(model: "anima", width: 1024, height: 768, at: 12, of: 133, next: ["z-image", "krea2"]), nil] {
+            let back = try WireJSON.decode(WorkerReply.self, from: WireJSON.encode(WorkerReply.preparing(told)))
             guard case .preparing(let c) = back else { return XCTFail("\(back)") }
-            XCTAssertEqual(c, compiling)
+            XCTAssertEqual(c, told)
         }
     }
 
@@ -120,7 +120,10 @@ final class EngineWorkerTests: XCTestCase {
             model: "m", prompt: "p", seed: 42, steps: 8, loras: [LoRAEntry("x.safetensors", strength: 0.5)],
             image: image(24, 16, alpha: false, seed: 4), evaluations: 8, strength: 0.6, startStep: 2, startSigma: 0.7,
             timings: { var t = Engine.Timings(); t.text = 1.25; t.denoising = 3.5; t.total = 5; return t }(),
-            footprints: { var f = Engine.Footprints(); var h = Engine.Held(stage: .denoising); h.held = 7; h.ring = 2; f.stages = [h]; f.neuralEngine = 0.25; return f }(),
+            footprints: { var f = Engine.Footprints(); var h = Engine.Held(stage: .denoising); h.held = 7; h.ring = 2
+                h.cycles = [Engine.Cycle(rows: 2560, shareable: 4096, unit: 512, seconds: 8.39, tflops: 6.1, neuralEngine: 3.4, gpu: 4.2),
+                            Engine.Cycle(rows: 0, shareable: 4096, unit: 512, zero: true, seconds: 9.1, tflops: 5.6)]
+                f.stages = [h]; f.neuralEngine = 0.25; return f }(),
             tokens: 12, detail: .more, solver: .dpmpp2m, variations: [Variation(seed: 1, strength: 0.5)], modelName: "M",
             isImportedModel: true, loraOrigins: [.init(name: "x", sha256: "ab")])
         var held = Engine.Held(stage: .text)

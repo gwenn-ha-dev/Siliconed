@@ -273,12 +273,13 @@ package final class StageWatch: @unchecked Sendable {
                 h.ring = max(h.ring, e.ring)
                 if let n = e.neuralEngine { h.neuralEngine = n }
                 if !e.open { lived += e.seconds; shared += e.seconds * (e.neuralEngine ?? 0) }
-                // A block that looked for its share in this render: its cycles as they ran.
-                if e.cycles.contains(where: \.trying) {
-                    h.calibration = Engine.Calibration(cycles: e.cycles.map { c in
-                        Engine.Calibration.Cycle(rows: c.rows, shareable: c.shareable, unit: c.unit, trying: c.trying, seconds: c.seconds,
-                                                 neuralEngine: c.calls?.ane, gpu: c.calls.map { $0.beside + $0.alone })
-                    })
+                // Its block's cycles as they ran, each with its rates: the last block of the stage that ran one.
+                if !e.cycles.isEmpty {
+                    h.cycles = e.cycles.map { c in
+                        let r = c.rates
+                        return Engine.Cycle(rows: c.rows, shareable: c.shareable, unit: c.unit, zero: c.trying, seconds: c.seconds,
+                                            tflops: r.block, neuralEngine: r.ane, gpu: r.gpu)
+                    }
                 }
             }
             if let largest = mine.max(by: { $0.groups < $1.groups }) { (h.groups, h.kept) = (largest.groups, largest.kept) }

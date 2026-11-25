@@ -294,10 +294,10 @@ extension AppState {
 
     /// **Core AI compiles**: a function the cache of the render under way does not hold (`Engine.Held.compiling`) — a
     /// model's first render, a new size, another share of the Neural Engine —, or what a preparation compiles ahead
-    /// (`preparingCoreAI`), which a render asked meanwhile waits for. What it waits for then is paid once, and no
+    /// (`compilingAhead`), which a render asked meanwhile waits for. What it waits for then is paid once, and no
     /// countdown says it.
     var compilingCoreAI: Bool {
-        preparingCoreAI || inProgress && measurements.compiling()
+        aheadCompiles || inProgress && renderCompiles
     }
 
     /// **The time remaining before the queue is empty**, and whether it is complete: the running render

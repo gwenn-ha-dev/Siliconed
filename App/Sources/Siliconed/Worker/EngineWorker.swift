@@ -147,13 +147,13 @@ package final class EngineWorker: @unchecked Sendable {
         }
     }
 
-    /// **Whether a preparation compiles now** (`WorkerReply.preparing`), told on the worker's reading thread: it must
-    /// return at once. A worker that stops ends it.
-    package var preparing: (@Sendable (Bool) -> Void)? {
+    /// **What a preparation compiles now** (`WorkerReply.preparing`), `nil` once it is done, told on the worker's reading
+    /// thread: it must return at once. A worker that stops ends it.
+    package var preparing: (@Sendable (WorkerPreparation?) -> Void)? {
         get { lock.withLock { _preparing } }
         set { lock.withLock { _preparing = newValue } }
     }
-    private var _preparing: (@Sendable (Bool) -> Void)?
+    private var _preparing: (@Sendable (WorkerPreparation?) -> Void)?
 
     /// **The compilations erased by the worker** (`CoreAI.erase`), between two pieces of work: sent now, in the order of
     /// the calls — after what was asked before, before what is asked after, which compiles again what it needs. `done`

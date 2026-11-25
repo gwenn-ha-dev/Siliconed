@@ -34,7 +34,14 @@ private final class Server: @unchecked Sendable {
     private var blob: UInt32 = 0
     /// Under `lock`: what the form's last preparation left to specialize, then the others' (`WorkerCall.prepare`), the
     /// ANE's first in each; whether one is on the queue.
-    private var pending: [Functions.Specialization] = [], background: [Functions.Specialization] = [], queued = false
+    private var pending: [Queued] = [], background: [Queued] = [], queued = false
+
+    /// **A specialization queued, and what it is for**: its key's model and size, its place among the key's (from 1).
+    private struct Queued {
+        let specialization: Functions.Specialization
+        let model: String
+        let width, height, at, of: Int
+    }
 
     /// A call in hand: its token, and what stops it once it runs (the writer's own cancel).
     final class Call: @unchecked Sendable {
@@ -130,7 +137,10 @@ private final class Server: @unchecked Sendable {
         do {
             let request = try order.request(blobs)
             let model = try Model.named(order.model, in: order.library.library)
-            let all = try Engine().prepare(request, model: model)
+            let planned = try Engine().prepare(request, model: model)
+            let all = planned.enumerated().map {
+                Queued(specialization: $1, model: order.model, width: order.width, height: order.height, at: $0 + 1, of: planned.count)
+            }
             lock.withLock { if later { background += all } else { pending = all } }
             ended(id, nil)
         } catch {
@@ -148,25 +158,29 @@ private final class Server: @unchecked Sendable {
         if go { work.async { self.specialize() } }
     }
 
-    /// **One specialization**, unless a call came since it was queued; its compilation told to the app
-    /// (`WorkerReply.preparing`), a failure on the standard error — the render that needs it compiles it, and says why.
+    /// **One specialization**, unless a call came since it was queued; its compilation told to the app — what it is for,
+    /// and the models queued after it (`WorkerReply.preparing`) —, a failure on the standard error: the render that needs
+    /// it compiles it, and says why. One already in Core AI's cache compiles nothing, and tells nothing.
     private func specialize() {
-        let next = lock.withLock { () -> Functions.Specialization? in
+        let taken = lock.withLock { () -> (Queued, [String])? in
             queued = false
-            guard calls.isEmpty else { return nil }
-            return pending.isEmpty ? background.isEmpty ? nil : background.removeFirst() : pending.removeFirst()
+            guard calls.isEmpty, let next = pending.isEmpty ? background.isEmpty ? nil : background.removeFirst() : pending.removeFirst()
+            else { return nil }
+            var after: [String] = []
+            for q in pending + background where q.model != next.model || q.at == 1 { if after.last != q.model { after.append(q.model) } }
+            return (next, after)
         }
-        guard let next else { return }
-        let out = out
+        guard let (next, after) = taken else { return }
+        let out = out, told = WorkerPreparation(model: next.model, width: next.width, height: next.height, at: next.at, of: next.of, next: after)
         let observation = Stages.observe { event in
             switch event {
-            case .compiling: out.send(WorkerReply.preparing(compiling: true))
-            case .compiled: out.send(WorkerReply.preparing(compiling: false))
+            case .compiling: out.send(WorkerReply.preparing(told))
+            case .compiled: out.send(WorkerReply.preparing(nil))
             default: break
             }
         }
-        do { try blocking { try await Functions.specialize(next) } } catch {
-            FileHandle.standardError.write(Data("silicore-worker: \(next.asset.lastPathComponent) not prepared: \(error)\n".utf8))
+        do { try blocking { try await Functions.specialize(next.specialization) } } catch {
+            FileHandle.standardError.write(Data("silicore-worker: \(next.specialization.asset.lastPathComponent) not prepared: \(error)\n".utf8))
         }
         observation.cancel()
         specializeNext()

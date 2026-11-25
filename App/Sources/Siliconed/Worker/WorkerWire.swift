@@ -9,7 +9,7 @@ import Foundation
 //     app → worker   render(id, order) · write(id, order) · prepare(id, order, background) · erase(id) · cancel(id)
 //                    the images: blobs, before their call
 //     worker → app   event(id, …) · written(id, …) · erased(id, bytes) · finished(id) · failed(id, error)
-//                    preparing(compiling), outside any call
+//                    preparing(what it compiles, or nil), outside any call
 //                    an image or a preview: a blob, before its event
 //
 // **One piece of work at a time**: the worker runs its calls in their order, a call waiting for the one before it. A
@@ -21,7 +21,7 @@ import Foundation
 /// `version` goes up with any change to what crosses below; the hello's own shape never changes — every build reads it
 /// first.
 package struct WorkerHello: Codable, Sendable, Equatable {
-    package static let version = 7
+    package static let version = 8
     package var protocolVersion: Int
 
     package init(protocolVersion: Int = WorkerHello.version) { self.protocolVersion = protocolVersion }
@@ -56,8 +56,21 @@ package enum WorkerReply: Codable, Sendable {
     /// The call is over, its last event sent.
     case finished(id: UInt32)
     case failed(id: UInt32, WorkerFailure)
-    /// A preparation's compilation begins (`true`) or ends, outside any call: what the app says while none renders.
-    case preparing(compiling: Bool)
+    /// A preparation's compilation begins — what it compiles for — or ends (`nil`), outside any call.
+    case preparing(WorkerPreparation?)
+}
+
+/// **What a preparation compiles now** (`WorkerCall.prepare`): the model and the size its specializations are for, the
+/// one under way (from 1) of those queued for that key, and the models queued after it, in their order — counted from
+/// the list the engine planned (`Engine.prepare`), not estimated.
+package struct WorkerPreparation: Codable, Sendable, Equatable {
+    package var model: String
+    package var width, height: Int
+    package var at, of: Int
+    package var next: [String]
+    package init(model: String, width: Int, height: Int, at: Int, of: Int, next: [String] = []) {
+        (self.model, self.width, self.height, self.at, self.of, self.next) = (model, width, height, at, of, next)
+    }
 }
 
 /// What a call fails with: the engine's one error, or the writer's own refusals.

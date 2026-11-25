@@ -169,6 +169,8 @@ final class MainWindow: NSObject, NSWindowDelegate {
     private(set) lazy var inspectors = Inspectors(carrier: carrier, local: local)
 
     func toggleChain() { inspectors.toggle(beside: window) }
+    /// The Chain inspector shown, at its top (`CompilationMark`).
+    func showChain() { inspectors.show(beside: window) }
 
     /// **The column in its own window**, when it is detached (`RackColumn.swift`).
     private(set) lazy var rackPanel = RackPanel(carrier: carrier, local: local)

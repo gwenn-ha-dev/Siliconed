@@ -264,7 +264,12 @@ final class AppState {
     /// The running render; those waiting are `file`, in the order they were requested.
     var currentJob: Job?
     /// The figures of the running render and of the last finished one — the Chain inspector.
-    var measurements = Measures()
+    var measurements = Measures() {
+        // Said where it flips only: the window's band reads it (`CompilationMark`), and the measures move at every event.
+        didSet { let c = measurements.compiling(); if c != renderCompiles { renderCompiles = c } }
+    }
+    /// **The render's own compilation** (`Measures.compiling`, its burst included), as the measures last said it.
+    private(set) var renderCompiles = false
     /// **Seconds per evaluation**, per model and format, learned in this session (never
     /// written): that is what estimates the queue and the "Generate" button. A pair never rendered has
     /// no estimate.
@@ -274,8 +279,13 @@ final class AppState {
     var sessionSeconds = 0.0
     var file: [Job] = []
     var inProgress: Bool { currentJob != nil }
-    /// **A preparation compiles now** (`AppState+Prepare.swift`): outside any render, or before the render that waits for it.
-    var preparingCoreAI = false
+    /// **What a preparation compiles now** (`AppState+Prepare.swift`): outside any render, or before the render that waits
+    /// for it; kept to the burst's last moment (`preparationTold`). Its count moves with each function; whether there is
+    /// one (`aheadCompiles`) only where it flips: the window's band reads that.
+    var compilingAhead: WorkerPreparation? {
+        didSet { if (compilingAhead != nil) != aheadCompiles { aheadCompiles = compilingAhead != nil } }
+    }
+    private(set) var aheadCompiles = false
     /// The form's key last prepared, and its pause under way (`AppState+Prepare.swift`).
     @ObservationIgnored var preparedKey: PreparationKey?
     @ObservationIgnored var preparation: Task<Void, Never>?

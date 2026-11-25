@@ -49,31 +49,28 @@ package final class Engine: Sendable {
         package var compiling = false
         /// The share of the stage's work the Neural Engine computed (as the family counts it); `nil` when it ran none.
         package var neuralEngine: Double?
-        /// **Its share of the Neural Engine found on this Mac**, where the engine looked for it in this render (a model's
-        /// first render here): each cycle of its block as it ran; `nil`: nothing looked for (a render that read the share
-        /// this Mac kept), or a history written before.
-        package var calibration: Calibration?
+        /// **Its block's cycles as they ran** (a DiT's evaluations, every image of a batch in turn: one block for the
+        /// batch), in every render; empty for a stage without a block.
+        package var cycles: [Cycle] = []
         package init(stage: Stage) { self.stage = stage }
     }
 
-    /// **The Neural Engine's share looked for** (`Block.rebalance`): the cycles of a stage's block, the first trying the
-    /// share of none (`Block.zero`).
-    package struct Calibration: Sendable, Codable, Equatable {
-        /// One cycle (a DiT evaluation): the Neural Engine's rows of those it could take, by its unit; whether it was one
-        /// of the share of none's trial; its seconds; the Neural Engine's calls and the GPU's, summed (nil: the cycle's calls not timed).
-        package struct Cycle: Sendable, Codable, Equatable {
-            package var rows, shareable, unit: Int
-            package var trying: Bool
-            package var seconds: Double
-            package var neuralEngine: Double?, gpu: Double?
-            package init(rows: Int, shareable: Int, unit: Int, trying: Bool, seconds: Double, neuralEngine: Double? = nil, gpu: Double? = nil) {
-                (self.rows, self.shareable, self.unit, self.trying, self.seconds, self.neuralEngine, self.gpu) = (rows, shareable, unit, trying, seconds, neuralEngine, gpu)
-            }
+    /// **A cycle of a block, as it ran** (`SiliCore.Stages.Cycle`): one DiT evaluation. The Neural Engine's rows of those
+    /// it could take, by its unit (0: the GPU alone); whether it visits the share of none (`Block.zero`: this Mac's κ
+    /// unknown, or the share predicted the fastest); its seconds; and **its rates, in TFLOP/s**: the block's — what its
+    /// calls executed over its own seconds, what its start loaded for a move left out —, and each unit's over its own
+    /// calls (nil: not timed — the GPU alone, a block's last cycle).
+    package struct Cycle: Sendable, Codable, Equatable {
+        package var rows, shareable, unit: Int
+        package var zero: Bool
+        package var seconds: Double
+        package var tflops: Double
+        package var neuralEngine: Double?, gpu: Double?
+        package init(rows: Int, shareable: Int, unit: Int, zero: Bool = false, seconds: Double, tflops: Double = 0,
+                     neuralEngine: Double? = nil, gpu: Double? = nil) {
+            (self.rows, self.shareable, self.unit, self.zero, self.seconds) = (rows, shareable, unit, zero, seconds)
+            (self.tflops, self.neuralEngine, self.gpu) = (tflops, neuralEngine, gpu)
         }
-        package var cycles: [Cycle] = []
-        /// Still looking: the last cycle told was the trial's.
-        package var looking: Bool { cycles.last?.trying ?? true }
-        package init(cycles: [Cycle] = []) { self.cycles = cycles }
     }
 
     /// **What a render held**, stage by stage, and what the Neural Engine took of it.

@@ -351,8 +351,10 @@ extension RemoteControlHelp {
 
         Answer:
           {"ok": true,
-           "running": {"job": "t3", "stage": "denoising", "compiling": false, "calibrating": false, "batch_image": 1, "step": 4,
+           "running": {"job": "t3", "stage": "denoising", "compiling": false, "batch_image": 1, "step": 4,
                        "steps_total": 8, "fraction": 0.52, "remaining_s": 21.3, "model": "z-image",
+                       "cycle": {"ane_rows": 2560, "rows": 4096, "seconds": 8.39, "tflops": 6.1,
+                                 "ane_tflops": 3.4, "gpu_tflops": 4.2},
                        "prompt": "…", "seeds": [42], …} | null,
            "queue": [{"job": "t4", "estimate_s": 45.2, …}, …],
            "waiting_for_license": [{"job": "t5", "state": "waiting_for_license",
@@ -362,6 +364,8 @@ extension RemoteControlHelp {
            "queue_remaining_s": 66.5, "remaining_complete": true,
            "history_images": 12, "library": "/Users/…/Siliconed",
            "beta": {"more_solvers": false, "steps": false, …}, "neural_engine": true, "compiling": false,
+           "preparing": {"model": "anima", "width": 1024, "height": 1024, "at": 12, "of": 133,
+                         "next": ["z-image"]} | null,
            "writer": {"state": "ready"}, "start_image": {…} | null, "computing_on": "Mac mini" | null,
            "memory": {"budget_bytes": 10737418240, "chosen": false, "default_bytes": 10737418240,
                       "range_bytes": [4294967296, 12884901888]}}
@@ -379,8 +383,11 @@ extension RemoteControlHelp {
                              size): what the render waits for then is paid once, and remaining_s does not count it. At the
                              top, also while no render runs: the app compiles ahead what the form's next render needs (its
                              model, size, LoRA, Neural Engine), and every installed model after an update.
-        calibrating        : true while the engine looks for this Mac's Neural Engine share (a model's first render here);
-                             the Chain inspector shows each step's share and seconds.
+        preparing          : what the app compiles ahead, while it does (the window's band says it): the model and size,
+                             the function it is at of those of that key, the models after it; null otherwise.
+        cycle              : the DiT's last step, as the Chain inspector shows each: the Neural Engine's rows of those it
+                             could take (0: the GPU alone), its seconds, its TFLOP/s — the block's, and the Neural Engine's
+                             and the GPU's over their own calls (null where they were not timed).
         steps_total        : the model's evaluations, not the requested steps.
         remaining_s        : null until the app has a measurement for this render.
         remaining_complete : false if a waiting job has no estimate (queue_remaining_s is a minimum).
@@ -400,8 +407,10 @@ extension RemoteControlHelp {
 
         Réponse :
           {"ok": true,
-           "running": {"job": "t3", "stage": "denoising", "compiling": false, "calibrating": false, "batch_image": 1, "step": 4,
+           "running": {"job": "t3", "stage": "denoising", "compiling": false, "batch_image": 1, "step": 4,
                        "steps_total": 8, "fraction": 0.52, "remaining_s": 21.3, "model": "z-image",
+                       "cycle": {"ane_rows": 2560, "rows": 4096, "seconds": 8.39, "tflops": 6.1,
+                                 "ane_tflops": 3.4, "gpu_tflops": 4.2},
                        "prompt": "…", "seeds": [42], …} | null,
            "queue": [{"job": "t4", "estimate_s": 45.2, …}, …],
            "waiting_for_license": [{"job": "t5", "state": "waiting_for_license",
@@ -411,6 +420,8 @@ extension RemoteControlHelp {
            "queue_remaining_s": 66.5, "remaining_complete": true,
            "history_images": 12, "library": "/Users/…/Siliconed",
            "beta": {"more_solvers": false, "steps": false, …}, "neural_engine": true, "compiling": false,
+           "preparing": {"model": "anima", "width": 1024, "height": 1024, "at": 12, "of": 133,
+                         "next": ["z-image"]} | null,
            "writer": {"state": "ready"}, "start_image": {…} | null, "computing_on": "Mac mini" | null,
            "memory": {"budget_bytes": 10737418240, "chosen": false, "default_bytes": 10737418240,
                       "range_bytes": [4294967296, 12884901888]}}
@@ -429,8 +440,11 @@ extension RemoteControlHelp {
                              En tête, aussi quand aucun rendu ne tourne : l'app compile d'avance ce dont le prochain rendu du
                              formulaire a besoin (son modèle, sa taille, son LoRA, le Neural Engine), et chaque modèle installé
                              après une mise à jour.
-        calibrating        : true tant que le moteur cherche la part du Neural Engine de ce Mac (le premier rendu d'un
-                             modèle ici) ; l'inspecteur Chaîne montre la part et les secondes de chaque pas.
+        preparing          : ce que l'app compile d'avance, tant qu'elle le fait (la barre de la fenêtre le dit) : le modèle
+                             et la taille, la fonction où elle en est de celles de cette clé, les modèles après lui ; null sinon.
+        cycle              : le dernier pas du DiT, comme l'inspecteur Chaîne montre chacun : les rangées du Neural Engine
+                             sur celles qu'il pouvait prendre (0 : le GPU seul), ses secondes, ses TFLOP/s — ceux du bloc, et
+                             ceux du Neural Engine et du GPU sur leurs propres appels (null où ils n'ont pas été chronométrés).
         steps_total        : les évaluations du modèle, pas les pas demandés.
         remaining_s        : null tant que l'app n'a pas de mesure pour ce rendu.
         remaining_complete : false si un travail en attente n'a pas d'estimation (queue_remaining_s est un minimum).

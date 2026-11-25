@@ -9,7 +9,7 @@
 // - **In the background**, after the form's: the default key (1024², no LoRA) of a model that becomes ready — an
 //   installation, an import, another library —, and of every installed model when this app or this macOS is not the one
 //   they were last prepared for (`CoreAI.preparationDue`): an update compiles again, on battery too, shown as any
-//   compilation (`compilingCoreAI`).
+//   compilation (`compilingCoreAI`): the window's band says what, and how far (`CompilationMark`).
 
 import Foundation
 import Siliconed
@@ -44,8 +44,8 @@ extension AppState {
     /// in their order): every installed model in the background when due, then the form's key for as long as the app lives.
     func prepareAtLaunch() {
         guard mirror == nil else { return }
-        EngineWorker.shared.preparing = { compiling in
-            DispatchQueue.main.async { MainActor.assumeIsolated { MainWindow.shared.local.preparationTold(compiling) } }
+        EngineWorker.shared.preparing = { what in
+            DispatchQueue.main.async { MainActor.assumeIsolated { MainWindow.shared.local.preparationTold(what) } }
         }
         if libraryReachable, CoreAI.preparationDue() {
             prepareInBackground(cards.map(\.id).filter(readySet.contains))
@@ -55,19 +55,19 @@ extension AppState {
         keyChanged()
     }
 
-    /// **A preparation's compilations said as one burst** (`Measures.burst`, as a render's): shown at the first, hidden
-    /// `burst` seconds past the last. Said function by function, the rack's line came and went several times a second,
-    /// and every view that reads `compilingCoreAI` with it, while the machine compiled.
-    func preparationTold(_ compiling: Bool) {
+    /// **A preparation's compilations said as one burst** (`Measures.burst`, as a render's): shown at the first, its count
+    /// moving with each, hidden `burst` seconds past the last. Said function by function, the word came and went several
+    /// times a second, and every view that reads `compilingCoreAI` with it, while the machine compiled.
+    func preparationTold(_ what: WorkerPreparation?) {
         preparationEnd?.cancel()
-        if compiling {
-            if !preparingCoreAI { preparingCoreAI = true }
+        if let what {
+            if compilingAhead != what { compilingAhead = what }
             return
         }
         preparationEnd = Task { [weak self] in
             try? await Task.sleep(for: .seconds(Measures.burst))
-            guard !Task.isCancelled, let self, self.preparingCoreAI else { return }
-            self.preparingCoreAI = false
+            guard !Task.isCancelled, let self, self.compilingAhead != nil else { return }
+            self.compilingAhead = nil
         }
     }
 

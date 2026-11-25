@@ -60,6 +60,10 @@ struct MainView: View {
             }
             // Without the spacer the title hidden leaves the right-hand group beside the left one.
             ToolbarSpacer(.flexible)
+            // While Core AI compiles, and only then: the one place the window says it (`CompilationMark`).
+            if app.compilingCoreAI {
+                ToolbarItem(placement: .primaryAction) { CompilationMark(app: app) }
+            }
             // Its own capsule, not the button's: a name, not a control. The band's clear glass took the colour of the image under
             // it, and a pale sky washed the dusk gradient out: the capsule is the window's own night (or paper), nearly opaque,
             // the ground the gradient was drawn for, whatever passes beneath.
@@ -78,6 +82,34 @@ struct MainView: View {
         .sheet(isPresented: $app.managementOpen) { ModelManagement(app: app) }
         .sheet(item: $app.hubOffer) { _ in HubSheet(app: app) }
         .sheet(item: $app.licenseRequest) { request in LicenseSheet(app: app, card: request.card) }
+    }
+}
+
+// MARK: - Core AI compiling
+
+/// **What Core AI compiles, in the window's band**, while it does — the one place it is said; the rack and the canvas say
+/// only why no time is told. A preparation: its model, its size, the function it is at of its key's
+/// (`AppState.compilingAhead`); a render: its own model and size. A click opens the Chain inspector, which says the rest
+/// (the models after it, the seconds of each stage).
+private struct CompilationMark: View {
+    let app: AppState
+
+    var body: some View {
+        Button { MainWindow.shared.showChain() } label: {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.mini)
+                Text(words).monospacedDigit().lineLimit(1)
+            }
+            .padding(.horizontal, 4)
+        }
+        .help("Core AI compiles for this Mac what the renders need, once. The Chain inspector says what.")
+    }
+
+    private var words: String {
+        if let p = app.compilingAhead {
+            return String(localized: "Core AI · \(app.modelName(p.model)) \(Figures.size(p.width, p.height)) · \(p.at)/\(p.of)")
+        }
+        return app.currentJob.map { String(localized: "Core AI · \($0.legend)") } ?? String(localized: "Core AI")
     }
 }
 

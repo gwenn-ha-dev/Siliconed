@@ -66,8 +66,13 @@ struct Measures {
     }
     func compiling(at now: Date = Date()) -> Bool { held.contains { compiling($0.stage, at: now) } }
 
-    /// The Neural Engine's share looked for in this render, still under way.
-    var calibrating: Bool { held.contains { $0.calibration?.looking == true } }
+    /// **The DiT's cycles of image `image`** (`Engine.Held.cycles`): one block for the batch, its evaluations in turn.
+    func cycles(image: Int) -> ArraySlice<Engine.Cycle> {
+        let all = held.first { $0.stage == .denoising }?.cycles ?? []
+        guard planned > 0 else { return all[...] }
+        let from = min(max(image, 0) * planned, all.count)
+        return all[from..<min(from + planned, all.count)]
+    }
 
     init() {}
 
