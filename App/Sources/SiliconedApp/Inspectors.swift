@@ -1,8 +1,13 @@
-// **The « Chain » inspector**: a floating panel over the app that follows the render — the chain stage by stage, the
-// queue, the session (`ChainInspector.swift`). A stage's line in the rack opens it at that stage.
+// **Two floating panels over the app**, each answering its own question:
 //
-// A panel and not a pane of the window: a pane would cover the image or resize it at each opening. It keeps nothing —
-// neither position nor restored state (incognito) — and follows the switch to another Mac's mirror by itself.
+// - **« Chain »**: where the render stands, in the chain's words — each stage, its module, its time, the unit that
+//   computed it; the queue, the last image, the session (`ChainInspector.swift`). A stage's line in the rack opens it at
+//   that stage.
+// - **« Machine »**: what the Mac does, in time — the Mac, what Core AI compiles, and the render's memory and compute on
+//   one time axis (`MachineInspector.swift`). Core AI's light at the foot of the column opens it.
+//
+// Panels and not panes of the window: a pane would cover the image or resize it at each opening. They keep nothing —
+// neither position nor restored state (incognito) — and follow the switch to another Mac's mirror by themselves.
 //
 // **What the engine did for one image** is not a window: it is the popover of the ⓘ under the image (`ImageInspector`),
 // beside what it describes, gone with a click elsewhere.
@@ -21,68 +26,80 @@ final class InspectorFocus {
 
 @MainActor
 final class Inspectors {
+    enum Kind { case chain, machine }
+
     private let carrier: Carrier
     private let local: AppState
-    private var panel: NSPanel?
+    private var panels: [Kind: NSPanel] = [:]
     let focus = InspectorFocus()
 
     init(carrier: Carrier, local: AppState) { (self.carrier, self.local) = (carrier, local) }
 
-    func hide() { panel?.orderOut(nil) }
+    func hide() { panels.values.forEach { $0.orderOut(nil) } }
 
-    var isShown: Bool { panel?.isVisible == true }
+    func isShown(_ kind: Kind) -> Bool { panels[kind]?.isVisible == true }
 
-    func toggle(beside window: NSWindow?) {
-        if isShown { panel?.orderOut(nil); return }
-        show(beside: window)
+    func toggle(_ kind: Kind, beside window: NSWindow?) {
+        if isShown(kind) { panels[kind]?.orderOut(nil); return }
+        show(kind, beside: window)
     }
 
     /// « Chain », scrolled to `stage`'s line and that line marked.
     func show(stage: Engine.Stage, beside window: NSWindow?) {
         focus.stage = stage
         focus.asked += 1
-        show(beside: window)
+        show(.chain, beside: window)
     }
 
-    func show(beside window: NSWindow?) {
-        let p = panel ?? make(beside: window)
-        panel = p
+    func show(_ kind: Kind, beside window: NSWindow?) {
+        let p = panels[kind] ?? make(kind, beside: window)
+        panels[kind] = p
         p.orderFront(nil)
     }
 
-    private func make(beside window: NSWindow?) -> NSPanel {
-        let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 380, height: 640),
+    private func make(_ kind: Kind, beside window: NSWindow?) -> NSPanel {
+        let size = kind == .chain ? NSSize(width: 380, height: 640) : NSSize(width: 520, height: 600)
+        let p = NSPanel(contentRect: NSRect(origin: .zero, size: size),
                         styleMask: [.titled, .closable, .resizable, .utilityWindow, .nonactivatingPanel],
                         backing: .buffered, defer: false)
         // Not « Chain »: the detached column's window bears that name, and the Window menu listed two « Chain ».
-        p.title = String(localized: "Chain Inspector")
+        p.title = kind == .chain ? String(localized: "Chain Inspector") : String(localized: "Machine")
         p.isFloatingPanel = true
         p.hidesOnDeactivate = false
         p.isRestorable = false
         p.isReleasedWhenClosed = false
-        let host = NSHostingController(rootView: InspectorRoot(carrier: carrier, local: local, focus: focus))
-        host.sizingOptions = []
-        p.contentViewController = host
-        p.setContentSize(NSSize(width: 380, height: 640))
+        let focus = focus
+        p.contentViewController = kind == .chain
+            ? Self.host(InspectorRoot(carrier: carrier, local: local) { ChainInspector(app: $0, focus: focus) })
+            : Self.host(InspectorRoot(carrier: carrier, local: local) { MachineInspector(app: $0) })
+        p.setContentSize(size)
         if let f = window?.frame {
-            // Along the window's right edge, over the history.
-            p.setFrameTopLeftPoint(NSPoint(x: f.maxX - 400, y: f.maxY - 60))
+            // The chain along the window's right edge, over the history; the machine beside it, further in.
+            let x = kind == .chain ? f.maxX - 400 : f.maxX - 940
+            p.setFrameTopLeftPoint(NSPoint(x: x, y: f.maxY - 60))
         } else {
             p.center()
         }
         return p
     }
+
+    /// The panel's own size kept: the content does not size it.
+    private static func host(_ view: some View) -> NSViewController {
+        let h = NSHostingController(rootView: view)
+        h.sizingOptions = []
+        return h
+    }
 }
 
-/// The inspector's content: the state the window shows now, this Mac's or a mirror's.
-private struct InspectorRoot: View {
+/// A panel's content: the state the window shows now, this Mac's or a mirror's.
+private struct InspectorRoot<Content: View>: View {
     let carrier: Carrier
     let local: AppState
-    let focus: InspectorFocus
+    @ViewBuilder let content: (AppState) -> Content
 
     var body: some View {
         let app = carrier.mirror ?? local
-        ChainInspector(app: app, focus: focus).id(ObjectIdentifier(app))
+        content(app).id(ObjectIdentifier(app))
     }
 }
 

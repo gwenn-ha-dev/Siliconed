@@ -122,8 +122,10 @@ package final class StageWatch: @unchecked Sendable {
         /// Pages swapped out while it lived (system-wide: the Mac's, `Memory.swapouts`).
         package var swapouts: UInt64 = 0
         package var neuralEngine: Double?
-        /// The groups of weights it kept, from the start and in flight (those its plan kept, while it is open).
+        /// The groups of weights it kept, from the start and in flight (those its plan kept, while it is open), and their
+        /// bytes with the residents' and the ring's (`Stage.Plan.weights`, then `Stages.Event.kept`).
         package var kept = 0
+        package var weights = 0
         package var open = true
         /// Its block's cycles as they ran (`SiliCore.Stages.Cycle`).
         package var cycles: [SiliCore.Stages.Cycle] = []
@@ -188,6 +190,13 @@ package final class StageWatch: @unchecked Sendable {
 
     deinit { if observation != nil { stop() } }
 
+    /// Under `lock`: **what the open stages hold, told to the series** (`MemoryRecorder.level`) — the floor the first of
+    /// them opened on, the weights of all; none open, the footprint is the process's.
+    private func leveled() {
+        let open = entries.filter(\.open)
+        recorder.level(floor: open.first?.floor, weights: open.reduce(0) { $0 + $1.weights })
+    }
+
     /// A stage of the render begins: what opens from now on is its own.
     package func begin(_ stage: Engine.Stage) {
         recorder.mark(stage)
@@ -210,10 +219,11 @@ package final class StageWatch: @unchecked Sendable {
                 let first = !entries.contains(where: \.open)
                 entries.append(Entry(name: plan.declaration.name, stage: order.last, p: plan.p, floor: plan.floor,
                                      budget: plan.budget, ring: plan.depth, groups: plan.declaration.groups.count,
-                                     kept: plan.kept.count))
+                                     kept: plan.kept.count, weights: plan.weights))
                 swapsAtOpen[entries.count - 1] = Memory.swapouts()
                 openedAt[entries.count - 1] = DispatchTime.now().uptimeNanoseconds
                 tick(true)
+                leveled()
                 return first
             }
             // A stage opens on the floor it was planned on: the peak is read from there, unless another is still open.
@@ -229,9 +239,13 @@ package final class StageWatch: @unchecked Sendable {
                 entries[i].swapouts = swaps &- (swapsAtOpen.removeValue(forKey: i) ?? swaps)
                 openedAt[i] = nil
                 if !entries.contains(where: \.open) { tick(false) }
+                leveled()
             }
-        case .kept(let n):
-            lock.withLock { if let i = entries.lastIndex(where: \.open) { entries[i].kept = max(entries[i].kept, n) } }
+        case .kept(let n, let weights):
+            lock.withLock {
+                if let i = entries.lastIndex(where: \.open) { entries[i].kept = max(entries[i].kept, n); entries[i].weights = weights }
+                leveled()
+            }
         case .neural(let share):
             lock.withLock { if let i = entries.lastIndex(where: \.open) ?? entries.indices.last { entries[i].neuralEngine = share } }
         case .cycle(let c):
@@ -276,9 +290,10 @@ package final class StageWatch: @unchecked Sendable {
                 // Its block's cycles as they ran, each with its rates: the last block of the stage that ran one.
                 if !e.cycles.isEmpty {
                     h.cycles = e.cycles.map { c in
-                        let r = c.rates
+                        let r = c.rates, total = c.flops.ane + c.flops.gpu
                         return Engine.Cycle(rows: c.rows, shareable: c.shareable, unit: c.unit, zero: c.trying, seconds: c.seconds,
-                                            tflops: r.block, neuralEngine: r.ane, gpu: r.gpu)
+                                            tflops: r.block, neuralEngine: r.ane, gpu: r.gpu, end: recorder.seconds(c.end),
+                                            aneFraction: total > 0 ? Double(c.flops.ane) / Double(total) : nil)
                     }
                 }
             }

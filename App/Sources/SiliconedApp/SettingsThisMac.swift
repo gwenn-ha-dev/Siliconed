@@ -58,27 +58,17 @@ struct MemoryBudgetRow: View {
 /// **What Core AI compiled for this Mac**: its weight, and « Erase… ».
 struct CompiledRow: View {
     let app: AppState
-    @State private var confirming = false
 
     var body: some View {
         SettingRow(Text("Compiled for This Mac"), subtitle,
                    detail: "Core AI compiles each of the engine’s functions for this Mac and keeps it, so that the next render starts at once. Erasing frees the disk: each model’s next render compiles again what it needs, from a few seconds to a minute. Siliconed erases them by itself after an update.") {
             IconTile(symbol: "cpu", color: Palette.peach, side: 26)
         } trailing: {
-            Button("Erase…") { confirming = true }
-                .controlSize(.small)
-                .unavailable(app.erasingCompiled ? String(localized: "Erasing…")
-                             : app.compiledBytes == 0 ? String(localized: "Nothing compiled yet.") : nil)
+            EraseCompiledButton(app: app)
         } below: {
             EmptyView()
         }
         .task { await app.weighCompiled() }
-        .confirmationDialog("Erase what was compiled for this Mac?", isPresented: $confirming) {
-            Button("Erase", role: .destructive) { app.eraseCompiled() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Each model’s next render compiles again what it needs, from a few seconds to a minute. A render under way finishes first.")
-        }
     }
 
     private var subtitle: Text? {
@@ -86,5 +76,25 @@ struct CompiledRow: View {
         guard let bytes = app.compiledBytes else { return nil }
         if bytes == 0 { return Text("Nothing compiled yet.") }
         return Text("\(Figures.disk(bytes)) · compiled again by each model’s next render")
+    }
+}
+
+/// **« Erase… » what Core AI compiled for this Mac**, after a confirmation (`AppState.eraseCompiled`): in Settings ›
+/// Macs and in the Machine window, the one gesture.
+struct EraseCompiledButton: View {
+    let app: AppState
+    @State private var confirming = false
+
+    var body: some View {
+        Button("Erase…") { confirming = true }
+            .controlSize(.small)
+            .unavailable(app.erasingCompiled ? String(localized: "Erasing…")
+                         : app.compiledBytes == 0 ? String(localized: "Nothing compiled yet.") : nil)
+            .confirmationDialog("Erase what was compiled for this Mac?", isPresented: $confirming) {
+                Button("Erase", role: .destructive) { app.eraseCompiled() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Each model’s next render compiles again what it needs, from a few seconds to a minute. A render under way finishes first.")
+            }
     }
 }

@@ -14,8 +14,9 @@ package struct Hello: Codable, Equatable, Sendable {
     /// plan says what is left to download apart from the room it takes, `RemotePlan.toDownload`, and a job carries its starting
     /// image, `RemoteJob.start`; a model deeper than its family is refused by name, `EngineError.importDeeperModel`; 11: a stage's
     /// footprint carries the Neural Engine's share looked for in a model's first render, `Engine.Calibration`; 12: it carries its
-    /// block's cycles in every render, with their TFLOP/s, `Engine.Cycle`, in its place).
-    package static let protocolVersion = 12
+    /// block's cycles in every render, with their TFLOP/s, `Engine.Cycle`, in its place; 13: a cycle carries its end and the Neural
+    /// Engine's part of its FLOP, and the memory series what the stages hold in time, `Engine.MemoryLevel`).
+    package static let protocolVersion = 13
 
     package let protocolVersion: Int
     /// The Mac's name, as the user knows it ("Mac mini de Gwenn").

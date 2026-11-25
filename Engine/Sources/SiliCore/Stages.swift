@@ -11,8 +11,9 @@ public enum Stages {
         /// flight).
         case closed(Stage.Plan, seconds: Double, kept: Int = 0)
         /// A stage's reader kept one more group in flight (`Ring`): the groups the open stage holds now, those its plan
-        /// kept from the start included — told as each is kept, for a reader of the stage while it lives.
-        case kept(Int)
+        /// kept from the start included, and the bytes of weights it holds now (`Stage.Plan.weights` and the groups kept
+        /// since) — told as each is kept, for a reader of the stage while it lives.
+        case kept(Int, weights: Int)
         /// The share of a stage's work the ANE computes, 0 to 1, as its client counts it (`computed`).
         case neural(Double)
         /// Core AI begins to specialize a function its cache does not hold (`Functions.load`), and has done so, in
@@ -29,12 +30,14 @@ public enum Stages {
     /// its start loaded, in seconds — the GPU's functions of a share moved (`moved`), of taller calls (`climbed`); nil,
     /// nothing; its calls' seconds, where they were timed (a share in flight, every cycle but the last); whether its
     /// start's move to the share of none was refused under B (`Block.zero`: κ measured at a later opening); what its
-    /// calls executed (`flops`), and the rates that gives (`rates`).
+    /// calls executed (`flops`), and the rates that gives (`rates`); when it ended (`end`, `DispatchTime` nanoseconds), for a
+    /// client that lays the cycles on its own clock.
     public struct Cycle: Sendable, Equatable {
         public let block: String
         public let unit, rows, shareable: Int
         public let trying: Bool
         public let seconds: Double
+        public let end: UInt64
         public let moved, climbed: Double?
         public let calls: Calls?
         public let refused: Bool

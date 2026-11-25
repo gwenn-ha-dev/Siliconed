@@ -4,14 +4,17 @@
 //     ─────────────────────────────────────────────────
 //     ↔ red, blue, green  ✕
 //     ⓘ 1 image of the Prompt Lab not used
-//     what stops it                          [ Generate 3 Images ]
+//     what stops it
+//     ● Core AI compiling                    [ Generate 3 Images ]
 //
 // - **No « Explore » beside it**: a series is the knobs' and the words' bracketing, which « Generate » renders
 //   whole, in finished images; what varies is said above it, one line per axis (`SeriesSummary`).
 // - **No cost here**: the size, the memory, the time and how many renders are the chain's, said under it (`RenderEstimate`);
 //   here, what varies, and the button that says how many images it makes.
-// - **What stops it is said beside it**: the reason, whole, and for a size this Mac cannot hold, the largest it can.
+// - **What stops it is said beside it**: the reason, whole, and for a size this Mac cannot hold, the largest it can —
+//   except an empty text, which its field's placeholder says already (the button's help still does).
 // - **What the Images box holds and the render will not read** is counted here too, never in silence.
+// - **Core AI's light, last, facing the button** (`CoreAIMark`): whether it compiles, and how far.
 // - ⌘↩ from anywhere in the window (the Render menu); when something stops the render, ⌘↩ unfolds the column, where the
 //   reason is said, instead of doing nothing.
 
@@ -34,9 +37,10 @@ struct GenerateControls: View {
             VStack(alignment: .leading, spacing: 4) {
                 SeriesSummary(app: app)
                 unusedLine
-                if let blocker {
+                if let blocker, blocker != AppState.writeAPrompt {
                     Text(blocker).font(.callout).fixedSize(horizontal: false, vertical: true)
                 }
+                CoreAIMark(app: app)
             }
             Spacer(minLength: 8)
             generate(blocker: blocker, renders: renders)

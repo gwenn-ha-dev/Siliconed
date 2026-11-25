@@ -9,7 +9,7 @@
 // - **In the background**, after the form's: the default key (1024², no LoRA) of a model that becomes ready — an
 //   installation, an import, another library —, and of every installed model when this app or this macOS is not the one
 //   they were last prepared for (`CoreAI.preparationDue`): an update compiles again, on battery too, shown as any
-//   compilation (`compilingCoreAI`): the window's band says what, and how far (`CompilationMark`).
+//   compilation (`compilingCoreAI`): Core AI's light at the foot of the column says what, and how far (`CoreAIMark`).
 
 import Foundation
 import Siliconed
@@ -30,6 +30,8 @@ extension AppState {
     static let pause = Duration.seconds(1.5)
     /// The prompt prepared while the form's is empty.
     static let standInPrompt = "a photograph"
+    /// How often a preparation's count moves on screen (`preparationTold`).
+    static let countEvery: TimeInterval = 0.5
 
     /// The form's key, `nil` when this Mac does not render it (another Mac's, a model not installed, no library).
     var preparationKey: PreparationKey? {
@@ -55,20 +57,37 @@ extension AppState {
         keyChanged()
     }
 
-    /// **A preparation's compilations said as one burst** (`Measures.burst`, as a render's): shown at the first, its count
-    /// moving with each, hidden `burst` seconds past the last. Said function by function, the word came and went several
-    /// times a second, and every view that reads `compilingCoreAI` with it, while the machine compiled.
+    /// **A preparation's compilations said as one burst** (`Measures.burst`, as a render's): shown at the first, hidden
+    /// `burst` seconds past the last. Said function by function, the word came and went several times a second, and every
+    /// view that reads `compilingCoreAI` with it, while the machine compiled. Its count moves at most every `countEvery`:
+    /// a key's specializations come up to 15 a second (Anima at 1024², 133 in 9.3 s); a new model or size is said at once.
     func preparationTold(_ what: WorkerPreparation?) {
         preparationEnd?.cancel()
         if let what {
-            if compilingAhead != what { compilingAhead = what }
+            let now = Date()
+            let other = compilingAhead.map { $0.model != what.model || $0.width != what.width || $0.height != what.height } ?? true
+            if other, compilingAhead != nil { aheadDone += 1 }
+            if compilingAhead != what, other || now.timeIntervalSince(aheadSaid) >= Self.countEvery {
+                compilingAhead = what
+                aheadSaid = now
+            }
             return
         }
         preparationEnd = Task { [weak self] in
             try? await Task.sleep(for: .seconds(Measures.burst))
             guard !Task.isCancelled, let self, self.compilingAhead != nil else { return }
             self.compilingAhead = nil
+            self.aheadDone = 0
         }
+    }
+
+    /// **How far the preparation under way is**, 0 to 1, over the keys of its burst: those done, then the one under way at
+    /// its specialization of its key's, of those done, it and those after it (`WorkerPreparation.next`). `nil` outside a
+    /// preparation: a render's own compilation does not know its count.
+    var preparationFraction: Double? {
+        guard let p = compilingAhead else { return nil }
+        let keys = Double(aheadDone + 1 + p.next.count)
+        return min(1, (Double(aheadDone) + Double(p.at) / Double(max(p.of, 1))) / keys)
     }
 
     /// **The default key of each of `models`, after the form's** (1024², no LoRA, the Neural Engine as chosen).

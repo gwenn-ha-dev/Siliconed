@@ -84,6 +84,10 @@ extension Stage {
 
         /// What Metal allocates for the arena (`Arena.allocation`) and what lies apart.
         public var arena: Int { Arena.allocation(bytes: heap) + apart }
+        /// **The weights its arena holds from the start**: the residents, the groups kept from the start, the ring's slots
+        /// (the groups that ride it pass through them) — in bytes, as read from the files' headers. A group kept in
+        /// flight adds its own (`Stages.Event.kept`).
+        public var weights: Int { sizes.residents + kept.reduce(0) { $0 + sizes.groups[$1]! } + depth * sizes.slot }
         /// P = floor + arena: what the stage allocates; Core AI's share is read in flight (`signal`, `estimates`).
         public var p: Int { floor + arena }
         /// P's terms, as a sentence.

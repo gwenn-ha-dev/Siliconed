@@ -192,6 +192,9 @@ private struct AppCommands: Commands {
                 .disabled(app.selectedEntry == nil || app.shownSeries != nil || app.historyGrid)
             Button("Chain Inspector") { window.toggleChain() }
                 .keyboardShortcut("i", modifiers: [.command, .option])
+            // U, the usage of the Mac: ⌥⌘M is the Window menu's Minimize All.
+            Button("Machine") { window.toggleMachine() }
+                .keyboardShortcut("u", modifiers: [.command, .option])
             Button(app.historyGrid ? "Back to the Image" : "History Grid") {
                 withAnimation(HistoryGrid.motion) { app.historyGrid.toggle() }
             }

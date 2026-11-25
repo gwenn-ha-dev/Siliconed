@@ -265,7 +265,7 @@ final class AppState {
     var currentJob: Job?
     /// The figures of the running render and of the last finished one — the Chain inspector.
     var measurements = Measures() {
-        // Said where it flips only: the window's band reads it (`CompilationMark`), and the measures move at every event.
+        // Said where it flips only: Core AI's light reads it (`CoreAIMark`), and the measures move at every event.
         didSet { let c = measurements.compiling(); if c != renderCompiles { renderCompiles = c } }
     }
     /// **The render's own compilation** (`Measures.compiling`, its burst included), as the measures last said it.
@@ -291,6 +291,10 @@ final class AppState {
     @ObservationIgnored var preparation: Task<Void, Never>?
     /// The end of a preparation's burst, said once it lasted (`preparationTold`).
     @ObservationIgnored var preparationEnd: Task<Void, Never>?
+    /// When `compilingAhead` last moved (`preparationTold`: its count, at most twice a second), and the keys of the burst
+    /// done before it (`preparationFraction`).
+    @ObservationIgnored var aheadSaid = Date.distantPast
+    @ObservationIgnored var aheadDone = 0
     /// A render is running or waiting: installations (several GB) and removing a model wait.
     var busy: Bool { inProgress || !file.isEmpty }
     var fraction = 0.0

@@ -343,7 +343,7 @@ struct DiTBox: View {
                 Text("step \(app.currentStep)/\(app.totalSteps)").monospacedDigit()
                 Spacer()
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    // What compiles is said once, in the window's band (`CompilationMark`); here, why no time is said.
+                    // What compiles is said once, at the foot of the column (`CoreAIMark`); here, why no time is said.
                     if app.compilingCoreAI {
                         Text("Estimate after compilation").foregroundStyle(Palette.secondary)
                     } else if let r = app.remaining(at: context.date) {

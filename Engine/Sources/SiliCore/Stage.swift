@@ -52,6 +52,8 @@ public final class Stage: @unchecked Sendable {
     /// Under `lock`: the groups the reader decided to keep whose heap is not allocated yet (`keeps`, `Arena.grow`) —
     /// counted by every decision against B meanwhile, a climb's as the reader's.
     var promised = 0
+    /// Under `lock`: the bytes of the groups kept past the signal, each counted as its place is taken (`Stages.Event.kept`).
+    private var keptInFlight = 0
     /// Under `lock`: the stage opened whole (its functions loaded); a stage whose opening threw keeps no reading.
     private var ready = false
     /// **The share at its peak, read every millisecond**: a call's working memory is taken and given back within the
@@ -146,10 +148,13 @@ public final class Stage: @unchecked Sendable {
             ring = Ring(slots: slots, once: d.once, cycle: d.cycle, bound: bound, keeps: keeps, place: { [weak self] g in
                 defer { self?.delivered(sizes.groups[g]!) }
                 let heap = surfaces ? 0 : try arena.grow(bytes: sizes.groups[g]!)
+                self?.lock.withLock { self?.keptInFlight += sizes.groups[g]! }
                 return Weights.place(laid[g]!, in: arena, heap: heap, surfaces: surfaces)
             }, keep: { [weak self] g, unwritten in
                 self?.keeps(sizes.groups[g]!, pending: unwritten * slotBytes, allocated: arena.allocated) ?? false
-            }, kept: { [fromStart = plan.kept.count] in Stages.tell(.kept(fromStart + $0)) }, fill: { g, place in
+            }, kept: { [weak self, fromStart = plan.kept.count, weights = plan.weights] n in
+                Stages.tell(.kept(fromStart + n, weights: weights + (self?.lock.withLock { self?.keptInFlight } ?? 0)))
+            }, fill: { g, place in
                 try Weights.read(groups[g]!, from: uncached[fileOf[g]!], into: place, arena: arena, staging: arena.pointer(stagingKey!))
             })
         }

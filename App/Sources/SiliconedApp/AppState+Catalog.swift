@@ -61,6 +61,10 @@ extension AppState {
 
     /// `blocker`, on a reading of the series the caller already made (`seriesReading`): a body that also shows how many
     /// images the click makes reads the series once, not once per sentence — each reading builds the grid again.
+    /// The reason of an empty text: the field's placeholder says it already, and the foot of the column does not repeat it
+    /// (`GenerateControls`); the button's help still does.
+    static let writeAPrompt = String(localized: "Write a prompt.")
+
     func blocker(reading series: @autoclosure () -> (blocker: String?, renders: Int)) -> String? {
         if let reason = linkBlocker { return reason }
         if let reason = libraryBlocker { return reason }
@@ -69,7 +73,7 @@ extension AppState {
         if prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             // Describe fills the text only when it ends: while it writes, the text is empty and the prompt is coming.
             let lab = LabModel.shared
-            return lab.isWriting && lab.rack === self ? String(localized: "The writer is writing the prompt.") : String(localized: "Write a prompt.")
+            return lab.isWriting && lab.rack === self ? String(localized: "The writer is writing the prompt.") : Self.writeAPrompt
         }
         if case .failure(let e) = alternatives { return Problem(e).text }
         // An unknown `@name`, too many images, a mention inside a group: said before the click (`LabInputs.carry`).

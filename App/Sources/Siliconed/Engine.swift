@@ -59,17 +59,22 @@ package final class Engine: Sendable {
     /// it could take, by its unit (0: the GPU alone); whether it visits the share of none (`Block.zero`: this Mac's κ
     /// unknown, or the share predicted the fastest); its seconds; and **its rates, in TFLOP/s**: the block's — what its
     /// calls executed over its own seconds, what its start loaded for a move left out —, and each unit's over its own
-    /// calls (nil: not timed — the GPU alone, a block's last cycle).
+    /// calls (nil: not timed — the GPU alone, a block's last cycle). **Where it lies in the render**: its end, in seconds
+    /// on the memory series' clock (`MemorySeries`, from the render's start), and the fraction of its FLOP the Neural
+    /// Engine executed — what the Machine window lays in time, each unit's part of the block's rate.
     package struct Cycle: Sendable, Codable, Equatable {
         package var rows, shareable, unit: Int
         package var zero: Bool
         package var seconds: Double
         package var tflops: Double
         package var neuralEngine: Double?, gpu: Double?
+        package var end: Double?
+        package var aneFraction: Double?
         package init(rows: Int, shareable: Int, unit: Int, zero: Bool = false, seconds: Double, tflops: Double = 0,
-                     neuralEngine: Double? = nil, gpu: Double? = nil) {
+                     neuralEngine: Double? = nil, gpu: Double? = nil, end: Double? = nil, aneFraction: Double? = nil) {
             (self.rows, self.shareable, self.unit, self.zero, self.seconds) = (rows, shareable, unit, zero, seconds)
             (self.tflops, self.neuralEngine, self.gpu) = (tflops, neuralEngine, gpu)
+            (self.end, self.aneFraction) = (end, aneFraction)
         }
     }
 

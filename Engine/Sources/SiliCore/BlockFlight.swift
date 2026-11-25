@@ -311,7 +311,7 @@ extension Block {
         guard let b = begun else { return }
         begun = nil
         let cycle = Stages.Cycle(block: declaration.name, unit: b.unit, rows: b.rows, shareable: shareable / b.unit * b.unit,
-                                 trying: b.trying, seconds: Double(end &- b.at) * 1e-9, moved: b.moved, climbed: b.climbed,
+                                 trying: b.trying, seconds: Double(end &- b.at) * 1e-9, end: end, moved: b.moved, climbed: b.climbed,
                                  calls: lastCalls, refused: b.refused, flops: flops)
         Stages.tell(.cycle(cycle))
         // The last cycle beside the ANE has no calls timed (`rebalance` times them at the next cycle's start): the one before kept.

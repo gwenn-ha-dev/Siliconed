@@ -165,12 +165,13 @@ final class MainWindow: NSObject, NSWindowDelegate {
         NSApp.activate()
     }
 
-    /// **The « Chain » inspector** (`Inspectors.swift`).
+    /// **The « Chain » inspector and the « Machine » window** (`Inspectors.swift`).
     private(set) lazy var inspectors = Inspectors(carrier: carrier, local: local)
 
-    func toggleChain() { inspectors.toggle(beside: window) }
-    /// The Chain inspector shown, at its top (`CompilationMark`).
-    func showChain() { inspectors.show(beside: window) }
+    func toggleChain() { inspectors.toggle(.chain, beside: window) }
+    func toggleMachine() { inspectors.toggle(.machine, beside: window) }
+    /// The Machine window shown (`CoreAIMark`).
+    func showMachine() { inspectors.show(.machine, beside: window) }
 
     /// **The column in its own window**, when it is detached (`RackColumn.swift`).
     private(set) lazy var rackPanel = RackPanel(carrier: carrier, local: local)

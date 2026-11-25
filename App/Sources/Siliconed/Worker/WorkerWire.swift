@@ -21,7 +21,7 @@ import Foundation
 /// `version` goes up with any change to what crosses below; the hello's own shape never changes — every build reads it
 /// first.
 package struct WorkerHello: Codable, Sendable, Equatable {
-    package static let version = 8
+    package static let version = 9
     package var protocolVersion: Int
 
     package init(protocolVersion: Int = WorkerHello.version) { self.protocolVersion = protocolVersion }

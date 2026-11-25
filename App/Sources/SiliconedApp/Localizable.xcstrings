@@ -293,42 +293,42 @@
         }
       }
     },
-    "%@ compiled" : {
+    "%@ compiled by Core AI" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ kompiliert"
+            "value" : "davon %@ Core-AI-Kompilierung"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ de compilación"
+            "value" : "incluye %@ de compilación de Core AI"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ de compilation"
+            "value" : "dont %@ de compilation Core AI"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ di compilazione"
+            "value" : "di cui %@ di compilazione Core AI"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "コンパイル %@"
+            "value" : "うち Core AI のコンパイル %@"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "编译 %@"
+            "value" : "其中 Core AI 编译 %@"
           }
         }
       }
@@ -2903,6 +2903,52 @@
         }
       }
     },
+    "%@, weights %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, davon Gewichte %2$@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, weights %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, de ellos pesos %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, dont poids %2$@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, di cui pesi %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@（うち重み %2$@）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@，其中权重 %2$@"
+          }
+        }
+      }
+    },
     "%@: accept its license to render" : {
       "localizations" : {
         "de" : {
@@ -3607,52 +3653,6 @@
         }
       }
     },
-    "%lld of %lld rows on the Neural Engine, by %lld" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld von %lld Zeilen auf der Neural Engine, in Einheiten von %lld"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld of %2$lld rows on the Neural Engine, by %3$lld"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld de %lld filas en el Neural Engine, en bloques de %lld"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld rangées sur %lld au Neural Engine, par %lld"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld righe su %lld sul Neural Engine, a blocchi di %lld"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Neural Engine に %lld 行／%lld 行（%lld 行単位）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Neural Engine 上 %lld / %lld 行（以 %lld 行为单位）"
-          }
-        }
-      }
-    },
     "%lld of %lld steps" : {
       "localizations" : {
         "de" : {
@@ -3693,48 +3693,48 @@
         }
       }
     },
-    "%lld of %lld weight groups kept in memory, the others read from the disk" : {
+    "%lld of %lld weight groups kept" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld von %lld Gewichtsgruppen im Speicher gehalten, die übrigen von der Festplatte gelesen"
+            "value" : "%lld von %lld Gewichtsgruppen im Speicher"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$lld of %2$lld weight groups kept in memory, the others read from the disk"
+            "value" : "%1$lld of %2$lld weight groups kept"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld de %lld grupos de pesos guardados en memoria, los demás leídos del disco"
+            "value" : "%lld de %lld grupos de pesos en memoria"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld groupes de poids sur %lld gardés en mémoire, les autres lus sur le disque"
+            "value" : "%lld groupes de poids sur %lld en mémoire"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld gruppi di pesi su %lld tenuti in memoria, gli altri letti dal disco"
+            "value" : "%lld gruppi di pesi su %lld in memoria"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld/%lld 個の重みグループをメモリに保持、残りはディスクから読み込み"
+            "value" : "重みグループ %lld/%lld 個をメモリに保持"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在内存中保留 %lld/%lld 个权重组，其余从磁盘读取"
+            "value" : "内存中保留 %lld/%lld 个权重组"
           }
         }
       }
@@ -4011,6 +4011,46 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "%lld rows on the ANE" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Zeilen auf der ANE"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld filas en el ANE"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld rangées à l’ANE"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld righe sull’ANE"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ANE に %lld 行"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ANE 上 %lld 行"
           }
         }
       }
@@ -6643,42 +6683,48 @@
         }
       }
     },
-    "ANE rows" : {
+    "ANE %@ + GPU %@ TFLOP/s" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ANE-Zeilen"
+            "value" : "ANE %@ + GPU %@ TFLOP/s"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ANE %1$@ + GPU %2$@ TFLOP/s"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "filas ANE"
+            "value" : "ANE %@ + GPU %@ TFLOP/s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "rangées ANE"
+            "value" : "ANE %@ + GPU %@ TFLOP/s"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "righe ANE"
+            "value" : "ANE %@ + GPU %@ TFLOP/s"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ANE 行"
+            "value" : "ANE %@ + GPU %@ TFLOP/s"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ANE 行"
+            "value" : "ANE %@ + GPU %@ TFLOP/s"
           }
         }
       }
@@ -11843,6 +11889,46 @@
         }
       }
     },
+    "Compute, in TFLOP/s" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechenleistung, in TFLOP/s"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cálculo, en TFLOP/s"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calcul, en TFLOP/s"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calcolo, in TFLOP/s"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "演算（TFLOP/s）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "算力（TFLOP/s）"
+          }
+        }
+      }
+    },
     "Computed on" : {
       "localizations" : {
         "de" : {
@@ -12563,128 +12649,82 @@
         }
       }
     },
-    "Core AI compiles for this Mac what the renders need, once. The Chain inspector says what." : {
+    "Core AI compiles for this Mac what the renders need, once. The Machine window says what." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Core AI kompiliert für diesen Mac einmal, was die Renderings brauchen. Der Ketten-Inspektor zeigt, was."
+            "value" : "Core AI kompiliert für diesen Mac einmal, was die Renderings brauchen. Das Fenster „Maschine“ zeigt, was."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Core AI compila para este Mac lo que necesitan los renderizados, una sola vez. El inspector de la cadena dice qué."
+            "value" : "Core AI compila para este Mac lo que necesitan los renderizados, una sola vez. La ventana Máquina dice qué."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Core AI compile pour ce Mac ce dont les rendus ont besoin, une fois. L’inspecteur de la chaîne dit quoi."
+            "value" : "Core AI compile pour ce Mac ce dont les rendus ont besoin, une fois. La fenêtre Machine dit quoi."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Core AI compila per questo Mac ciò che serve ai rendering, una volta sola. L’ispettore della catena dice cosa."
+            "value" : "Core AI compila per questo Mac ciò che serve ai rendering, una volta sola. La finestra Macchina dice cosa."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Core AI はこの Mac 向けに、生成に必要なものを一度だけコンパイルします。内容はチェーンインスペクタに表示されます。"
+            "value" : "Core AI はこの Mac 向けに、生成に必要なものを一度だけコンパイルします。内容は「マシン」ウインドウに表示されます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Core AI 为这台 Mac 编译生成所需的内容，只需一次。处理链检查器会显示具体内容。"
+            "value" : "Core AI 为这台 Mac 编译生成所需的内容，只需一次。“机器”窗口会显示具体内容。"
           }
         }
       }
     },
-    "Core AI · %@" : {
+    "Core AI compiling…" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Core AI · %@"
+            "value" : "Core AI kompiliert …"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Core AI · %@"
+            "value" : "Core AI compilando…"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Core AI · %@"
+            "value" : "compilation Core AI…"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Core AI · %@"
+            "value" : "Core AI in compilazione…"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Core AI · %@"
+            "value" : "Core AI コンパイル中…"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Core AI · %@"
-          }
-        }
-      }
-    },
-    "Core AI · %@ %@ · %lld/%lld" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Core AI · %@ %@ · %lld/%lld"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Core AI · %1$@ %2$@ · %3$lld/%4$lld"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Core AI · %@ %@ · %lld/%lld"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Core AI · %@ %@ · %lld/%lld"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Core AI · %@ %@ · %lld/%lld"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Core AI · %@ %@ · %lld/%lld"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Core AI · %@ %@ · %lld/%lld"
+            "value" : "Core AI 正在编译…"
           }
         }
       }
@@ -21369,6 +21409,46 @@
         }
       }
     },
+    "Machine" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maschine"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máquina"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Machine"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macchina"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マシン"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "机器"
+          }
+        }
+      }
+    },
     "Macs" : {
       "localizations" : {
         "de" : {
@@ -21565,6 +21645,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请腾出空间——卸载一个模型，或在“模型”面板中放弃已中断的下载——然后重新开始：已下载的文件会保留。"
+          }
+        }
+      }
+    },
+    "Memory" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speicher"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Memoria"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mémoire"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Memoria"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メモリ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内存"
           }
         }
       }
@@ -24461,46 +24581,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚未编译任何内容。"
-          }
-        }
-      }
-    },
-    "Nothing compiling." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keine Kompilierung."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nada en compilación."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rien ne compile."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nessuna compilazione."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "コンパイル中のものはありません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "没有正在编译的内容。"
           }
         }
       }
@@ -29053,6 +29133,46 @@
         }
       }
     },
+    "Renders on “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rendert auf „%@“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Genera en «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rend sur « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Genera su «%@»"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」で生成"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在“%@”上生成"
+          }
+        }
+      }
+    },
     "Renders with what this Mac holds — maybe nothing yet. The library on the other disk is not touched" : {
       "localizations" : {
         "de" : {
@@ -31379,6 +31499,98 @@
         }
       }
     },
+    "Siliconed holds at most %@ of that Mac’s %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed belegt höchstens %1$@ der %2$@ jenes Macs."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Siliconed holds at most %1$@ of that Mac’s %2$@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed ocupa como máximo %1$@ de los %2$@ de ese Mac."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed y prend au plus %1$@ des %2$@ de ce Mac."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed occupa al massimo %1$@ dei %2$@ di quel Mac."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconedが使うのは、そのMacの%2$@のうち最大%1$@です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed 最多占用那台 Mac %2$@ 中的 %1$@。"
+          }
+        }
+      }
+    },
+    "Siliconed holds at most %@ of this Mac’s %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed belegt höchstens %1$@ der %2$@ dieses Macs."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Siliconed holds at most %1$@ of this Mac’s %2$@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed ocupa como máximo %1$@ de los %2$@ de este Mac."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed prend au plus %1$@ des %2$@ de ce Mac."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed occupa al massimo %1$@ dei %2$@ di questo Mac."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconedが使うのは、このMacの%2$@のうち最大%1$@です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed 最多占用这台 Mac %2$@ 中的 %1$@。"
+          }
+        }
+      }
+    },
     "Siliconed is up to date." : {
       "localizations" : {
         "de" : {
@@ -31735,6 +31947,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Siliconed 的指令，即此版本发送的内容。"
+          }
+        }
+      }
+    },
+    "Siliconed’s limit, %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limit von Siliconed, %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "límite de Siliconed, %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "limite de Siliconed, %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "limite di Siliconed, %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconedの上限 %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed 的上限 %@"
+          }
+        }
+      }
+    },
+    "Siliconed’s memory limit, set in Settings › Macs: the most the engine holds while it renders" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Speicherlimit von Siliconed, eingestellt in Einstellungen › Macs: das Höchste, was die Engine beim Rendern belegt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El límite de memoria de Siliconed, ajustado en Ajustes › Mac: lo máximo que ocupa el motor mientras genera"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La limite de mémoire de Siliconed, réglée dans Réglages › Mac : le plus que le moteur prend pendant un rendu"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il limite di memoria di Siliconed, impostato in Impostazioni › Mac: il massimo che il motore occupa durante la generazione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconedのメモリ上限（「設定」›「Mac」で設定）：生成中にエンジンが使う最大量"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed 的内存上限，在“设置” › “Mac”中设定：引擎生成时占用的最大量"
           }
         }
       }
@@ -34187,6 +34479,46 @@
         }
       }
     },
+    "The Render in Time" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Rendering im Zeitverlauf"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El renderizado en el tiempo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rendu dans le temps"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il rendering nel tempo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成の時間経過"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成过程时间线"
+          }
+        }
+      }
+    },
     "The cells still waiting leave the queue; the running one stops" : {
       "localizations" : {
         "de" : {
@@ -34387,42 +34719,42 @@
         }
       }
     },
-    "The chain stage by stage: module, weights, time, memory, GPU and Neural Engine (⌥⌘I)" : {
+    "The chain stage by stage: module, weights, time, the unit that computed (⌥⌘I)" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Kette Stufe für Stufe: Modul, Gewichte, Zeit, Speicher, GPU und Neural Engine (⌥⌘I)"
+            "value" : "Die Kette Stufe für Stufe: Modul, Gewichte, Zeit, die rechnende Einheit (⌥⌘I)"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La cadena etapa por etapa: módulo, pesos, tiempo, memoria, GPU y Neural Engine (⌥⌘I)"
+            "value" : "La cadena etapa por etapa: módulo, pesos, tiempo, la unidad que calculó (⌥⌘I)"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La chaîne étage par étage : module, poids, temps, mémoire, GPU et Neural Engine (⌥⌘I)"
+            "value" : "La chaîne étage par étage : module, poids, temps, l’unité qui a calculé (⌥⌘I)"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La catena stadio per stadio: modulo, pesi, tempo, memoria, GPU e Neural Engine (⌥⌘I)"
+            "value" : "La catena stadio per stadio: modulo, pesi, tempo, l’unità che ha calcolato (⌥⌘I)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ステージごとのチェーン：モジュール、重み、時間、メモリ、GPUとNeural Engine（⌥⌘I）"
+            "value" : "ステージごとのチェーン：モジュール、重み、時間、計算したユニット（⌥⌘I）"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "逐级查看处理链：模块、权重、时间、内存、GPU 与 Neural Engine（⌥⌘I）"
+            "value" : "逐级查看处理链：模块、权重、时间、计算单元（⌥⌘I）"
           }
         }
       }
@@ -37157,6 +37489,46 @@
         }
       }
     },
+    "The render begins." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Rendering beginnt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El renderizado empieza."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rendu commence."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il rendering inizia."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成を開始しています。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成即将开始。"
+          }
+        }
+      }
+    },
     "The render can start from one image: it keeps its composition, the strength says how far it moves away." : {
       "localizations" : {
         "de" : {
@@ -38805,6 +39177,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这台 Mac 不提供 macOS 的超分辨率"
+          }
+        }
+      }
+    },
+    "This Mac in time: what Core AI compiled, the memory, the TFLOP/s (⌥⌘U)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Mac im Zeitverlauf: was Core AI kompiliert hat, der Speicher, die TFLOP/s (⌥⌘U)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este Mac en el tiempo: lo que compiló Core AI, la memoria, los TFLOP/s (⌥⌘U)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce Mac dans le temps : ce que Core AI a compilé, la mémoire, les TFLOP/s (⌥⌘U)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo Mac nel tempo: ciò che Core AI ha compilato, la memoria, i TFLOP/s (⌥⌘U)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間で見るこのMac：Core AIがコンパイルしたもの、メモリ、TFLOP/s（⌥⌘U）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "随时间查看这台 Mac：Core AI 编译的内容、内存、TFLOP/s（⌥⌘U）"
           }
         }
       }
@@ -43827,76 +44239,36 @@
         }
       }
     },
-    "all" : {
+    "all %lld weight groups kept" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "gesamt"
+            "value" : "alle %lld Gewichtsgruppen im Speicher"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "total"
+            "value" : "los %lld grupos de pesos en memoria"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "tout"
+            "value" : "les %lld groupes de poids en mémoire"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "totale"
+            "value" : "tutti i %lld gruppi di pesi in memoria"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "全体"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "整体"
-          }
-        }
-      }
-    },
-    "all %lld weight groups kept in memory" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "alle %lld Gewichtsgruppen im Speicher gehalten"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "los %lld grupos de pesos guardados en memoria"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "les %lld groupes de poids gardés en mémoire"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "tutti i %lld gruppi di pesi tenuti in memoria"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 個の重みグループすべてをメモリに保持"
+            "value" : "重みグループ %lld 個すべてをメモリに保持"
           }
         },
         "zh-Hans" : {
@@ -44227,6 +44599,46 @@
         }
       }
     },
+    "base" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Basis"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "base"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "socle"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "base"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ベース"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "基础"
+          }
+        }
+      }
+    },
     "base %@ · peak %@ under the limit of %@" : {
       "localizations" : {
         "de" : {
@@ -44423,46 +44835,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在编译"
-          }
-        }
-      }
-    },
-    "compiling…" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "kompiliert …"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "compilando…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "compilation…"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "compilazione…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "コンパイル中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在编译…"
           }
         }
       }
@@ -45911,6 +46283,46 @@
         }
       }
     },
+    "intermediates" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zwischenwerte"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "intermedios"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "intermédiaires"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "intermedi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中間データ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中间数据"
+          }
+        }
+      }
+    },
     "job expected (t3), not \"%@\"" : {
       "localizations" : {
         "de" : {
@@ -45947,46 +46359,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "应为任务（t3），而不是“%@”"
-          }
-        }
-      }
-    },
-    "last render" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "letztes Rendering"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "último renderizado"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "dernier rendu"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ultimo rendering"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "前回の生成"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上次生成"
           }
         }
       }
@@ -46151,46 +46523,6 @@
         }
       }
     },
-    "limit %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Limit %@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "límite %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "limite %@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "limite %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上限 %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上限 %@"
-          }
-        }
-      }
-    },
     "lost, trying again…" : {
       "localizations" : {
         "de" : {
@@ -46351,42 +46683,42 @@
         }
       }
     },
-    "max %@" : {
+    "max %@ TFLOP/s" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "max. %@"
+            "value" : "max. %@ TFLOP/s"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "máx. %@"
+            "value" : "máx. %@ TFLOP/s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "max %@"
+            "value" : "max %@ TFLOP/s"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "max %@"
+            "value" : "max %@ TFLOP/s"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "最大 %@"
+            "value" : "最大 %@ TFLOP/s"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "最高 %@"
+            "value" : "最高 %@ TFLOP/s"
           }
         }
       }
@@ -46513,6 +46845,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "模型“%@”不可用：%@"
+          }
+        }
+      }
+    },
+    "model weights" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modellgewichte"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pesos del modelo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "poids du modèle"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pesi del modello"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデルの重み"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型权重"
           }
         }
       }
@@ -47558,46 +47930,6 @@
         }
       }
     },
-    "nothing compiled" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "nichts kompiliert"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "nada compilado"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "rien de compilé"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "niente compilato"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "コンパイルなし"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未编译任何内容"
-          }
-        }
-      }
-    },
     "nothing is running or waiting" : {
       "localizations" : {
         "de" : {
@@ -48118,42 +48450,42 @@
         }
       }
     },
-    "preparing" : {
+    "peak %@" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "bereitet vor"
+            "value" : "Spitze %@"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "preparando"
+            "value" : "pico %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "prépare"
+            "value" : "crête %@"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "in preparazione"
+            "value" : "picco %@"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "準備中"
+            "value" : "ピーク %@"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在准备"
+            "value" : "峰值 %@"
           }
         }
       }
@@ -48434,6 +48766,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "秩 %lld–%lld"
+          }
+        }
+      }
+    },
+    "rates not counted" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TFLOP/s nicht gezählt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TFLOP/s sin contar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TFLOP/s non comptés"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TFLOP/s non conteggiati"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TFLOP/s 未計測"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TFLOP/s 未统计"
           }
         }
       }
@@ -48884,6 +49256,46 @@
         }
       }
     },
+    "share moved" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anteil verschoben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "reparto movido"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "part déplacée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "quota spostata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配分を変更"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分配已调整"
+          }
+        }
+      }
+    },
     "silicontrol drives this app from a terminal, a script or an AI agent. See: silicontrol help" : {
       "localizations" : {
         "de" : {
@@ -49084,46 +49496,6 @@
         }
       }
     },
-    "step" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schritt"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "paso"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "pas"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "passo"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ステップ"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "步"
-          }
-        }
-      }
-    },
     "step %lld/%lld" : {
       "localizations" : {
         "de" : {
@@ -49160,92 +49532,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "第 %lld/%lld 步"
-          }
-        }
-      }
-    },
-    "step %lld: %@ TFLOP/s" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schritt %lld: %@ TFLOP/s"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "step %1$lld: %2$@ TFLOP/s"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "paso %lld: %@ TFLOP/s"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "pas %lld : %@ TFLOP/s"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "passo %lld: %@ TFLOP/s"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ステップ%lld：%@ TFLOP/s"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 %lld 步：%@ TFLOP/s"
-          }
-        }
-      }
-    },
-    "step %lld: pending" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schritt %lld: ausstehend"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "paso %lld: pendiente"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "pas %lld : à venir"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "passo %lld: in arrivo"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ステップ%lld：未実行"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 %lld 步：待处理"
           }
         }
       }
@@ -50338,86 +50624,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这张图像在 %@ 像素以上无法容纳该比例"
-          }
-        }
-      }
-    },
-    "this render" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "dieses Rendering"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "este renderizado"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ce rendu"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "questo rendering"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "この生成"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本次生成"
-          }
-        }
-      }
-    },
-    "time" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zeit"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "tiempo"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "temps"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "tempo"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "時間"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "时间"
           }
         }
       }
