@@ -255,12 +255,31 @@ import Testing
         let beside = 6.60 / 2108 * 4156
         #expect(abs(Block.predicted(cycle, measured: 2048, rows: 0) - (beside + 3.15)) < 1e-9)
         #expect(abs(Block.predicted(cycle, measured: 2048, rows: 0, alone: 1.24) - (beside / 1.24 + 3.15)) < 1e-9)
-        // κ touches the share of none only.
+        // κ leaves the share measured, and those past it, as measured.
         #expect(Block.predicted(cycle, measured: 2048, rows: 2048, alone: 1.24) == Block.predicted(cycle, measured: 2048, rows: 2048))
+        #expect(Block.predicted(cycle, measured: 2048, rows: 3072, alone: 1.24) == Block.predicted(cycle, measured: 2048, rows: 3072))
         #expect(Block.aloneRate(cycle, measured: 2048, zero: beside / 1.24 + 3.15).map { abs($0 - 1.24) < 1e-9 } == true)
         #expect(abs(Block.aloneRate(cycle, measured: 2048, zero: 16.14)! - 1.0) < 0.01)
         // A cycle at 0 no longer than the `gpu` steps tells nothing.
         #expect(Block.aloneRate(cycle, measured: 2048, zero: 3.0) == nil)
+    }
+
+    /// **Between none and the share measured, the GPU's seconds a row on a straight line** from 1/κ of them to them: the
+    /// GPU slows as the ANE beside it takes more. Krea 2 Standard 1024² on the M5 Pro (25/11/2026): at 2048 rows the ANE
+    /// 6.55 s, the GPU beside 2.93 for 2048 rows, its `gpu` steps 1.00; at 0, 5.40 s; 1024 rows told took 4.82. The
+    /// constant predicted 1024 at 5.40, no faster than none, and the share of none stayed.
+    @Test func theGPUSlowsAsTheANETakesMore() {
+        typealias C = Block.Timed
+        let cycle: [[C]] = [[C(kind: .neural, step: "ffn", phase: 0, rows: 2048, seconds: 6.55),
+                             C(kind: .past, step: "ffn", phase: 0, rows: 2048, seconds: 2.93),
+                             C(kind: .fixed, step: "heads", phase: 1, rows: 4096, seconds: 1.00)]]
+        let kappa = Block.aloneRate(cycle, measured: 2048, zero: 5.40)!
+        #expect(abs(kappa - 1.332) < 0.001)
+        #expect(abs(Block.predicted(cycle, measured: 2048, rows: 0, alone: kappa) - 5.40) < 1e-9)
+        #expect(abs(Block.predicted(cycle, measured: 2048, rows: 1024) - 5.395) < 0.001)
+        #expect(abs(Block.predicted(cycle, measured: 2048, rows: 1024, alone: kappa) - 4.848) < 0.001)
+        let best = Block.bestShare(cycle, measured: 2048, unit: 1024, shareable: 4096, alone: kappa)
+        #expect(best.rows == 1024 && best.seconds < 5.40 - 0.5)
     }
 
     /// A tapped run is the GPU's alone over every row: a block declared tapped has the GPU's functions of the whole pass
