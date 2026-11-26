@@ -500,7 +500,8 @@ extension RemoteControlHelp {
                          to do meanwhile; the GPU waits for its last calls before that step), at_groups at the start of a
                          layer, between two calls of one stretch, outside before its first call and after its last —;
                          each step's calls on each unit: "ane", "beside" (the GPU past the Neural Engine's rows),
-                         "alone" (the GPU's own steps), "edge"; "unread", the calls whose end was not read.
+                         "alone" (the GPU's own steps), "edge" and "ane edge" (a block's edges, the GPU's or the Neural
+                         Engine's); "unread", the calls whose end was not read.
         engine_stages  : under Debug Live, each engine stage's opening (its plan, the wait for the memory the stages
                          before let go where it waited, arena, residents, ring, functions) and close (let go), in
                          seconds, from "opened" and "closed" on the render's clock; its "runs", its calls outside the
@@ -543,8 +544,9 @@ extension RemoteControlHelp {
                          Engine n'a rien à faire pendant ce temps ; le GPU attend ses derniers appels avant cette étape),
                          at_groups au début d'une couche, between entre deux appels d'un même enchaînement, outside avant
                          son premier appel et après son dernier — ; les appels de chaque étape sur chaque unité : "ane",
-                         "beside" (le GPU après les rangées du Neural Engine), "alone" (les étapes du GPU seul), "edge" ;
-                         "unread", les appels dont la fin n'a pas été lue.
+                         "beside" (le GPU après les rangées du Neural Engine), "alone" (les étapes du GPU seul), "edge"
+                         et "ane edge" (les bords d'un bloc, du GPU ou du Neural Engine) ; "unread", les appels dont la
+                         fin n'a pas été lue.
         engine_stages  : sous Debug live, l'ouverture de chaque étage du moteur (son plan, l'attente de la mémoire lâchée
                          par les étages d'avant là où il a attendu, arène, résidents, anneau, fonctions) et sa fermeture
                          (tout lâcher), en secondes, depuis "opened" et "closed" sur l'horloge du rendu ; ses "runs", ses

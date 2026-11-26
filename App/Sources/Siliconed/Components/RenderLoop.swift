@@ -8,7 +8,7 @@ import SiliCore
 /// `decoderInput` and `picture` once an image; `denoiser` from the tokens on, on a thread of its own, beside the text
 /// where the family opens its DiT ahead (`opensAhead`), after it otherwise. What one stage makes for a later one (ids, a
 /// conditioning, an edit's references) the family keeps.
-package protocol RenderParts {
+package protocol RenderParts: SendableMetatype {
     associatedtype Decoder: LatentDecoder
     /// The family's part of `request` on `model`, as admitted: what it refuses before any computation (a module of
     /// another family, a LoRA it does not recognize) thrown here.
@@ -102,7 +102,7 @@ package protocol RenderDenoiser: AnyObject {
 /// after it otherwise, as alone.
 package enum RenderLoop {
     /// **A family's render** (`FamilyTraits.render`): its part made of the request (`RenderParts.init`), then `run`.
-    package static func render<Parts: RenderParts & SendableMetatype>(
+    package static func render<Parts: RenderParts>(
         _ parts: Parts.Type
     ) -> @Sendable (Request, Admission, [UInt64], Model, Cancellation?, (Engine.Event) -> Void) throws -> [Engine.Render] {
         { request, admitted, seeds, model, cancellation, emit in
@@ -113,7 +113,7 @@ package enum RenderLoop {
     /// **What a family's render of `request` would specialize** (`FamilyTraits.prepare`): its part made as the render
     /// makes it, the prompt tokenized, then each stage at the shapes the render opens it — its own (`RenderParts.prepare`),
     /// then the decoder.
-    package static func preparation<Parts: RenderParts & SendableMetatype>(
+    package static func preparation<Parts: RenderParts>(
         _ parts: Parts.Type
     ) -> @Sendable (Request, Admission, Model) throws -> [Preparation] {
         { request, admitted, model in
@@ -251,8 +251,9 @@ package enum RenderLoop {
         guard !pending.isEmpty else { throw EngineError.nonFiniteImage(stage: .denoising) }
         let kept = KeptLatents(tokens: tokens, images: pending)
         if let keeping { try kept.write(to: keeping) }
+        // The decoder opened beside stays under the `defer`'s join: a cancellation before its session is taken waits for
+        // its opening, which lets it go, rather than leaving it to open past the render.
         let session = decoding
-        decoding = nil
         return try decode(parts, kept, request, admitted, seeds: seeds, model: model, cancellation: cancellation, emit: emit) {
             try session?.get() ?? DecoderSession<Parts.Decoder>(decoder)
         }

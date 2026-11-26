@@ -34,9 +34,8 @@ public final class BandStage: @unchecked Sendable {
     /// **A stage of bands' candidates, built once** (`candidates`): the plan of each band's positions (the tallest first),
     /// its functions built at its shapes and named by their bytes (`prefix-<hash>`), its socle from the files' headers —
     /// what `admit` judges before the computation whose result the stage reads and `open` opens after it, judged on the
-    /// floor each meets. Built once, not at each (26/11/2026, the M1 Pro: a stage's four candidates built and named
-    /// before the transformer before it, then again after it, 0.34 to 0.40 s the second time, the trace's gap before
-    /// the stage).
+    /// floor each meets. Built once: built and named again after the transformer before it, a stage's four candidates
+    /// took 0.34 to 0.40 s (26/11/2026, the M1 Pro), the trace's gap before the stage.
     public struct Candidates: @unchecked Sendable {
         public let name: String
         let files: [SafeTensors]
@@ -95,12 +94,6 @@ public final class BandStage: @unchecked Sendable {
         let chosen = p.value
         return BandStage(chosen.bands, stage, candidate: chosen.rank, narrowed: chosen.narrowed,
                          signatures: chosen.assets.mapValues { Block.Signature(c.modules[$0]!) }, assets: chosen.assets)
-    }
-
-    /// The stage of `candidates` built (`candidates`) and opened (`open`): what a stage opened at once takes.
-    public static func open(_ name: String, prefix: String, candidates: [Int], files: [SafeTensors], residents: [Weights.Entry], budget: Int,
-                            plan: (Int) -> Bands) async throws -> BandStage {
-        try await open(Self.candidates(name, prefix: prefix, candidates: candidates, files: files, residents: residents, budget: budget, plan: plan))
     }
 
     /// **What `open` would specialize**, its assets written: every candidate that holds on the floor the process comes

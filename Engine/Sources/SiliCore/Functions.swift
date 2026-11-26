@@ -127,13 +127,14 @@ public enum Functions {
     }
 
     /// **`load`, and whether Core AI specialized the function here** rather than handing it from its cache: a load that
-    /// compiled is no measure of what loading costs (`Block.move`).
-    public static func loaded(_ url: URL, unit: ComputeUnitKind? = .gpu) async throws -> (function: InferenceFunction, compiled: Bool) {
+    /// compiled is no measure of what loading costs (`Block.move`). `stage`: the stage it loads for (its declaration's
+    /// name), which a compilation names.
+    public static func loaded(_ url: URL, unit: ComputeUnitKind? = .gpu, stage: String? = nil) async throws -> (function: InferenceFunction, compiled: Bool) {
         let options = options(unit)
         if let cached = try? AIModelCache.default.model(for: url, options: options) { return (try main(cached, url), false) }
         let t = DispatchTime.now().uptimeNanoseconds
-        Stages.tell(.compiling)
-        defer { Stages.tell(.compiled(seconds: seconds(since: t))) }
+        Stages.tell(.compiling(stage: stage))
+        defer { Stages.tell(.compiled(stage: stage, seconds: seconds(since: t))) }
         return (try main(try await AIModel(contentsOf: url, options: options), url), true)
     }
 
@@ -154,8 +155,8 @@ public enum Functions {
         let options = options(s.unit)
         if (try? AIModelCache.default.model(for: s.asset, options: options)) != nil { return }
         let t = DispatchTime.now().uptimeNanoseconds
-        Stages.tell(.compiling)
-        defer { Stages.tell(.compiled(seconds: seconds(since: t))) }
+        Stages.tell(.compiling(stage: nil))
+        defer { Stages.tell(.compiled(stage: nil, seconds: seconds(since: t))) }
         _ = try await AIModel.specialize(contentsOf: s.asset, options: options)
     }
 

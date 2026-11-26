@@ -174,7 +174,7 @@ extension Runs {
         let observation = Stages.observe { e in
             switch e {
             case .compiling: told.withLock { $0.append("compiling") }
-            case .compiled(let s): told.withLock { $0.append("compiled") }; print("compiled in \(String(format: "%.3f", s)) s")
+            case .compiled(_, let s): told.withLock { $0.append("compiled") }; print("compiled in \(String(format: "%.3f", s)) s")
             default: break
             }
         }

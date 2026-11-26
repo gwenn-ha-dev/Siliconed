@@ -126,6 +126,9 @@ package final class StageWatch: @unchecked Sendable {
         package var seconds = 0.0
         /// Pages swapped out while it lived (system-wide: the Mac's, `Memory.swapouts`).
         package var swapouts: UInt64 = 0
+        /// What Core AI compiled for its functions, in seconds, and its compilations under way: counted on it from their
+        /// start to their end, said under the render's stage it is ranked in (`stage`).
+        package var compilation = 0.0, compiling = 0
         package var neuralEngine: Double?
         /// The groups of weights it kept, from the start and in flight (those its plan kept, while it is open), and their
         /// bytes with the residents' and the ring's (`Stage.Plan.weights`, then `Stages.Event.kept`).
@@ -151,7 +154,8 @@ package final class StageWatch: @unchecked Sendable {
     private var entries: [Entry] = []
     private var swapsAtOpen: [Int: UInt64] = [:], openedAt: [Int: UInt64] = [:]
     private var order: [Engine.Stage] = []
-    /// What Core AI compiled under each of the render's stages, in seconds, and the compilations under way.
+    /// What Core AI compiled for no engine stage heard (`Stages.Event.compiling` naming none), under the render's stage
+    /// under way, in seconds, and the compilations under way.
     private var compiled: [Engine.Stage: Double] = [:], compiling: [Engine.Stage: Int] = [:]
     /// Called when a compilation begins or ends, on the thread that loads the function: it must return at once.
     /// Under `lock`: set by the render's thread, read by the ticker and by the engine's observation.
@@ -281,15 +285,23 @@ package final class StageWatch: @unchecked Sendable {
                     if let cycle { entries[i].traced[cycle] = o } else { entries[i].runs.append(o) }
                 }
             }
-        case .compiling:
+        // A compilation counted on the engine stage that loads: a DiT opening beside the text may end its compilation
+        // after the text has closed, its end meeting its start.
+        case .compiling(let name):
             guard lock.withLock({ () -> Bool in
+                if let name, let i = entry(name) { entries[i].compiling += 1; return true }
                 guard let stage = order.last else { return false }
                 compiling[stage, default: 0] += 1
                 return true
             }) else { return }
             changed?()
-        case .compiled(let seconds):
+        case .compiled(let name, let seconds):
             guard lock.withLock({ () -> Bool in
+                if let name, let i = entry(name) {
+                    entries[i].compiling = max(0, entries[i].compiling - 1)
+                    entries[i].compilation += seconds
+                    return true
+                }
                 guard let stage = order.last else { return false }
                 compiling[stage] = max(0, compiling[stage, default: 0] - 1)
                 compiled[stage, default: 0] += seconds
@@ -329,8 +341,8 @@ package final class StageWatch: @unchecked Sendable {
             let mine = all.filter { $0.stage == stage }
             guard !mine.isEmpty || compiled[stage] != nil || compiling[stage] != nil else { return nil }
             var h = Engine.Held(stage: stage)
-            h.compilation = compiled[stage] ?? 0
-            h.compiling = compiling[stage, default: 0] > 0
+            h.compilation = mine.reduce(compiled[stage] ?? 0) { $0 + $1.compilation }
+            h.compiling = compiling[stage, default: 0] > 0 || mine.contains { $0.compiling > 0 }
             for e in mine {
                 h.counted = max(h.counted, e.p - e.floor)
                 h.held = max(h.held, e.peak - e.floor)

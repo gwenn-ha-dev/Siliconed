@@ -7,8 +7,7 @@ import Synchronization
 // **The memory of a render, stage by stage** — `siliconed check <model> memory [--size 1024]`.
 //
 // A render is a few of the engine's stages: the text, [the image,] the DiT, the decoder, one beside the one before it
-// where B holds both (`SiliCore.Stage.beside`), after it otherwise. The
-// engine plans each under B before it allocates (P = the floor + the arena, `SiliCore.Stage.plan`) and reads Core AI's
+// where B holds both (`SiliCore.Stage.beside`), after it otherwise. The engine plans each under B before it allocates (P = the floor + the arena, `SiliCore.Stage.plan`) and reads Core AI's
 // share while it runs, keeping weights in memory while B holds them with a margin beside (`Stage.signal`); this stage
 // renders one picture and reads what the process really held while each lived (`StageWatch`).
 //

@@ -21,13 +21,13 @@ import SiliCore
 ///
 /// On the engine: the decoder's functions and arithmetic (`FluxVAE`), every level by bands, the last whole.
 package enum Flux2VAEEncoder {
-    /// **A picture's latent as the denoiser reads it**, `[128, H/16, W/16]`, batch-norm normalized. `image` is
-    /// `[3, H, W]` in [−1, 1].
     /// **What `latent` would specialize** for a picture `height × width`, nothing allocated (`BandStage.prepare`).
     package static func prepare(height: Int, width: Int, path: String) throws -> [Preparation] {
         try Flux2VAEDecoder.vae.prepare(.encode, path: path, height: height, width: width, budget: MemoryBudget.machineCeiling())
     }
 
+    /// **A picture's latent as the denoiser reads it**, `[128, H/16, W/16]`, batch-norm normalized. `image` is
+    /// `[3, H, W]` in [−1, 1].
     package static func latent(of image: ImageRGB, path: String) throws -> [Float] {
         let budget = MemoryBudget.machineCeiling()
         return try blocking {

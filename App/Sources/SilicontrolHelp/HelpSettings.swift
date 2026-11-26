@@ -40,8 +40,8 @@ extension RemoteControlHelp {
         silicontrol set preview [on|off]
         silicontrol set debug-live [on|off]
 
-        Settings' switches, and the DiT box's « Preview every step », from the terminal. Each goes through the function its switch calls, so the choice is
-        written and the window follows, exactly as a click.
+        Settings' switches, the DiT box's « Preview every step » and the Machine window's « Debug Live », from the terminal. Each goes through the
+        function its switch calls, so the choice is written and the window follows, exactly as a click.
 
         BETA is the four switches of Settings › Advanced › Beta, off by default:
           more-solvers      the solvers Euler a, DPM++ 2M and UniPC (--solver of « add »)
@@ -117,8 +117,8 @@ extension RemoteControlHelp {
         silicontrol set preview [on|off]
         silicontrol set debug-live [on|off]
 
-        Les interrupteurs des Réglages, et l'« Aperçu à chaque pas » de la boîte du DiT, depuis le terminal. Chacun passe par la fonction que son interrupteur appelle : le
-        choix est écrit et la fenêtre suit, exactement comme un clic.
+        Les interrupteurs des Réglages, l'« Aperçu à chaque pas » de la boîte du DiT et le « Debug live » de la fenêtre Machine, depuis le terminal. Chacun
+        passe par la fonction que son interrupteur appelle : le choix est écrit et la fenêtre suit, exactement comme un clic.
 
         BETA, ce sont les quatre interrupteurs de Réglages › Avancé › Bêta, éteints par défaut :
           more-solvers      les solveurs Euler a, DPM++ 2M et UniPC (--solver de « add »)

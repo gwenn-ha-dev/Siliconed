@@ -10,7 +10,7 @@ extension Stages {
         /// A stage's opening from its start (`DispatchTime` nanoseconds): its arena, its residents read, its ring, its
         /// functions loaded.
         case opening(stage: String, start: UInt64, pieces: [Piece])
-        /// A stage's close from its start: everything let go, then the wait for the footprint (`Stage.close`).
+        /// A stage's close from its start: everything let go, no wait (`Stage.close`).
         case closing(stage: String, start: UInt64, pieces: [Piece])
         /// A block's cycle, its ordinal among the block's cycles from 0 (told before the cycle's `Event.cycle`), or a
         /// run of calls outside the cycles (nil: groups run once, a stage of bands' run).

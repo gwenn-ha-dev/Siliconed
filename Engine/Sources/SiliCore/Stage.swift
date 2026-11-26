@@ -70,7 +70,7 @@ public final class Stage: @unchecked Sendable {
     /// The reader's staging in the arena.
     private var staging: Int?
     var use = 0
-    /// What its close waited for, once closed (`Stages` told once): a stage may be closed again by its owner's `deinit`.
+    /// What its close left, once closed (`Stages` told once): a stage may be closed again by its owner's `deinit`.
     private var settled: Settled?
     /// Its stream's identity, which a call on it marks (`called`).
     var streamID: ObjectIdentifier?
@@ -152,12 +152,12 @@ public final class Stage: @unchecked Sendable {
         // The functions loaded while the residents and the kept groups are read: Core AI loads them, and `aned` the ANE's,
         // while the reader converts on the cores — one after the other until then, 0.08 to 0.71 s of residents and 0.22
         // to 0.46 s of loading at a warm 30-block transformer's opening (26/11/2026, the M1 Pro, the trace).
-        let declared = d.functions.sorted(by: { $0.key < $1.key })
+        let declared = d.functions.sorted(by: { $0.key < $1.key }), stage = d.name
         let loading = Task { () async throws -> Loaded in
             var l = Loaded()
             for (name, f) in declared {
                 try Task.checkCancellation()
-                let one = try await Functions.loaded(try Functions.asset(f.asset, f.build), unit: f.unit)
+                let one = try await Functions.loaded(try Functions.asset(f.asset, f.build), unit: f.unit, stage: stage)
                 l.functions[name] = one.function
                 l.compiled = l.compiled || one.compiled
             }
@@ -394,7 +394,7 @@ public final class Stage: @unchecked Sendable {
     /// likewise). On the M5 Pro either order leaves within 2 s (21/11/2026).
     @discardableResult
     public func close() -> Settled {
-        // Closed again (its owner's `deinit`): what the first close waited for, not a second wait.
+        // Closed again (its owner's `deinit`): what the first close left, nothing let go twice.
         lock.lock(); let done = settled; lock.unlock()
         if let done { return done }
         let start = DispatchTime.now().uptimeNanoseconds

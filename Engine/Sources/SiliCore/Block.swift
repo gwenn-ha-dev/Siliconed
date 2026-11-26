@@ -71,8 +71,9 @@ public final class Block: @unchecked Sendable {
     var zero: Zero?
     enum Zero: Equatable { case cold(rows: Int, seconds: Double), measured(rows: Int, seconds: Double) }
     /// **κ for this block** (`ThisMac.Capacity.alone`): its arithmetic's on this Mac at the opening, then its own once it
-    /// visited the share of none; nil, unknown. Whether it visited it: once a block.
+    /// visited the share of none; nil, unknown.
     var alone: Double?
+    /// Whether it visited the share of none: once a block.
     var zeroVisited = false
     /// The buffers a GPU call has read or written (`encode`).
     var seen = Set<ObjectIdentifier>()
@@ -87,7 +88,7 @@ public final class Block: @unchecked Sendable {
     /// **What the cycle under way executes**, by unit, added up as its calls are made (`Signature.flops`, counted once as
     /// each function was written): integers, no timing of their own; told with the cycle (`Stages.Cycle.flops`).
     var flops = Stages.Flops()
-    /// The last warm cycle's rates, kept on this Mac at the block's close (`keepRates`).
+    /// The last warm cycle's rates, kept on this Mac at the block's close (`keepMeasured`).
     var warmRates: Stages.Rates?
     /// **What the block executed since its opening, over its span** (`Stages.Work`, told at its close): its calls' FLOP,
     /// its first call put on the stream, its last one's end as a wait read it (`settled`, an ANE call's own end).
@@ -334,6 +335,6 @@ public final class Block: @unchecked Sendable {
     }
 
     /// A block its owner lets go unclosed (an error past its opening: a low rank refused) is closed all the same; one
-    /// closed already is not waited for again (`Stage.close` gives what its first close waited for).
+    /// closed already lets nothing go twice (`Stage.close` gives what its first close left).
     deinit { close() }
 }

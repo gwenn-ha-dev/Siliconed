@@ -82,7 +82,7 @@ extension Block {
         Stages.tell(.calling(stage: stage.plan.declaration.name))
     }
 
-    /// Everything let go, and the footprint waited for (`Stage.close`): the functions the block loaded itself first.
+    /// Everything let go, no wait (`Stage.close`): the functions the block loaded itself first.
     @discardableResult
     public func close() -> Stage.Settled {
         // A copy prepared ahead writes into the arena: done, or its wait for the ring's next use given up, first.

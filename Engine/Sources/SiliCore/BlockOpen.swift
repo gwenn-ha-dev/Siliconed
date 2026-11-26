@@ -219,8 +219,8 @@ extension Block {
     /// shares told, one transformer 8.55 s a cycle at 2560 rows by 512, 9.15 at the best of 1024's grid (3072), another
     /// 4.054 at 2048 rows by 512 against 4.035 by 1024; f16, the share in flight, the latter 3.72 s by 512 against 3.55
     /// by 1024, both at 2048 rows. The M5 Pro's shares kept, 22–24/11, lay on 1024's grid (1024 rows). Fixed, not tried:
-    /// one measured cycle a unit, in a block's first run on a Mac, decided the unit of every block of its arithmetic
-    /// after — left at 1024 by the first to run, the other at 9.57 s.
+    /// one measured cycle a unit, in a block's first run on a Mac, would decide the unit of every block of its arithmetic
+    /// after — tried so, the first to run left it at 1024, the other at 9.57 s.
     static func neuralUnit(_ arithmetic: String, shareable: Int) -> Int {
         arithmetic == "codes" || shareable < 2 * 1024 ? 512 : 1024
     }

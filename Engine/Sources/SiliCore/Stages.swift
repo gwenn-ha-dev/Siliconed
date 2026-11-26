@@ -20,9 +20,11 @@ public enum Stages {
         /// another runs (`Stage.beside`), and the work a reader ascribes it is what comes from its first call.
         case calling(stage: String)
         /// Core AI begins to specialize a function its cache does not hold (`Functions.load`), and has done so, in
-        /// `seconds`: a compilation, told whether a stage is open or not.
-        case compiling
-        case compiled(seconds: Double)
+        /// `seconds`: a compilation, told whether a stage is open or not. `stage`: the stage whose functions load (its
+        /// declaration's name), nil outside one (a preparation): a stage opened beside another compiles while the
+        /// other runs, and may end its compilation after the other closed.
+        case compiling(stage: String?)
+        case compiled(stage: String?, seconds: Double)
         /// A cycle of a block, done (`Block.run`): told at the next cycle's first group, or at the block's close.
         case cycle(Cycle)
         /// **What a stage's calls executed, over their span** (`Work`), in every run: a block's at its close (every call
@@ -54,7 +56,7 @@ public enum Stages {
     nonisolated(unsafe) private static var _tracing = false
 
     /// **A cycle of a block, as it ran**: the ANE's rows over it at its unit (0: the GPU alone) of the rows it could
-    /// take, whether it visits the share of none (`Block.zero`: where this Mac's κ is unknown, or predicted the fastest); its seconds from
+    /// take, whether it visits the share of none (`Block.zero`: where the curve predicts it the fastest, κ unknown taken at its bound); its seconds from
     /// its first group to the next cycle's first (the last cycle's, to the block's close); what
     /// its start loaded, in seconds — the GPU's functions of a share moved (`moved`), of taller calls (`climbed`); nil,
     /// nothing; its calls' seconds, where they were timed (a share in flight, every cycle but the last); whether its

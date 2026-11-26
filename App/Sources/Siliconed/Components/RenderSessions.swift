@@ -7,7 +7,7 @@ import SiliCore
 /// **A VAE decoder a render runs**: a latent to the picture's planes, on the engine's functions (`FluxVAEDecoder`,
 /// `QwenImageVAEDecoder`, …). It is opened once for a batch — its plan drawn from B, its arena taken,
 /// its functions loaded — then run for each latent.
-package protocol LatentDecoder {
+package protocol LatentDecoder: SendableMetatype {
     /// **What `admit` judged and `open` opens**: the decoder's candidates, their functions built and named once
     /// (`BandStage.candidates`).
     associatedtype Admitted: Sendable

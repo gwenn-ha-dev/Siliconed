@@ -153,7 +153,7 @@ public final class Layers: @unchecked Sendable {
         await block.values(name, rows: range, into: &out)
     }
 
-    /// Everything let go, and the footprint waited for (`Stage.close`).
+    /// Everything let go, no wait (`Stage.close`).
     @discardableResult
     public func close() -> Stage.Settled { block.close() }
 }
@@ -183,7 +183,7 @@ extension Block {
         let done = stage.stream.done(end)
         (marks[f], last) = (done, done)
         executed(gpu: signatures[f]?.flops ?? 0)
-        if firstCall == nil { firstCall = encoded }
+        if firstCall == nil { began(encoded) }
         if traced {
             recorded.append(Recorded(call: Stages.Called(kind: .edge, step: name, group: traceGroup, place: traceGroup * Self.places - 1,
                                                          flops: signatures[f]?.flops ?? 0), end: end, after: streamEnd, encoded: encoded))

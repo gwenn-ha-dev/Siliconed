@@ -27,8 +27,8 @@ import SiliCore
 /// **Each product on what the file holds**: its codes where the file holds codes, else its weight in f16
 /// (`SharedWeights.half`, the publisher's bf16 rounded once), no input rotated (`product16`) — the Compact's blocks 0 and
 /// 27 all in f16, the MLP of 1 to 3 too, the others on codes; every product of the Standard beside the ANE in f16. Every
-/// block of both in these forms, the ANE beside on every one. (The Compact's five blocks with float products were the
-/// GPU's alone in guarded forms till 26/11/2026: 0.96 s of a step of 4.14 at 1024² on the M1 Pro, the ANE idle.) Block 0's
+/// block of both in these forms, the ANE beside on every one: the Compact's five blocks with float products, the GPU's
+/// alone in the guarded forms, took 0.96 s of a step of 4.14 at 1024² on the M1 Pro, the ANE idle. Block 0's
 /// branches written by `out-taps`, `crossout-taps` and `ffn-taps` (the GPU's, for a check listening, `Block.run`'s
 /// `tapped`): each product's true value before its gate, in f16.
 enum AnimaShared {

@@ -326,7 +326,7 @@ extension Block {
 
     /// **The cycle begun last, told done at `end`** (`Stages.Event.cycle`): at the next cycle's first group, or at the
     /// block's close. Its rates noted where it ran warm at the share kept — nothing loaded at its start, not the first, not
-    /// the share of none's —: kept on this Mac at the block's close (`keepRates`), no file written in flight.
+    /// the share of none's —: kept on this Mac at the block's close (`keepMeasured`), no file written in flight.
     func cycled(until end: UInt64) {
         defer { lastCalls = nil; flops = Stages.Flops() }
         if traced { told(until: end) }
@@ -384,6 +384,8 @@ extension Block {
     /// block to block as from cycle to cycle (`ThisMac.Capacity.ratio`).
     func keepMeasured() {
         let (key, arithmetic, rates, ratio) = (key, arithmetic, warmRates, ratio)
+        // Kept once: a block closed by its owner is closed again by its `deinit`.
+        (warmRates, self.ratio) = (nil, nil)
         let moved = rates.map { r in ThisMac.current.rates?[key].map { $0.moved(r) } ?? true } ?? false
         guard moved || ratio != nil else { return }
         try? ThisMac.update {
@@ -475,7 +477,7 @@ extension Block {
             let m = try Self.module(spec)
             let asset = try Functions.named(m, prefix: "block")
             signatures[name] = Signature(m)
-            let l = try await Functions.loaded(try Functions.asset(asset) { m }, unit: .gpu)
+            let l = try await Functions.loaded(try Functions.asset(asset) { m }, unit: .gpu, stage: stage.plan.declaration.name)
             functions[name] = l.function
             compiled = compiled || l.compiled
         }

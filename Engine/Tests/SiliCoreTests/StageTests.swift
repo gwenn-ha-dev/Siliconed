@@ -610,7 +610,7 @@ import Testing
         // Frozen, it keeps nothing in flight, and reads nothing of what the other takes.
         #expect(!running.holds(expects: 0))
         footprint.lock.withLock { footprint.base += 500 << 20 }
-        running.observe()
+        _ = running.observe()
         #expect(running.lock.withLock { running.largest } == Int.min)
         let beside = try await Stage(device, plan: p.plan, files: [StagePlans.file], measured: measured, opening: p.opening) { footprint.bytes }
         #expect(beside.lock.withLock { beside.frozen })

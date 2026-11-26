@@ -1,5 +1,6 @@
 // **This Mac's compilations**: the functions' assets and what Core AI specialized of them (`CoreAI.compiled`), which
-// Settings ▸ Macs ▸ This Mac weighs and erases (`CompiledRow`), and `silicontrol compiled` as well.
+// Settings ▸ Macs ▸ This Mac (`CompiledRow`) and the Machine window (`CompiledLine`) weigh and erase, and
+// `silicontrol compiled` as well.
 //
 // - **The engine erases them** (`EngineWorker.erase`), in the order of its calls: after the work before, before the work
 //   after, which compiles again what it needs. Nothing waits for it here; a render asked meanwhile waits there.

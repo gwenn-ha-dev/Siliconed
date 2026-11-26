@@ -23,6 +23,8 @@ final class RenderLoopTests: XCTestCase {
         /// The evaluations left the loop told the DiT, before each.
         var told: [Int] = []
         var decoderOpened = 0
+        /// How long the decoder takes to open.
+        var decoderPause = 0.0
         var decoded = 0
         var tokenized = 0
         /// The shapes each preparation was asked at, the part's then the decoder's.
@@ -101,6 +103,19 @@ final class RenderLoopTests: XCTestCase {
         XCTAssertThrowsError(try run(seeds: [1, 2, 3])) { XCTAssertEqual($0 as? EngineError, .cancelled) }
         XCTAssertEqual(Self.script.evaluations, 3)
         XCTAssertEqual(Self.script.decoderOpened, 0)
+    }
+
+    /// **A cancellation at the batch's last evaluation**: the decoder opened beside it is waited for, not left to open
+    /// past the render.
+    func testACancellationAtTheLastEvaluationWaitsForTheDecoderBeside() throws {
+        let cancellation = Cancellation()
+        Self.script.cancellation = cancellation
+        Self.script.cancelAt = 1
+        Self.script.decoderPause = 0.2
+        XCTAssertThrowsError(try run(seeds: [1])) { XCTAssertEqual($0 as? EngineError, .cancelled) }
+        XCTAssertEqual(Self.script.evaluations, 2)
+        XCTAssertEqual(Self.script.decoderOpened, 1, "opened beside the last evaluation, and waited for")
+        XCTAssertEqual(Self.script.decoded, 0)
     }
 
     /// Every latent lost at the DiT: the batch fails there, no decoder opened.
@@ -191,6 +206,7 @@ private final class LoopDiT: RenderDenoiser {
 private struct LoopDecoder: LatentDecoder {
     let pixels: Int
     static func open(_ admitted: Int) async throws -> LoopDecoder {
+        try await Task.sleep(for: .seconds(RenderLoopTests.script.decoderPause))
         RenderLoopTests.script.decoderOpened += 1
         return LoopDecoder(pixels: admitted)
     }

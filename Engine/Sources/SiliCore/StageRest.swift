@@ -1,9 +1,9 @@
 import Foundation
 
 /// **What the stages let go leave behind, waited for only where it changes something.** A stage let go gives its heap
-/// back within 0.05 to 0.5 s, then 100 to 160 MiB of Core AI's or Metal's 1 to 2 s after (18/11/2026, the M1 Pro); the
-/// close used to wait for it, 2 s at most, before the next stage was planned: 0.6 to 2.0 s at each close of a chain
-/// of stages, 2.0 at a transformer's (26/11/2026, the M1 Pro, the trace). `close` now waits for nothing and says where the
+/// back within 0.05 to 0.5 s, then 100 to 160 MiB of Core AI's or Metal's 1 to 2 s after (18/11/2026, the M1 Pro); a
+/// wait for it at each close, 2 s at most, before the next stage is planned costs 0.6 to 2.0 s at each close of a chain
+/// of stages, 2.0 at a transformer's (26/11/2026, the M1 Pro, the trace). So `close` waits for nothing and says where the
 /// process comes back to (`rested`); the next stage is planned on the footprint now, what trails included — its P the
 /// higher by it, never the lower: what trails only leaves — and waits only where that changes its plan (another form,
 /// or a refusal, than on the rest), or where its functions were never read on this Mac: a stage's reading is the
@@ -12,8 +12,8 @@ import Foundation
 /// nor first reserve (`Opening.trailing`, `keep`): a function met in flight is read at a later run.
 extension Stage {
     /// Under `restLock`: the footprint the process comes back to once what the last stage let go has left — the
-    /// process's before it allocated, where its close used to wait for (not the least of every stage's: a floor grown
-    /// since, a stage still open, would make every opening wait its 2 s); nil, nothing let go is awaited.
+    /// process's before it allocated (not the least of every stage's: a floor grown since, a stage still open, would make
+    /// every opening wait its 2 s); nil, nothing let go is awaited.
     nonisolated(unsafe) private static var resting: Int?
     private static let restLock = NSLock()
 
@@ -28,8 +28,7 @@ extension Stage {
     }
 
     /// **The wait for what the stages let go**: until the footprint is back within `margin` of the rest, 2 s at most;
-    /// past them, what is left lies in the floors that follow (as it did when each close waited). What it left, against
-    /// the rest.
+    /// past them, what is left lies in the floors that follow. What it left, against the rest.
     @discardableResult
     public static func settle() -> Settled {
         let t = DispatchTime.now().uptimeNanoseconds

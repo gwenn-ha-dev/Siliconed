@@ -36,6 +36,29 @@ final class StageWatchTests: XCTestCase {
         XCTAssertEqual(ledger.heard.map(\.open), [false, false])
     }
 
+    /// **A compilation is the stage's that loads**: the DiT opened beside the text compiles past the text's close —
+    /// counted on it from its start to its end, said under the denoising once it calls, nothing left compiling.
+    func testACompilationBesideIsTheStageThatLoads() throws {
+        let ledger = StageWatch()
+        defer { ledger.stop() }
+        let tell = SiliCore.Stages.tell
+        let text = try plan("text", bytes: 64 << 20), dit = try plan("dit", bytes: 512 << 20)
+
+        ledger.begin(.text)
+        tell(.opened(text)); tell(.calling(stage: "text"))
+        tell(.opened(dit)); tell(.compiling(stage: "dit"))
+        XCTAssertEqual(ledger.held().stages.map(\.compiling), [true], "the DiT compiles, the text's until it calls")
+        tell(.closed(text, seconds: 1))
+        ledger.begin(.denoising)
+        tell(.compiled(stage: "dit", seconds: 2))
+        tell(.calling(stage: "dit"))
+
+        let (stages, _) = ledger.held()
+        XCTAssertEqual(stages.map(\.stage), [.text, .denoising])
+        XCTAssertEqual(stages.map(\.compiling), [false, false])
+        XCTAssertEqual(stages.map(\.compilation), [0, 2])
+    }
+
     /// **A stage opened beside the one that runs** (`Stage.beside`) is the render's stage under way at its first call;
     /// what each tells while both are open is its own.
     func testAStageOpenedBesideIsTheStageOfItsFirstCall() throws {

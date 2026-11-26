@@ -107,7 +107,7 @@ enum BandStages {
     }
 
     /// A decoder by bands of rows against the whole one, bit for bit, under a small B (`--budget`).
-    static func stage<Decoder: BandedDecoder & SendableMetatype>(_ model: String, sizes: [String], _: Decoder.Type, latent: @escaping @Sendable (Goldens) throws -> Latent,
+    static func stage<Decoder: BandedDecoder>(_ model: String, sizes: [String], _: Decoder.Type, latent: @escaping @Sendable (Goldens) throws -> Latent,
                                               path: @escaping @Sendable () throws -> String) -> Stage {
         Stage(
             model: model, name: "vae-bands",

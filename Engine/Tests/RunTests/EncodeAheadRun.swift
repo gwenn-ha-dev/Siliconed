@@ -29,7 +29,7 @@ extension Runs {
             let t0 = DispatchTime.now().uptimeNanoseconds
             for i in 0..<16 {
                 let (fn, from, to) = i % 2 == 0 ? (f, x, y) : (g, y, x)
-                await last[i % 2]?.value
+                _ = await last[i % 2]?.value
                 let left = try Run.encode(fn, bench.stream, inputs: ["x": View(buffer: from, type: .float16, shape: [n])],
                                           outputs: [("y", View(buffer: to, type: .float16, shape: [n]))])
                 #expect(left.isEmpty)
