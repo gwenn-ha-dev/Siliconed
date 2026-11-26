@@ -111,7 +111,7 @@ package final class AnimaEvaluation {
     }
 
     /// **What `open` would specialize** (`Arithmetic.prepare`): the same declaration, nothing allocated.
-    package static func prepare(_ path: String, geometry: Geometry, loras: LoRAStack = .none, budget: Int) throws -> [Functions.Specialization] {
+    package static func prepare(_ path: String, geometry: Geometry, loras: LoRAStack = .none, budget: Int) throws -> [Preparation] {
         let file = try Self.file(path)
         let quantized = blocks.indices.map { Self.quantized($0, in: file) }, ranks = ranks(loras)
         return try Arithmetic.prepare(file: file, codes: codesMarker, budget: budget) {

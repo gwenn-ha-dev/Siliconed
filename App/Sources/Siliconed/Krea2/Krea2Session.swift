@@ -166,7 +166,7 @@ final class Krea2Session {
     }
 
     /// **What `open` would specialize** (`Arithmetic.prepare`): the same declaration, nothing allocated.
-    static func prepare(file: SafeTensors, geometry: Geometry, loras: LoRAStack = .none, budget: Int) throws -> [Functions.Specialization] {
+    static func prepare(file: SafeTensors, geometry: Geometry, loras: LoRAStack = .none, budget: Int) throws -> [Preparation] {
         let ranks = Self.ranks(loras)
         return try Arithmetic.prepare(file: file, codes: marker, budget: budget) { declaration(geometry, $0, ranks: ranks, taps: false) }
     }

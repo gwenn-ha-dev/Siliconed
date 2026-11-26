@@ -26,7 +26,7 @@ extension Runs {
         let compilations = Mutex(0)
         let observation = Stages.observe { if case .compiling = $0 { compilations.withLock { $0 += 1 } } }
         defer { observation.cancel() }
-        for s in specializations { try await Functions.specialize(s) }
+        for s in specializations { try await s.run() }
         print("prepared: \(units.filter { $0 == "ane" }.count) of the ANE's, \(units.filter { $0 == "gpu" }.count) of the GPU's")
         #expect(compilations.withLock { $0 } == specializations.count, "\(compilations.withLock { $0 }) compilations told of \(specializations.count)")
 

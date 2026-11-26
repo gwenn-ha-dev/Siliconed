@@ -55,7 +55,7 @@ package enum QwenImage21VAEEncoder {
     /// **The mean of a picture's latent**, `[64, H/16, W/16]`, not yet `normalized`: the encoder run once from the VAE at
     /// `path` under the machine's B, let go. `image` is the RGBA `[4, H, W]` in [−1, 1] (`QwenImage21References.rgba`).
     /// **What `mean` would specialize** for a picture `height × width`, nothing allocated (`BandStage.prepare`).
-    package static func prepare(height: Int, width: Int, path: String) throws -> [Functions.Specialization] {
+    package static func prepare(height: Int, width: Int, path: String) throws -> [Preparation] {
         try QwenImageVAERun.prepare(.init("qwen-image-2.1-vae-encoder", file: try SafeTensors(path), budget: MemoryBudget.machineCeiling()) {
             plan(height: height, width: width, positions: $0)
         })

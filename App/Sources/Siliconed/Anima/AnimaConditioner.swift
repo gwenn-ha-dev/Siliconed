@@ -163,7 +163,7 @@ package struct AnimaConditioner {
 
     /// **What `context` would specialize** for `targetLength` T5 identifiers over `sourceLength` of Qwen's states, nothing
     /// allocated (`Stage.prepare`).
-    package static func prepare(targetLength: Int, sourceLength: Int, path: String, budget: Int) throws -> [Functions.Specialization] {
+    package static func prepare(targetLength: Int, sourceLength: Int, path: String, budget: Int) throws -> [Preparation] {
         let c = AnimaConditioner(targetLength: targetLength, sourceLength: sourceLength)
         return try SiliCore.Stage.prepare(declaration(c, taps: false).declaration, files: [try AnimaEvaluation.file(path)], budget: budget)
     }

@@ -78,7 +78,7 @@ extension Block {
         defer { cycleRecords = [] }
         observe(last: last, warm: warm)
         // At 0 rows: the visit goes on (its cycles' calls are not timed).
-        if let z = zero, let last, z != .due { return try await probe(z, last: last) }
+        if let z = zero, let last { return try await probe(z, last: last) }
         var records: [[Timed]] = []
         for r in cycleRecords {
             var record = r
@@ -109,20 +109,36 @@ extension Block {
         let kappa = alone ?? 1
         func predicted(_ u: Int) -> Double { Self.predicted(smoothed, measured: a0, rows: u * unit, unit: unit, alone: kappa) }
         let best = Self.bestShare(smoothed, measured: a0, unit: unit, shareable: shareable, admitted: admitted ?? [], alone: kappa).rows / unit
-        // The share of none, visited where κ is unknown (`zero` due: the visit measures it), or where the curve predicts it
-        // the fastest and the move pays — once a block: its own κ is the visit's from then on.
-        if let last, zero == .due || shouldVisitZero(than: predicted(best), now: predicted(units)) {
-            zero = .due
-            return try await probe(.due, last: last)
-        }
+        // The share of none, visited where the curve predicts it the fastest and the move pays — κ unknown, at its bound,
+        // the visit measuring it —, once a block: its own κ is the visit's from then on.
+        if let last, shouldVisitZero() { return try await visitZero(last: last) }
         return best != units && pays(predicted(units) - predicted(best)) ? try await move(units: best) : nil
     }
 
-    /// **Whether the share of none is predicted the fastest** (`zero`): its cycle predicted from the smoothed calls at the
-    /// share and this block's κ, faster than the best share's, and the move there paying over the cycles left.
-    private func shouldVisitZero(than best: Double, now: Double) -> Bool {
-        guard let alone, !zeroVisited, let at = smoothedAt else { return false }
-        let zero = Self.predicted(smoothed, measured: at, rows: 0, unit: unit, alone: alone)
+    /// **κ at most**, where this Mac's is not known yet for a block's arithmetic: the GPU at half its rate beside the
+    /// ANE. Measured 1.00 on the M1 Pro, 1.24 to 1.33 on the M5 Pro (25/11/2026). At the share where both units finish
+    /// together a cycle takes ≈ S·γ / (1 + ρ) + g, at none S·γ / κ + g: none wins only where κ > 1 + ρ, so a Mac whose
+    /// ANE runs as fast as its GPU beside it (ρ ≥ 1: 1.69 on the M1 Pro's codes, ≈ 0.3 on the M5 Pro) never visits it,
+    /// where visiting it to measure κ cost a transformer of 6 billion weights on its codes, at 4096 rows, its first run's
+    /// two cycles of 16 s against 8.5 on the M1 Pro.
+    static let aloneAtMost = 2.0
+
+    /// **The share of none's cycle and the best share's**, predicted from a cycle's calls at `a0` with κ (`alone`) — not
+    /// known yet, at its bound (`aloneAtMost`): the share of none at the fastest it could be, every share below the one
+    /// measured on the same line (`predicted`).
+    static func zeroAgainstBest(_ records: [[Timed]], measured a0: Int, unit: Int, shareable: Int, admitted: Set<Int> = [],
+                                alone: Double?) -> (zero: Double, best: Double) {
+        let kappa = alone ?? aloneAtMost
+        return (predicted(records, measured: a0, rows: 0, unit: unit, alone: kappa),
+                bestShare(records, measured: a0, unit: unit, shareable: shareable, admitted: admitted, alone: kappa).seconds)
+    }
+
+    /// **Whether the share of none is predicted the fastest** (`zeroAgainstBest`), once a block: faster than the best
+    /// share's, and the move there paying over the cycles left.
+    private func shouldVisitZero() -> Bool {
+        guard !zeroVisited, let at = smoothedAt else { return false }
+        let (zero, best) = Self.zeroAgainstBest(smoothed, measured: at, unit: unit, shareable: shareable, admitted: admitted ?? [], alone: alone)
+        let now = Self.predicted(smoothed, measured: at, rows: units * unit, unit: unit, alone: alone ?? Self.aloneAtMost)
         return zero < best && pays(now - zero)
     }
 
@@ -232,19 +248,22 @@ extension Block {
         return (t(k), k * unit)
     }
 
-    /// **The share of none, measured** (`zero`), at a cycle's first group: `due`, the cycle before ran
-    /// warm at the share — its seconds noted, the block moved to 0 rows (not kept on this Mac yet; refused under B, no
-    /// probe, measured again at the next opening); `cold`, the cycle before was the first at 0 — dropped; `measured`, it
-    /// was the second (`zeroMeasured`). The seconds the loading took; nil, nothing moved.
+    /// **The share of none, visited** at a cycle's first group, the cycle before warm at the share: its seconds noted, the
+    /// block moved to 0 rows (not kept on this Mac yet; refused under B, weighed again at the next opening). The seconds
+    /// the loading took; nil, nothing moved.
+    private func visitZero(last: Double) async throws -> Double? {
+        zeroVisited = true
+        let rows = units * unit
+        // Refused under B: told with the cycle (`Stages.Cycle.refused`).
+        guard let loaded = try await move(units: 0, keep: false) else { zeroRefused = true; return nil }
+        zero = .cold(rows: rows, seconds: last)
+        return loaded
+    }
+
+    /// **The share of none, measured** (`zero`), at a cycle's first group: `cold`, the cycle before was the first at 0 —
+    /// dropped; `measured`, it was the second (`zeroMeasured`). The seconds the loading took; nil, nothing moved.
     private func probe(_ z: Zero, last: Double) async throws -> Double? {
         switch z {
-        case .due:
-            zeroVisited = true
-            let rows = units * unit
-            // Refused under B: told with the cycle (`Stages.Cycle.refused`), measured again at the next opening.
-            guard let loaded = try await move(units: 0, keep: false) else { zero = nil; zeroRefused = true; return nil }
-            zero = .cold(rows: rows, seconds: last)
-            return loaded
         case .cold(let rows, let seconds):
             zero = .measured(rows: rows, seconds: seconds)
             return nil
@@ -256,7 +275,7 @@ extension Block {
 
     /// **A warm cycle at 0 rows taken `zero` seconds**, against `seconds` at `share` rows: κ measured from it and the
     /// smoothed calls at the share (`aloneRate`), this block's from now on and its arithmetic's on this Mac, smoothed from block
-    /// to block (`ThisMac.Capacity.alone`: the next openings predict their share of none, and visit it no more). The share
+    /// to block (`ThisMac.Capacity.alone`: the next openings predict their share of none with it, not its bound). The share
     /// of none weighed against the best share the curve predicts with that κ (`bestShare`), the share left where it ran
     /// faster than that prediction: not against the share left alone — a first opening starts at half, far from where
     /// the units finish together, and its share of none won there and stayed, its cycles no longer timed (a transformer of

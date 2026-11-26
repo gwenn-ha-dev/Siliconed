@@ -169,7 +169,7 @@ final class MossDiT {
     }
 
     /// **What `open` would specialize** (`Arithmetic.prepare`): the same declaration, nothing allocated.
-    static func prepare(file: SafeTensors, geometry g: Geometry, budget: Int, loras: LoRAStack = .none) throws -> [Functions.Specialization] {
+    static func prepare(file: SafeTensors, geometry g: Geometry, budget: Int, loras: LoRAStack = .none) throws -> [Preparation] {
         let ranks = Self.ranks(loras)
         return try Arithmetic.prepare(file: file, codes: "layers.0.proj.qkv.weight", budget: budget) { declaration(g, $0, tapped: false, ranks: ranks) }
     }

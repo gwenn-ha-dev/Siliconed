@@ -118,7 +118,7 @@ package enum QwenImage21Render {
         }
 
         /// An edit's vision tower is not prepared: it compiles as it loads, as any function the cache does not hold.
-        func prepare(height: Int, width: Int) throws -> [Functions.Specialization] {
+        func prepare(height: Int, width: Int) throws -> [Preparation] {
             let sequence = try QwenImage21DiT.Sequence(slots: Array(rows.dropFirst(dropped)), references: grids, height: height, width: width)
             return try Qwen3Encoder(config: .qwenImage21, path: text.map).prepare(tokens: ids.count)
                 + (encoding.map { e in try references.flatMap { try QwenImage21VAEEncoder.prepare(height: $0.height, width: $0.width, path: e.path) } } ?? [])

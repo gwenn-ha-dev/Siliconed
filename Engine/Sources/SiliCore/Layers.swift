@@ -74,7 +74,7 @@ public final class Layers: @unchecked Sendable {
     }
 
     /// **What `open` would specialize**, its assets written (`Block.prepare`).
-    public static func prepare(_ d: Declaration, files: [SafeTensors], budget: Int) throws -> [Functions.Specialization] {
+    public static func prepare(_ d: Declaration, files: [SafeTensors], budget: Int) throws -> [Preparation] {
         try Block.prepare(block(d), files: files, budget: budget, share: .gpu)
     }
 

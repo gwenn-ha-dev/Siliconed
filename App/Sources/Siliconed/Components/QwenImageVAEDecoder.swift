@@ -92,7 +92,7 @@ package final class QwenImageVAEDecoder: BandedDecoder {
         return p
     }
 
-    package static func prepare(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> [Functions.Specialization] {
+    package static func prepare(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> [Preparation] {
         try QwenImageVAERun.prepare(try plans(path: path, latentHeight: latentHeight, latentWidth: latentWidth, budget: budget))
     }
 

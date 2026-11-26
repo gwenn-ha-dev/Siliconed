@@ -45,7 +45,7 @@ package final class FluxVAEDecoder: LatentDecoder {
         return c
     }
 
-    package static func prepare(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> [Functions.Specialization] {
+    package static func prepare(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> [Preparation] {
         try vae.prepare(.decode, path: path, height: latentHeight, width: latentWidth, budget: budget)
     }
 

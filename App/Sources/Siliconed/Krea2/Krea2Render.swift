@@ -66,7 +66,7 @@ package enum Krea2Render {
         func give(_ dit: any RenderDenoiser) throws {}
 
         /// The text's rows past the template (`assemble`): what the fusion and the DiT read.
-        func prepare(height: Int, width: Int) throws -> [Functions.Specialization] {
+        func prepare(height: Int, width: Int) throws -> [Preparation] {
             let budget = MemoryBudget.machineCeiling(), rows = ids.count - Krea2Text.templateTokens
             let file = try MapWeights.dit(inputs.denoising.map, marker: Krea2Session.marker)
             let geometry = Krea2Session.Geometry(latentHeight: height, latentWidth: width, text: rows)

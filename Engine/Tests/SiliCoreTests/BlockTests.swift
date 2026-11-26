@@ -313,6 +313,26 @@ import Testing
         #expect(best.rows == 1024 && best.seconds < 5.40 - 0.5)
     }
 
+    /// **κ not known yet, at its bound** (`Block.aloneAtMost`): the share of none visited only where it could win with it.
+    /// Z-Image Compact 1024² on the M1 Pro (ρ 1.69): none 9.66 s at best against 8.15 at 2560 rows, never visited (the
+    /// visit cost its first render 16 s); Krea 2 Standard 1024² on the M5 Pro (ρ ≈ 0.3): none 3.93 at best against 4.30 at
+    /// 1024, visited, and once κ is measured (1.33) left: 5.40 against 4.85.
+    @Test func theShareOfNoneIsVisitedWhereItCouldWin() {
+        typealias C = Block.Timed
+        let z: [[C]] = [[C(kind: .neural, step: "ffn", phase: 0, rows: 2048, seconds: 3.84),
+                         C(kind: .past, step: "ffn", phase: 0, rows: 2108, seconds: 6.60),
+                         C(kind: .fixed, step: "heads", phase: 1, rows: 4156, seconds: 3.15)]]
+        let m1 = Block.zeroAgainstBest(z, measured: 2048, unit: 512, shareable: 4096, alone: nil)
+        #expect(abs(m1.zero - 9.656) < 0.001 && abs(m1.best - 8.147) < 0.001)
+        let krea: [[C]] = [[C(kind: .neural, step: "ffn", phase: 0, rows: 2048, seconds: 6.55),
+                            C(kind: .past, step: "ffn", phase: 0, rows: 2048, seconds: 2.93),
+                            C(kind: .fixed, step: "heads", phase: 1, rows: 4096, seconds: 1.00)]]
+        let m5 = Block.zeroAgainstBest(krea, measured: 2048, unit: 1024, shareable: 4096, alone: nil)
+        #expect(abs(m5.zero - 3.93) < 0.001 && abs(m5.best - 4.296) < 0.001)
+        let known = Block.zeroAgainstBest(krea, measured: 2048, unit: 1024, shareable: 4096, alone: 1.332)
+        #expect(known.zero > known.best)
+    }
+
     /// A tapped run is the GPU's alone over every row: a block declared tapped has the GPU's functions of the whole pass
     /// beside those past the ANE's, a step that taps (`Step.taps`) in its tapped form under a name of its own.
     @Test func aTappedRunHasItsOwnFunctions() {

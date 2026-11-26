@@ -196,7 +196,7 @@ final class ZImageTransformer {
 
     /// **What `open` would specialize** (`Arithmetic.prepare`): the same declaration, nothing allocated.
     static func prepare(file: SafeTensors, geometry g: Geometry, loras: LoRAStack = .none,
-                        budget: Int = MemoryBudget.machineCeiling()) throws -> [Functions.Specialization] {
+                        budget: Int = MemoryBudget.machineCeiling()) throws -> [Preparation] {
         let ranks = ZImageDiT.loraRanks(loras)
         return try Arithmetic.prepare(file: file, codes: ZImageDiT.codesMarker, budget: budget) { declaration(g, $0, ranks: ranks) }
     }

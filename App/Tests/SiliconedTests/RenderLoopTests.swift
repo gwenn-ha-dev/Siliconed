@@ -117,7 +117,7 @@ final class RenderLoopTests: XCTestCase {
         let admitted = try Admission.judge(request, chain: model.chain)
         let all = try RenderLoop.preparation(LoopParts.self)(request, admitted, model)
         XCTAssertEqual(Self.script.tokenized, 1)
-        XCTAssertEqual(all.map(\.asset.lastPathComponent), ["part", "decoder"])
+        XCTAssertEqual(all.map(\.name), ["part", "decoder"])
         XCTAssertEqual(Self.script.prepared, ["part \(admitted.height)×\(admitted.width)", "decoder \(admitted.height)×\(admitted.width)"])
         XCTAssertEqual(Self.script.decoderOpened + Self.script.evaluations, 0)
     }
@@ -170,10 +170,10 @@ private struct LoopParts: RenderParts {
         return LoopDiT()
     }
     func give(_ dit: any RenderDenoiser) throws {}
-    func prepare(height: Int, width: Int) throws -> [Functions.Specialization] {
+    func prepare(height: Int, width: Int) throws -> [Preparation] {
         XCTAssertEqual(RenderLoopTests.script.tokenized, 1, "prepared after its tokens")
         RenderLoopTests.script.prepared.append("part \(height)×\(width)")
-        return [Functions.Specialization(URL(fileURLWithPath: "/part"), unit: .gpu)]
+        return [.specialization(Functions.Specialization(URL(fileURLWithPath: "/part"), unit: .gpu))]
     }
     var decoderPath: String { "" }
 }
@@ -199,9 +199,9 @@ private struct LoopDecoder: LatentDecoder {
         let factor = LatentSpace.flux.factor
         return 3 * factor * latentHeight * factor * latentWidth
     }
-    static func prepare(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> [Functions.Specialization] {
+    static func prepare(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> [Preparation] {
         RenderLoopTests.script.prepared.append("decoder \(latentHeight)×\(latentWidth)")
-        return [Functions.Specialization(URL(fileURLWithPath: "/decoder"), unit: .gpu)]
+        return [.specialization(Functions.Specialization(URL(fileURLWithPath: "/decoder"), unit: .gpu))]
     }
     func pixels(_ latent: [Float]) async throws -> [Float] {
         RenderLoopTests.script.decoded += 1

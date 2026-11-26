@@ -29,7 +29,7 @@ package enum FluxVAEEncoder {
     }
 
     /// **What `latent` would specialize** for a picture `height × width`, nothing allocated (`BandStage.prepare`).
-    package static func prepare(height: Int, width: Int, path: String) throws -> [Functions.Specialization] {
+    package static func prepare(height: Int, width: Int, path: String) throws -> [Preparation] {
         try FluxVAEDecoder.vae.prepare(.encode, path: path, height: height, width: width, budget: MemoryBudget.machineCeiling())
     }
 

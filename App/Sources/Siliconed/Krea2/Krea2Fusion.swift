@@ -68,7 +68,7 @@ enum Krea2Fusion {
     }
 
     /// **What `text` would specialize** for `t` text rows, nothing allocated (`Stage.prepare`).
-    static func prepare(rows t: Int, file: SafeTensors, loras: LoRAStack = .none, budget: Int) throws -> [Functions.Specialization] {
+    static func prepare(rows t: Int, file: SafeTensors, loras: LoRAStack = .none, budget: Int) throws -> [Preparation] {
         try SiliCore.Stage.prepare(declaration(palier: Krea2Session.Geometry.palier(t), ranks: ranks(loras)), files: [file], budget: budget)
     }
 

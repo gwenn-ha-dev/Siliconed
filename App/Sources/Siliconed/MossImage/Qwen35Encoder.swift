@@ -184,7 +184,7 @@ package struct Qwen35Encoder: Sendable {
 
     /// **What `states` would specialize** over `tokens` identifiers (their template applied), nothing allocated: the
     /// layers at their palier (`Layers.prepare`).
-    package func prepare(tokens: Int, map mapPath: String) throws -> [Functions.Specialization] {
+    package func prepare(tokens: Int, map mapPath: String) throws -> [Preparation] {
         let file = try SafeTensors(mapPath)
         return try Layers.prepare(declaration(rows: try Self.palier(tokens), path: try Self.path(of: file)), files: [file],
                                   budget: MemoryBudget.machineCeiling())

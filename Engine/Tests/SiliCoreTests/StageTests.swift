@@ -188,6 +188,20 @@ import Testing
         try? FileManager.default.removeItem(at: ThisMac.file!)
     }
 
+    /// **A stage of bands never read on this Mac is read ahead** (`BandStage.prepare`, `read`): every candidate unknown,
+    /// what its opening takes the soberest for; once the soberest was read, none is.
+    @Test func aStageNeverReadIsReadAhead() throws {
+        let c = try BandStage.candidates("t", prefix: "bands-read", candidates: [1 << 12, 1 << 11], files: [], residents: [],
+                                         budget: 1 << 40) { BandPlans.plan(rows: 100, positions: $0).0 }
+        #expect(BandStage.unread(c))
+        let soberest = c.socles.last!.declaration
+        try ThisMac.update {
+            $0.readings = [Stage.key(soberest): 1 << 20]
+            $0.extents = [Stage.key(soberest): soberest.extent!]
+        }
+        #expect(!BandStage.unread(c))
+    }
+
     /// Two writers at once, each its own opening of the file as two processes have: every measure of both is kept
     /// (each reads, changes and writes under the file's lock).
     @Test func twoWritersAtOnceLoseNothing() throws {

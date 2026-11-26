@@ -18,7 +18,7 @@ package protocol LatentDecoder {
     /// asks it before its DiT, over the floor its DiT will give back, and opens what it judged after it.
     static func admit(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> Admitted
     /// **What `open` would specialize** under `budget`, its assets written, nothing allocated (`BandStage.prepare`).
-    static func prepare(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> [Functions.Specialization]
+    static func prepare(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> [Preparation]
     /// Whether B made its plan cut finer than the one it prefers (`bandDecodingNotice`).
     var narrowed: Bool { get }
     /// A latent, as the decoder reads it, to the picture's planes `[3, H, W]` in `[-1, 1]`.

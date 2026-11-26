@@ -174,7 +174,7 @@ package final class QwenImage21Loop {
 
     /// **What `open` would specialize** (`Arithmetic.prepare`): the same declaration, nothing allocated.
     package static func prepare(map: String, sequence: QwenImage21DiT.Sequence, loras: LoRAStack = .none,
-                                budget: Int = MemoryBudget.machineCeiling()) throws -> [Functions.Specialization] {
+                                budget: Int = MemoryBudget.machineCeiling()) throws -> [Preparation] {
         let g = Geometry(sequence), ranks = QwenImage21Functions.ranks(loras)
         return try Arithmetic.prepare(file: try Self.file(map), codes: marker, budget: budget) { declaration(g, $0, ranks: ranks, tapped: false) }
     }

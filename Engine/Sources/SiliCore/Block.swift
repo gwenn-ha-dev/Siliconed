@@ -64,13 +64,12 @@ public final class Block: @unchecked Sendable {
     let neuralRows: Set<String>
     /// **The share of none, visited** (`probe`): two cycles at 0 rows — the GPU alone on the same functions and weights —,
     /// the first cold (its calls carry their first calls), the second against a warm cycle at the share; the faster kept.
-    /// Visited where this Mac's κ for the block's arithmetic is not known yet, which the visit measures
-    /// (`ThisMac.Capacity.alone`), and where the curve predicts it the fastest (`rebalance`): a point of the curve like
-    /// any other share, predicted from the cycles at a share and κ, not measured on each key. `due`: to
-    /// run once a warm cycle at the share ran; `cold`, `measured`: at 0 now, the share it left and that share's cycle
-    /// seconds. Nil: none to run.
+    /// Visited where the curve predicts it the fastest (`rebalance`): a point of the curve like any other share, predicted
+    /// from the cycles at a share and κ (`ThisMac.Capacity.alone`) — where κ is not known yet, at its bound, which the
+    /// visit then measures —, not measured on each key. `cold`, `measured`: at 0 now, the share it left and that share's
+    /// cycle seconds. Nil: none to run.
     var zero: Zero?
-    enum Zero: Equatable { case due, cold(rows: Int, seconds: Double), measured(rows: Int, seconds: Double) }
+    enum Zero: Equatable { case cold(rows: Int, seconds: Double), measured(rows: Int, seconds: Double) }
     /// **κ for this block** (`ThisMac.Capacity.alone`): its arithmetic's on this Mac at the opening, then its own once it
     /// visited the share of none; nil, unknown. Whether it visited it: once a block.
     var alone: Double?
@@ -321,11 +320,11 @@ public final class Block: @unchecked Sendable {
     static func digest(_ bytes: Data) -> String { Data(SHA256.hash(data: bytes)).prefix(8).map { String(format: "%02x", $0) }.joined() }
 
     init(_ d: Declaration, stage: Stage, heights: [Height], height: Int, unit: Int, total: Int, units: Int, share: Share, key: String,
-                 arithmetic: String, zero: Bool, alone: Double?, shareable: Int, neuralRows: Set<String>, copies: Set<String>, named: Double,
+                 arithmetic: String, alone: Double?, shareable: Int, neuralRows: Set<String>, copies: Set<String>, named: Double,
                  signatures: [String: Signature], forms: [String: Form], groups: [String: Group], resolver: Resolver) {
         (declaration, self.stage, self.heights, self.height, self.unit, self.total, self.units, self.share) = (d, stage, heights, height, unit, total, units, share)
         (self.key, self.arithmetic, self.shareable, self.neuralRows) = (key, arithmetic, shareable, neuralRows)
-        (self.alone, self.zero) = (alone, zero ? .due : nil)
+        self.alone = alone
         (self.copies, self.named, self.signatures, self.forms, self.groups, self.resolver) = (copies, named, signatures, forms, groups, resolver)
         functions = stage.functions
         traced = stage.traced

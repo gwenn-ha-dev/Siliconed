@@ -34,7 +34,7 @@ package protocol RenderParts {
     var opensAhead: Bool { get }
     /// **What its stages would specialize**, after `tokens`: the text, the image stage (`encodes`) and the DiT, each at
     /// the shapes the render opens it (`SiliCore`'s `prepare`), nothing allocated, nothing computed.
-    func prepare(height: Int, width: Int) throws -> [Functions.Specialization]
+    func prepare(height: Int, width: Int) throws -> [Preparation]
     /// The VAE the decoder reads.
     var decoderPath: String { get }
     /// What the decoder reads of a final latent (the family's normalization).
@@ -115,7 +115,7 @@ package enum RenderLoop {
     /// then the decoder.
     package static func preparation<Parts: RenderParts & SendableMetatype>(
         _ parts: Parts.Type
-    ) -> @Sendable (Request, Admission, Model) throws -> [Functions.Specialization] {
+    ) -> @Sendable (Request, Admission, Model) throws -> [Preparation] {
         { request, admitted, model in
             var parts = try Parts(request, admitted, model: model)
             _ = try parts.tokens()

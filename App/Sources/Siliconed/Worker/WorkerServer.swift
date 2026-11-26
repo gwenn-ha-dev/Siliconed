@@ -11,8 +11,9 @@ import SiliCore
 ///   renders — the render cache's conditionings, what Core AI loaded — goes with it.
 /// - **Its name is stable**: Core AI files its compilations by process name.
 /// - **Its first work is Core AI's first call** (`CoreAI.witness`): every stage's floor holds it.
-/// - **A preparation compiles between the calls** (`WorkerCall.prepare`): its specializations one at a time on the
-///   work's queue while no call is in hand — a call that comes waits for the one under way, the others after it.
+/// - **A preparation compiles between the calls** (`WorkerCall.prepare`): its pieces one at a time on the work's queue
+///   while no call is in hand — a call that comes waits for the one under way, the others after it —, each function
+///   specialized, and a stage of bands whose kin this Mac never read read once (`Preparation`).
 package enum WorkerServer {
     package static func run() -> Never {
         _ = MemoryBudget.machineCeiling()
@@ -36,9 +37,10 @@ private final class Server: @unchecked Sendable {
     /// ANE's first in each; whether one is on the queue.
     private var pending: [Queued] = [], background: [Queued] = [], queued = false
 
-    /// **A specialization queued, and what it is for**: its key's model and size, its place among the key's (from 1).
+    /// **A piece of a preparation queued** (`Preparation`: a specialization, or a stage of bands read), **and what it is
+    /// for**: its key's model and size, its place among the key's (from 1).
     private struct Queued {
-        let specialization: Functions.Specialization
+        let piece: Preparation
         let model: String
         let width, height, at, of: Int
     }
@@ -139,7 +141,7 @@ private final class Server: @unchecked Sendable {
             let model = try Model.named(order.model, in: order.library.library)
             let planned = try Engine().prepare(request, model: model)
             let all = planned.enumerated().map {
-                Queued(specialization: $1, model: order.model, width: order.width, height: order.height, at: $0 + 1, of: planned.count)
+                Queued(piece: $1, model: order.model, width: order.width, height: order.height, at: $0 + 1, of: planned.count)
             }
             lock.withLock { if later { background += all } else { pending = all } }
             ended(id, nil)
@@ -158,9 +160,10 @@ private final class Server: @unchecked Sendable {
         if go { work.async { self.specialize() } }
     }
 
-    /// **One specialization**, unless a call came since it was queued; its compilation told to the app — what it is for,
-    /// and the models queued after it (`WorkerReply.preparing`) —, a failure on the standard error: the render that needs
-    /// it compiles it, and says why. One already in Core AI's cache compiles nothing, and tells nothing.
+    /// **One piece of a preparation** (`Preparation`), unless a call came since it was queued; a compilation told to the
+    /// app — what it is for, and the models queued after it (`WorkerReply.preparing`) —, a failure on the standard error:
+    /// the render that needs it compiles it, or opens its stage of bands at its soberest, and says why. A function
+    /// already in Core AI's cache compiles nothing, a stage read since it was queued reads nothing, and tells nothing.
     private func specialize() {
         let taken = lock.withLock { () -> (Queued, [String])? in
             queued = false
@@ -179,8 +182,8 @@ private final class Server: @unchecked Sendable {
             default: break
             }
         }
-        do { try blocking { try await Functions.specialize(next.specialization) } } catch {
-            FileHandle.standardError.write(Data("silicore-worker: \(next.specialization.asset.lastPathComponent) not prepared: \(error)\n".utf8))
+        do { try blocking { try await next.piece.run() } } catch {
+            FileHandle.standardError.write(Data("silicore-worker: \(next.piece.name) not prepared: \(error)\n".utf8))
         }
         observation.cancel()
         specializeNext()

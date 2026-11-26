@@ -35,7 +35,8 @@ public struct ThisMac: Codable, Sendable, Equatable {
     /// transformers of 6 and 13 billion weights, 0.29 to 0.39), less than a unit of the share apart. `alone`, κ: the GPU's
     /// rate alone against its rate beside the ANE, over the steps it shares — what predicts a block's cycle at 0 rows from
     /// its cycles at a share — T(0), the GPU's rows beside the ANE over every row and divided by κ, plus its own steps
-    /// (`Block.zero`) —, measured where a block runs at 0, smoothed from block to block. Kept by arithmetic rather than by
+    /// (`Block.zero`) —, measured where a block runs at 0, smoothed from block to block; not known yet, at its bound
+    /// (`Block.aloneAtMost`), the share of none visited only where it could win with it. Kept by arithmetic rather than by
     /// block: 1.24 on the M5 Pro (21/11/2026), 1.00 on the M1 Pro (25/11, a transformer of 6 billion weights on its codes
     /// at 4096 rows: its GPU beside the ANE at 2048 rows, 13.01 s for every row, against 16.14 − 3.15 at 0), where the share
     /// of none measured on each key cost two cycles of eight at 16.8 and 16.1 s against 8.45 at the share.

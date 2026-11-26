@@ -161,7 +161,7 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
 
     /// **What `block` would specialize** (`Block.prepare`): the same arithmetic and declaration, nothing allocated.
     package static func prepare(file: SafeTensors, codes marker: String, budget: Int,
-                                _ declaration: (Arithmetic) -> Block.Declaration) throws -> [Functions.Specialization] {
+                                _ declaration: (Arithmetic) -> Block.Declaration) throws -> [Preparation] {
         let arithmetic = of(codes: Self.codes(file, marker: marker), neuralEngine: CoreAI.neuralEngineInForce)
         return try Block.prepare(declaration(arithmetic), files: [file], budget: budget, share: arithmetic.share)
     }

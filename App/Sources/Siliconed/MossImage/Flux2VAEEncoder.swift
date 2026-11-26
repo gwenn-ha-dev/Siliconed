@@ -24,7 +24,7 @@ package enum Flux2VAEEncoder {
     /// **A picture's latent as the denoiser reads it**, `[128, H/16, W/16]`, batch-norm normalized. `image` is
     /// `[3, H, W]` in [−1, 1].
     /// **What `latent` would specialize** for a picture `height × width`, nothing allocated (`BandStage.prepare`).
-    package static func prepare(height: Int, width: Int, path: String) throws -> [Functions.Specialization] {
+    package static func prepare(height: Int, width: Int, path: String) throws -> [Preparation] {
         try Flux2VAEDecoder.vae.prepare(.encode, path: path, height: height, width: width, budget: MemoryBudget.machineCeiling())
     }
 

@@ -65,7 +65,7 @@ package enum AnimaRender {
             try dit.give(context)
         }
 
-        func prepare(height: Int, width: Int) throws -> [Functions.Specialization] {
+        func prepare(height: Int, width: Int) throws -> [Preparation] {
             let budget = MemoryBudget.machineCeiling(), text = inputs.text
             let c = AnimaConditioner(targetLength: t5Ids.count, sourceLength: qwenIds.count)
             let geometry = AnimaEvaluation.Geometry(height: height, width: width, context: c.rows)

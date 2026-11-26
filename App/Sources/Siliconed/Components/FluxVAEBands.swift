@@ -159,7 +159,7 @@ extension FluxVAE {
     package func admit(_ c: Candidates) throws { try BandStage.admit(c.bands) }
 
     /// What `open` would specialize, nothing allocated (`BandStage.prepare`).
-    package func prepare(_ direction: FluxVAEPlan.Direction, path: String, height: Int, width: Int, budget: Int) throws -> [Functions.Specialization] {
+    package func prepare(_ direction: FluxVAEPlan.Direction, path: String, height: Int, width: Int, budget: Int) throws -> [Preparation] {
         try BandStage.prepare(candidates(direction, path: path, height: height, width: width, budget: budget).bands)
     }
 

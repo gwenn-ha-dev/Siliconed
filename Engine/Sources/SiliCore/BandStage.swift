@@ -108,9 +108,30 @@ public final class BandStage: @unchecked Sendable {
     /// the one taken alone: with nothing of its kin read on this Mac `open` takes the finest (`Stage.choose`), once read a
     /// taller one; and it opens later on a higher floor — a candidate refused here is refused there (25/11/2026, the M1
     /// Pro, a stage of 4 candidates: opened at the finest the first time, prepared, at the tallest the next, never
-    /// prepared, and compiled it).
-    public static func prepare(_ c: Candidates) throws -> [Functions.Specialization] {
+    /// prepared, and compiled it). Nothing of its kin read on this Mac, its reading after them (`read`).
+    public static func prepare(_ c: Candidates) throws -> [Preparation] {
         try Stage.specializations(choice(c, floor: Stage.restingFloor()).holding.flatMap(\.declaration.functions.values))
+            + (unread(c) ? [.reading(c)] : [])
+    }
+
+    /// **The stage's reading taken ahead** (`Preparation.reading`), where nothing of its kin was read on this Mac yet:
+    /// the candidate `open` takes on such a Mac (its soberest, `Stage.choose`), each of its functions called twice on
+    /// what its arena holds — Core AI takes a function's working memory at its second call (`Stage.signal`), and two
+    /// calls of one function in flight a second set (`inFlight`) —, its reading kept (`run`), the stage closed, nothing
+    /// read back. Its next opening bounds the other candidates from that reading (`Stage.estimates`) and takes the first
+    /// that holds. Read since it was asked for: nothing.
+    public static func read(_ c: Candidates) async throws {
+        guard unread(c) else { return }
+        let stage = try await open(c)
+        defer { _ = stage.stage.close() }
+        _ = try await stage.run(keeping: [], each: 2)
+    }
+
+    /// **Whether nothing of the stage's kin was read on this Mac**: every candidate's estimate unknown, what `open` takes
+    /// the soberest for (`Stage.choose`).
+    static func unread(_ c: Candidates) -> Bool {
+        Stage.estimates(extents: c.socles.map { (Stage.key($0.declaration), $0.declaration.extent) }, budget: c.socles.first?.budget)
+            .allSatisfy { $0 == .unknown }
     }
 
     /// **Whether `open` would hold over `floor`**, nothing allocated: the candidate it would take, or `OverBudget` with
@@ -142,7 +163,7 @@ public final class BandStage: @unchecked Sendable {
         let estimates = Stage.estimates(extents: holding.map { (Stage.key($0.plan.declaration), $0.plan.declaration.extent!) }, budget: budget)
         // Every form fused: `OverBudget` too, the finest's P its number (`Stage.choose`).
         let chosen = holding[try Stage.choose(holding.map(\.plan), estimates)].rank
-        let unread = holding.count == c.socles.count && estimates.allSatisfy { $0 == .unknown }
+        let unread = holding.count == c.socles.count && Self.unread(c)
         return Choice(rank: chosen, bands: c.plans[chosen], plan: holding.first { $0.rank == chosen }!.plan, narrowed: chosen > 0 && !unread,
                       assets: c.named[chosen], holding: holding.map(\.plan))
     }
@@ -165,8 +186,11 @@ public final class BandStage: @unchecked Sendable {
     /// Every call, in order, `inFlight` on the stream; the marks `keeping` names read back as their calls are done,
     /// `[C, rows, W]` f32. What the run executed told at its end (`Stages.Work`); under the trace (`Stage.traced`), each
     /// call's start and end, from the ends its waits give (`Stages.Trace.calls`).
-    public func run(keeping: Set<String> = []) async throws -> [String: [Float]] {
-        var kept: [String: [Float]] = [:]
+    public func run(keeping: Set<String> = []) async throws -> [String: [Float]] { try await run(keeping: keeping, each: nil) }
+
+    /// The run, each function called `each` times at most (all, nil): the calls of a reading (`read`).
+    private func run(keeping: Set<String>, each: Int?) async throws -> [String: [Float]] {
+        var kept: [String: [Float]] = [:], called: [Bands.Shaped: Int] = [:]
         let marks = plan.marks.filter { keeping.contains($0.name) }
         let stream = stage.stream!
         var flight: [Task<UInt64, Never>] = []
@@ -175,6 +199,10 @@ public final class BandStage: @unchecked Sendable {
         var flops = 0, first: UInt64?
         func landed(_ end: UInt64) { if traced { ends.append(end) } }
         for (i, call) in plan.calls.enumerated() {
+            if let each {
+                called[call.function, default: 0] += 1
+                if called[call.function]! > each { continue }
+            }
             let sig = signatures[call.function]!
             func bind(_ arg: String, _ shape: [Int], _ type: NDArray.ScalarType) -> View {
                 if let s = call.spots[arg] { return view(s) }

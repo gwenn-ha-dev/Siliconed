@@ -239,7 +239,7 @@ extension Stage {
     /// **What `open` would specialize**, its assets written: the same plan and choice, from the files' headers, nothing
     /// allocated or read (`specializations`), on the floor the process comes back to (`restingFloor`).
     public static func prepare(_ declaration: Declaration, files: [SafeTensors], budget: Int, depth: Int = 2,
-                               measured: ThisMac = .current) throws -> [Functions.Specialization] {
+                               measured: ThisMac = .current) throws -> [Preparation] {
         let choice = try chosen(declaration, files: files, budget: budget, depth: depth, measured: measured)
         return try specializations(choice(restingFloor()).declaration.functions.values)
     }
@@ -259,13 +259,13 @@ extension Stage {
     /// **`functions` as a stage loads them, to specialize before it opens** (`Functions.specialize`): each asset written,
     /// each function once, the ANE's first — 0.4 to 2.3 s each to compile on the M1 Pro (25/11/2026), 0.3 to 1.1 on the
     /// M5 Pro, a GPU's ≈ 35 ms (24/11): a preparation cut short has done the most of it.
-    public static func specializations(_ functions: some Sequence<Function>) throws -> [Functions.Specialization] {
+    public static func specializations(_ functions: some Sequence<Function>) throws -> [Preparation] {
         // Once by its name and unit: an asset's URL ends in a slash once its folder exists, so the same function met
         // before and after it was written would give two.
         var seen = Set<String>(), all: [(name: String, s: Functions.Specialization)] = []
         for f in functions where seen.insert(ThisMac.shareKey(asset: f.asset, unit: f.unit)).inserted {
             all.append((f.asset, Functions.Specialization(try Functions.asset(f.asset, f.build), unit: f.unit)))
         }
-        return all.sorted { ($0.s.unit == .neuralEngine ? 0 : 1, $0.name) < ($1.s.unit == .neuralEngine ? 0 : 1, $1.name) }.map(\.s)
+        return all.sorted { ($0.s.unit == .neuralEngine ? 0 : 1, $0.name) < ($1.s.unit == .neuralEngine ? 0 : 1, $1.name) }.map { .specialization($0.s) }
     }
 }

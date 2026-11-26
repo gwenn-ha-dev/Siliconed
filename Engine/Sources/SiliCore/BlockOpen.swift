@@ -26,7 +26,7 @@ extension Block {
     /// Mac's last), its functions built at the calls' rows and named by their bytes, the plan of the first cut whose socle
     /// holds, the stage made; the ANE's share said (`Stages.computed`). In flight, its share of none (the GPU alone, the
     /// same functions) is a point of the same curve, legitimate wherever the ANE gains nothing: predicted from this Mac's
-    /// κ, visited where it is predicted the fastest, and where κ is not known yet (`zero`).
+    /// κ, or its bound where it is not known yet, and visited where it is predicted the fastest (`zero`).
     public static func open(_ device: MTLDevice, _ d: Declaration, files: [SafeTensors], budget: Int, share: Share,
                             measured: ThisMac = .current) async throws -> Block {
         let began = DispatchTime.now().uptimeNanoseconds
@@ -41,10 +41,7 @@ extension Block {
         let (heights, height) = (p.value.heights, p.value.height)
         let stage = try await Stage(device, plan: p.plan, files: files, measured: measured, opening: p.opening)
         let block = Block(d, stage: stage, heights: heights, height: height, unit: o.unit, total: o.total, units: o.units, share: share,
-                          key: o.key, arithmetic: o.arithmetic,
-                          // κ unknown on this Mac for its arithmetic: the share of none visited, to measure it.
-                          zero: o.inFlight && o.units > 0 && measured.capacities?[o.arithmetic]?.alone == nil,
-                          alone: measured.capacities?[o.arithmetic]?.alone,
+                          key: o.key, arithmetic: o.arithmetic, alone: measured.capacities?[o.arithmetic]?.alone,
                           shareable: d.shareable, neuralRows: o.neuralRows,
                           copies: o.copies, named: named, signatures: o.signatures, forms: o.forms, groups: o.groups, resolver: o.resolver)
         block.told()
@@ -61,7 +58,7 @@ extension Block {
     /// and the share of none (`zero`). A share met later is specialized as it loads, as any function the cache does not
     /// hold. On the floor the process comes back to (`Stage.restingFloor`).
     public static func prepare(_ d: Declaration, files: [SafeTensors], budget: Int, share: Share,
-                               measured: ThisMac = .current) throws -> [Functions.Specialization] {
+                               measured: ThisMac = .current) throws -> [Preparation] {
         let o = try opening(d, files: files, budget: budget, share: share, measured: measured)
         let j = try o.judged(on: Stage.restingFloor(), measured: measured)
         var functions = j.plans.flatMap { Array($0.declaration.functions.values) }

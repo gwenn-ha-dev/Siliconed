@@ -35,7 +35,7 @@ extension Engine {
     /// request's own refusals first (`Admission`), then the family's stages at the shapes its render opens them, nothing
     /// allocated, nothing computed; the ANE's functions first, the longest to compile, each stage's order kept. On the
     /// engine queue, as a render: no asset is written while a render loads it.
-    package func prepare(_ request: Request, model: Model) throws(EngineError) -> [Functions.Specialization] {
+    package func prepare(_ request: Request, model: Model) throws(EngineError) -> [Preparation] {
         dispatchPrecondition(condition: .notOnQueue(Engine.file))
         let all = try EngineError.boundary {
             try Engine.file.sync {

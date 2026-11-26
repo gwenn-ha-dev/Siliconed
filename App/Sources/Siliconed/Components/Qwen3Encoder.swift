@@ -117,7 +117,7 @@ package struct Qwen3Encoder {
     }
 
     /// **What `states` would specialize** over `tokens` identifiers, nothing allocated: the layers at their palier.
-    package func prepare(tokens: Int) throws -> [Functions.Specialization] {
+    package func prepare(tokens: Int) throws -> [Preparation] {
         let file = try Self.file(path)
         return try prepare(file, try Qwen3Arithmetic(file, prefix: prefix), rows: try Qwen3Encoder.palier(tokens))
     }

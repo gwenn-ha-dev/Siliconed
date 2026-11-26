@@ -66,7 +66,7 @@ package enum ZImageRender {
             dit.caps = caps
         }
 
-        func prepare(height: Int, width: Int) throws -> [Functions.Specialization] {
+        func prepare(height: Int, width: Int) throws -> [Preparation] {
             let geometry = try ZImageTransformer.Geometry(latentHeight: height, latentWidth: width, capLength: ids.count)
             return try Qwen3Encoder(config: .zImage, path: inputs.text.map).prepare(tokens: ids.count)
                 + (inputs.start.map { try FluxVAEEncoder.prepare(height: $0.image.height, width: $0.image.width, path: $0.encoding.path) } ?? [])

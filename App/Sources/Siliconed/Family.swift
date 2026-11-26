@@ -89,7 +89,7 @@ package struct FamilyTraits: Sendable {
     package let render: @Sendable (_ request: Request, _ admitted: Admission, _ seeds: [UInt64], _ model: Model,
                                    _ cancellation: Cancellation?, _ emit: (Engine.Event) -> Void) throws -> [Engine.Render]
     /// **What its render of a request would specialize** (`RenderLoop.preparation`), compiled before the render comes.
-    package let prepare: @Sendable (_ request: Request, _ admitted: Admission, _ model: Model) throws -> [Functions.Specialization]
+    package let prepare: @Sendable (_ request: Request, _ admitted: Admission, _ model: Model) throws -> [Preparation]
 }
 
 /// **What the interface says of a family**, declared in its folder: English sentences, the keys of the app's catalog
