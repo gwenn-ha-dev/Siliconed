@@ -213,14 +213,29 @@ public final class Block: @unchecked Sendable {
         }.filter { $0.start < rows.upperBound }
     }
 
-    /// **The GPU's calls of step `s` of form `f` over pass `p`, the ANE's first `neural` rows aside**: an `either` step's
-    /// past them, a `gpu` step's over the pass. (A `gpu` step in two calls beside the ANE — the rows past the ANE's
-    /// while it ends, then its rows, or its rows first so that it starts its next step — let the ANE take more rows but
-    /// cost the GPU more than it gave: a transformer of 6 billion weights at 4128 rows, 2.37 s a cycle at the best share
-    /// against 2.31, the attention in two calls 0.49 s against 0.41; measured 19/11 on the mini.)
-    static func calls(_ f: Form, _ s: Step, _ p: Pass, neural: Int, cut: Int?, limit: Int) -> [Tile] {
+    /// **The GPU's calls of step `i` of form `f` over pass `p`, the ANE's first `neural` rows aside**: an `either` step's
+    /// past them, a `gpu` step's over the pass — in two where the ANE's next step reads it (`first`): the ANE's first
+    /// unit, then the rest.
+    static func calls(_ d: Declaration, _ f: Form, _ i: Int, _ p: Pass, neural: Int, unit: Int, cut: Int?) -> [Tile] {
+        let s = f.steps[i], limit = p.limit ?? d.rows
         let from = s.unit == .either && f.shared && p.shareable != nil ? p.rows.lowerBound + neural : p.rows.lowerBound
-        return calls(from..<p.rows.upperBound, cut: cut, limit: limit)
+        guard let first = first(d, f, i, p, neural: neural, unit: unit) else { return calls(from..<p.rows.upperBound, cut: cut, limit: limit) }
+        return [Tile(start: from, rows: first)] + calls(from + first..<p.rows.upperBound, cut: cut, limit: limit)
+    }
+
+    /// **The rows of the first call of a `gpu` step that leads to a step the ANE shares**, the `gpu` steps between them
+    /// included: its first unit's, so that the ANE runs its phase on that unit while the GPU computes the rest (`run`).
+    /// The `gpu` steps in a row are called alike, as a cut calls every step alike: a row's value one writes and the next
+    /// reads lies as the writer's call lays it (a transformer's queries heads first, `[1, heads, rows, hd]`: the attention
+    /// in two calls on queries written in one read another unit's rows — its output wrong, 26/11 on the M1 Pro). Nil where
+    /// the step is one call: the GPU alone, a pass that is not cut (a function computing across the rows it writes), no
+    /// shared step after the `gpu` steps. (Tried 19/11 on the mini, the ANE's rows first in one call and the rest in
+    /// another, under the marks that covered the calls after theirs (`SerialStream`): the ANE's next step waited for both,
+    /// 2.37 s a cycle at the best share against 2.31.)
+    static func first(_ d: Declaration, _ f: Form, _ i: Int, _ p: Pass, neural: Int, unit: Int) -> Int? {
+        guard neural > 0, d.cuts, f.shared, p.shareable != nil, f.steps[i].unit == .gpu, p.rows.count > unit,
+              f.steps[i...].first(where: { $0.unit != .gpu })?.unit == .either else { return nil }
+        return unit
     }
 
     /// The phase of an `either` step beside the ANE: the steps between two `gpu` steps, counted by the `gpu` steps before
@@ -230,16 +245,17 @@ public final class Block: @unchecked Sendable {
     /// A GPU call's function: its form's step at its rows, tapped or not.
     typealias Spec = (form: Form, step: String, rows: Int, tapped: Bool)
 
-    /// **The GPU's functions of the steps at `neural` rows of the ANE's**: every form used over every pass, by name.
-    static func steps(_ d: Declaration, _ used: [Form], neural: Int, cut: Int?) -> [String: Spec] {
+    /// **The GPU's functions of the steps at `neural` rows of the ANE's** (units of `unit`): every form used over every
+    /// pass, by name.
+    static func steps(_ d: Declaration, _ used: [Form], neural: Int, unit: Int, cut: Int?) -> [String: Spec] {
         var all: [String: Spec] = [:]
         for f in used {
             for p in d.passes where p.serves(f) {
-                for s in f.steps {
-                    for t in calls(f, s, p, neural: neural, cut: cut, limit: p.limit ?? d.rows) { all[gpu(f.name, s.name, t.rows)] = (f, s.name, t.rows, false) }
+                for (i, s) in f.steps.enumerated() {
+                    for t in calls(d, f, i, p, neural: neural, unit: unit, cut: cut) { all[gpu(f.name, s.name, t.rows)] = (f, s.name, t.rows, false) }
                     // A tapped run leaves the ANE: every row of the pass the GPU's, a step that taps in its tapped form.
                     if d.tapped {
-                        for t in calls(f, s, p, neural: 0, cut: cut, limit: p.limit ?? d.rows) { all[gpu(f.name, s.name, t.rows, tapped: s.taps)] = (f, s.name, t.rows, s.taps) }
+                        for t in calls(d, f, i, p, neural: 0, unit: unit, cut: cut) { all[gpu(f.name, s.name, t.rows, tapped: s.taps)] = (f, s.name, t.rows, s.taps) }
                     }
                 }
             }

@@ -61,10 +61,10 @@ extension AnimaEvaluation {
         (name, key, path == .bf16 ? .bfloat16(joined: []) : .half)
     }
 
-    /// Block i's group in the guarded forms: its modulation, its self-attention, its cross-attention's query and output,
-    /// its MLP.
-    static func entries(block i: Int, _ path: Path, quantized: Set<String>) -> [Weights.Entry] {
-        func product(_ name: String) -> Weights.Entry { Self.product(name, "blocks.\(i)." + products[name]!, path, quantized: quantized.contains(name)) }
+    /// Block i's group in the guarded forms (the Standard's): its modulation, its self-attention, its cross-attention's
+    /// query and output, its MLP.
+    static func entries(block i: Int, _ path: Path) -> [Weights.Entry] {
+        func product(_ name: String) -> Weights.Entry { Self.product(name, "blocks.\(i)." + products[name]!, path, quantized: false) }
         let p = "blocks.\(i)."
         return modulationEntries(block: i) + ["q", "k", "v", "o", "cq", "co", "m1", "m2"].map(product)
             + [gain("q_norm", p + "self_attn.q_norm.weight", path), gain("k_norm", p + "self_attn.k_norm.weight", path),
@@ -99,10 +99,14 @@ extension AnimaEvaluation {
 
     // MARK: - The declaration
 
-    /// The guarded form of a block whose products on codes are `q` (and block 0's under taps, its branches besides).
-    static func guardedForm(_ q: Set<String>, taps: Bool) -> String {
+    /// The guarded form of a block (the Standard's, on the GPU alone: no product on codes; block 0's under taps, its
+    /// branches besides).
+    static func guardedForm(taps: Bool) -> String { "guarded" + (taps ? "-taps" : "") }
+
+    /// The shared form of a block whose products on codes are `q` (the cross keys' and values' apart: the context's edge).
+    static func sharedForm(_ q: Set<String>) -> String {
         let own = q.subtracting(["ck", "cv"]).sorted()
-        return "guarded" + (own.isEmpty ? "" : "-" + own.joined(separator: "+")) + (taps ? "-taps" : "")
+        return "shared" + (own.isEmpty ? "" : "-" + own.joined(separator: "+"))
     }
 
     /// The context's edge of a block whose products on codes are `q`.
@@ -124,7 +128,7 @@ extension AnimaEvaluation {
     /// forms the steps' own; block 0's branches under taps), its other tensors (each block's cross keys and values its
     /// own), the edges' weights read once, a group a block (its context products held), its forms, the image's pass.
     static func declaration(_ g: Geometry, _ arithmetic: Arithmetic, quantized: [Set<String>], taps: Bool, ranks: [String: Int]) -> Block.Declaration {
-        let path = Self.path(arithmetic), shared = sharedBlocks(arithmetic, quantized)
+        let path = Self.path(arithmetic), shared = sharedBlocks(arithmetic)
         let (k, c, e) = (g.keys, g.context, factorElement(path)), (bytes, gainRow) = (Layout.element(e), AnimaFunction.gainRow)
         var n = Block.Declaration("Anima's DiT (\(path)\(shared.isEmpty ? "" : ", shared"), \(g.height)×\(g.width), \(k) keys)", rows: k)
         n.perRow = [.init("x", width: d, e, next: "y", factor: path == .f16 ? "f" : nil), .init("q", width: d, e), .init("k", width: d, e),
@@ -150,33 +154,34 @@ extension AnimaEvaluation {
         n.tensors = t.map { SiliCore.Stage.Tensor($0.0, bytes: $0.1) } + [SiliCore.Stage.Tensor("velocity", bytes: latent, .apart)]
             + blocks.indices.flatMap { LoRAStack.tensors(loraProducts(block: $0), ranks: ranks, element: e, prefix: "\(block($0)).") }
         n.residents = others(path)
-        func form(_ i: Int) -> String { shared.contains(i) ? "shared" : guardedForm(quantized[i], taps: taps && i == 0) }
+        func form(_ i: Int) -> String { shared.contains(i) ? sharedForm(quantized[i]) : guardedForm(taps: taps && i == 0) }
         n.groups = blocks.indices.map { i in
-            Block.Group(block(i), form: form(i), weights: shared.contains(i) ? AnimaShared.layer(i, weights: arithmetic.weights) : entries(block: i, path, quantized: quantized[i]),
+            Block.Group(block(i), form: form(i), weights: shared.contains(i) ? AnimaShared.layer(i, codes: quantized[i]) : entries(block: i, path),
                         held: contextEntries(block: i, path, quantized: quantized[i]))
         }
         n.cycle = blocks
-        // The guarded forms read the f32 factors; the activations' q beside the product's weight q.
-        let factors: [String: Block.Bind] = path == .f16 ? ["x_factor": .rows("f"), "y_factor": .next("f")] : [:]
+        // The activations' q beside the product's weight q.
         var made = Set<String>()
         for i in blocks.indices where !shared.contains(i) && made.insert(form(i)).inserted {
-            let (q, tapping) = (quantized[i], taps && i == 0)
+            let tapping = taps && i == 0
             n.forms.append(Block.Form(form(i), steps: [.init("pre", on: .gpu), .init("post", on: .gpu, whole: ["k", "v"], bind: ["q": .rows("q")])],
-                                      bind: rows.merging(factors) { a, _ in a }) { step, b in
-                step == "pre" ? function(.pre, path, block: q, rows: b.rows, ranks: ranks).module()
-                    : function(.post, path, block: q, rows: b.rows, keys: k, context: c, taps: tapping, ranks: ranks).module()
+                                      bind: rows) { step, b in
+                step == "pre" ? function(.pre, path, block: [], rows: b.rows, ranks: ranks).module()
+                    : function(.post, path, block: [], rows: b.rows, keys: k, context: c, taps: tapping, ranks: ranks).module()
             })
         }
-        if !shared.isEmpty {
-            n.forms.append(Block.Form("shared", steps: [
+        // A shared form a set of products on codes: the steps without products (heads, attention, cross) the same module in
+        // each, so the same compiled function (`Functions.name`: the module's digest).
+        for i in blocks.indices where shared.contains(i) && made.insert(form(i)).inserted {
+            let q = quantized[i]
+            n.forms.append(Block.Form(form(i), steps: [
                 .init("pre"), .init("heads", on: .gpu), .init("attention", on: .gpu, whole: ["k", "v"], bind: ["q": .rows("q"), "o": .rows("attended")]),
                 .init("out", bind: ["y": .rows("mid"), "y_factor": .rows("mid_factor")], taps: listening),
                 .init("cross", on: .gpu, bind: ["o": .rows("attended")]),
                 .init("crossout", bind: ["x": .rows("mid"), "x_factor": .rows("mid_factor"), "y": .rows("mid2"), "y_factor": .rows("mid2_factor")],
                       taps: listening),
                 .init("ffn", bind: ["x": .rows("mid2"), "x_factor": .rows("mid2_factor")], taps: listening)]) { step, b in
-                AnimaShared.module(step + (b.tapped ? "-taps" : ""), rows: b.rows, keys: k, context: c, weights: arithmetic.weights, ranks: ranks,
-                                   neural: b.neural)
+                AnimaShared.module(step + (b.tapped ? "-taps" : ""), rows: b.rows, keys: k, context: c, codes: q, ranks: ranks, neural: b.neural)
             })
         }
         n.passes = [Block.Pass("image", rows: 0..<g.tokens, shareable: 0..<g.tokens)]

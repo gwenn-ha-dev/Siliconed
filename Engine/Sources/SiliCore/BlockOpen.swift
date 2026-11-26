@@ -60,7 +60,7 @@ extension Block {
         if o.inFlight && o.units > 0 {
             for cut in o.heights.map(\.cut) {
                 for n in [0, o.units - 1, o.units + 1] where n == 0 || (n >= 1 && n < o.total) {
-                    for (_, spec) in steps(d, d.used, neural: n * o.unit, cut: cut) {
+                    for (_, spec) in steps(d, d.used, neural: n * o.unit, unit: o.unit, cut: cut) {
                         nonisolated(unsafe) let m = try module(spec)
                         functions.append(Stage.Function(Functions.name(m, prefix: "block"), unit: .gpu) { m })
                     }
@@ -146,7 +146,7 @@ extension Block {
         let cuts: [Int?] = [nil] + [4096, 2048, 1024].filter { d.cuts && $0 < longest }
         var heights: [Height] = [], plans: [Stage.Plan] = [], refusal: Error? = nil
         for cut in cuts {
-            let now = steps(d, used, neural: units * unit, cut: cut)
+            let now = steps(d, used, neural: units * unit, unit: unit, cut: cut)
             for (name, spec) in now where assets[name] == nil {
                 let m = try module(spec)
                 (modules[name], assets[name]) = ((m, .gpu), Functions.name(m, prefix: "block"))

@@ -156,9 +156,9 @@ import Testing
         var d = Block.Declaration("two passes", rows: 256)
         d.forms = Self.declaration.forms
         d.passes = [Block.Pass("long", rows: 0..<256), Block.Pass("short", rows: 0..<64, forms: ["another"])]
-        #expect(Set(Block.steps(d, d.forms, neural: 0, cut: nil).keys) == Set(["pre", "heads", "attention"].map { Block.gpu("s", $0, 256) }))
+        #expect(Set(Block.steps(d, d.forms, neural: 0, unit: 64, cut: nil).keys) == Set(["pre", "heads", "attention"].map { Block.gpu("s", $0, 256) }))
         d.passes[1].forms = nil
-        #expect(Block.steps(d, d.forms, neural: 0, cut: nil).count == 6)
+        #expect(Block.steps(d, d.forms, neural: 0, unit: 64, cut: nil).count == 6)
     }
 
     /// **The best share is on its unit's grid**: the cycle ran at 3072 rows; 1024's grid has 3.0 s at best, 512's 2.5 s
@@ -236,11 +236,42 @@ import Testing
         let pass: [C] = [C(kind: .neural, step: "pre", phase: 0, rows: 256, seconds: 1), C(kind: .past, step: "pre", phase: 0, rows: 768, seconds: 1.5),
                          C(kind: .fixed, step: "heads", phase: 1, rows: 1024, seconds: 0.5),
                          C(kind: .neural, step: "out", phase: 1, rows: 256, seconds: 0.25), C(kind: .past, step: "out", phase: 1, rows: 768, seconds: 0.75)]
-        #expect(Block.predicted([pass], measured: 256, rows: 256) == 0.5 + 1.5 + 0.75)
-        #expect(Block.predicted([pass], measured: 256, rows: 512) == 0.5 + 2 + max(0.5, 0.5))
-        #expect(Block.predicted([pass, pass], measured: 256, rows: 256, neural: 2) == 2 * (0.5 + 2 + 0.75))
+        #expect(Block.predicted([pass], measured: 256, rows: 256, unit: 256) == 0.5 + 1.5 + 0.75)
+        #expect(Block.predicted([pass], measured: 256, rows: 512, unit: 256) == 0.5 + 2 + max(0.5, 0.5))
+        #expect(Block.predicted([pass, pass], measured: 256, rows: 256, unit: 256, neural: 2) == 2 * (0.5 + 2 + 0.75))
         let f = Self.declaration.forms[0]
         #expect(f.steps.indices.map { Block.phase(f, $0) } == [0, 0, 1])
+    }
+
+    /// **The `gpu` steps that lead to one the ANE shares, in two** (`Block.first`): the ANE's first unit, then the rest,
+    /// where the pass is cut and the ANE shares; the phase after it predicted from the first call's end on the ANE's side.
+    @Test func aStepInTwoLeadsThePhaseAfter() {
+        typealias C = Block.Timed
+        typealias T = Block.Tile
+        var d = Self.declaration
+        d.forms[0].steps.append(.init("out"))
+        let f = d.forms[0], p = d.passes[0]
+        #expect(Block.calls(d, f, 2, p, neural: 8, unit: 8, cut: nil) == [T(start: 0, rows: 8), T(start: 8, rows: 8)])
+        // The `gpu` steps in a row called alike: a row's value lies as its writer's call lays it.
+        #expect(Block.calls(d, f, 1, p, neural: 8, unit: 8, cut: nil) == [T(start: 0, rows: 8), T(start: 8, rows: 8)])
+        #expect(Block.calls(d, f, 0, p, neural: 8, unit: 8, cut: nil) == [T(start: 8, rows: 8)])
+        #expect(Block.calls(d, f, 2, p, neural: 0, unit: 8, cut: nil) == [T(start: 0, rows: 16)])
+        #expect(Block.calls(d, f, 3, p, neural: 8, unit: 8, cut: nil) == [T(start: 8, rows: 8)])
+        d.cuts = false
+        #expect(Block.first(d, f, 2, p, neural: 8, unit: 8) == nil)
+        // Two units of 256: the GPU's step 0.1 s on the first unit's rows, 0.4 on the rest; the GPU 0.5 + 0.3, the ANE
+        // 0.1, then its first unit (0.25) beside the rest (0.4), then its second (0.25).
+        let pass: [C] = [C(kind: .fixed, step: "attention", phase: 0, rows: 256, seconds: 0.1, first: true),
+                         C(kind: .fixed, step: "attention", phase: 0, rows: 768, seconds: 0.4),
+                         C(kind: .neural, step: "out", phase: 1, rows: 256, seconds: 0.25), C(kind: .neural, step: "out", phase: 1, rows: 256, seconds: 0.25),
+                         C(kind: .past, step: "out", phase: 1, rows: 512, seconds: 0.3)]
+        #expect(abs(Block.predicted([pass], measured: 512, rows: 512, unit: 256) - 0.8) < 1e-9)
+        #expect(abs(Block.predicted([pass], measured: 512, rows: 768, unit: 256) - 1.0) < 1e-9)
+        #expect(abs(Block.predicted([pass], measured: 512, rows: 0, unit: 256) - 1.1) < 1e-9)
+        #expect(C.summed(pass).map(\.first) == [true, false, false, false])
+        // As the flight reads them, summed by step: the unit told, not the share's rows.
+        #expect(abs(Block.predicted([C.summed(pass)], measured: 512, rows: 512, unit: 256) - 0.8) < 1e-9)
+        #expect(abs(Block.predicted([C.summed(pass)], measured: 512, rows: 768, unit: 256) - 1.0) < 1e-9)
     }
 
     /// **The share of none, predicted from a cycle at a share and κ** (`ThisMac.Capacity.alone`): the GPU's past rows over
@@ -253,11 +284,11 @@ import Testing
                              C(kind: .past, step: "ffn", phase: 0, rows: 2108, seconds: 6.60),
                              C(kind: .fixed, step: "heads", phase: 1, rows: 4156, seconds: 3.15)]]
         let beside = 6.60 / 2108 * 4156
-        #expect(abs(Block.predicted(cycle, measured: 2048, rows: 0) - (beside + 3.15)) < 1e-9)
-        #expect(abs(Block.predicted(cycle, measured: 2048, rows: 0, alone: 1.24) - (beside / 1.24 + 3.15)) < 1e-9)
+        #expect(abs(Block.predicted(cycle, measured: 2048, rows: 0, unit: 512) - (beside + 3.15)) < 1e-9)
+        #expect(abs(Block.predicted(cycle, measured: 2048, rows: 0, unit: 512, alone: 1.24) - (beside / 1.24 + 3.15)) < 1e-9)
         // κ leaves the share measured, and those past it, as measured.
-        #expect(Block.predicted(cycle, measured: 2048, rows: 2048, alone: 1.24) == Block.predicted(cycle, measured: 2048, rows: 2048))
-        #expect(Block.predicted(cycle, measured: 2048, rows: 3072, alone: 1.24) == Block.predicted(cycle, measured: 2048, rows: 3072))
+        #expect(Block.predicted(cycle, measured: 2048, rows: 2048, unit: 512, alone: 1.24) == Block.predicted(cycle, measured: 2048, rows: 2048, unit: 512))
+        #expect(Block.predicted(cycle, measured: 2048, rows: 3072, unit: 512, alone: 1.24) == Block.predicted(cycle, measured: 2048, rows: 3072, unit: 512))
         #expect(Block.aloneRate(cycle, measured: 2048, zero: beside / 1.24 + 3.15).map { abs($0 - 1.24) < 1e-9 } == true)
         #expect(abs(Block.aloneRate(cycle, measured: 2048, zero: 16.14)! - 1.0) < 0.01)
         // A cycle at 0 no longer than the `gpu` steps tells nothing.
@@ -275,9 +306,9 @@ import Testing
                              C(kind: .fixed, step: "heads", phase: 1, rows: 4096, seconds: 1.00)]]
         let kappa = Block.aloneRate(cycle, measured: 2048, zero: 5.40)!
         #expect(abs(kappa - 1.332) < 0.001)
-        #expect(abs(Block.predicted(cycle, measured: 2048, rows: 0, alone: kappa) - 5.40) < 1e-9)
-        #expect(abs(Block.predicted(cycle, measured: 2048, rows: 1024) - 5.395) < 0.001)
-        #expect(abs(Block.predicted(cycle, measured: 2048, rows: 1024, alone: kappa) - 4.848) < 0.001)
+        #expect(abs(Block.predicted(cycle, measured: 2048, rows: 0, unit: 512, alone: kappa) - 5.40) < 1e-9)
+        #expect(abs(Block.predicted(cycle, measured: 2048, rows: 1024, unit: 512) - 5.395) < 0.001)
+        #expect(abs(Block.predicted(cycle, measured: 2048, rows: 1024, unit: 512, alone: kappa) - 4.848) < 0.001)
         let best = Block.bestShare(cycle, measured: 2048, unit: 1024, shareable: 4096, alone: kappa)
         #expect(best.rows == 1024 && best.seconds < 5.40 - 0.5)
     }
@@ -289,10 +320,10 @@ import Testing
         d.forms[0].steps[1].taps = true
         d.passes = [d.passes[0]]
         let used = [d.forms[0]]
-        let plain = Block.steps(d, used, neural: 8, cut: nil)
+        let plain = Block.steps(d, used, neural: 8, unit: 8, cut: nil)
         #expect(plain.keys.sorted() == ["s.attention-16", "s.heads-16", "s.pre-8"] && plain.values.allSatisfy { !$0.tapped })
         d.tapped = true
-        let tapped = Block.steps(d, used, neural: 8, cut: nil)
+        let tapped = Block.steps(d, used, neural: 8, unit: 8, cut: nil)
         #expect(tapped.keys.sorted() == ["s.attention-16", "s.heads+taps-16", "s.heads-16", "s.pre-16", "s.pre-8"])
         #expect(tapped["s.heads+taps-16"]?.tapped == true && tapped["s.heads-16"]?.tapped == false && tapped["s.pre-16"]?.tapped == false)
         #expect(Block.gpu("s", "heads", 16, tapped: true) == "s.heads+taps-16" && Block.gpu("s", "heads", 16) == "s.heads-16")
@@ -331,7 +362,7 @@ import Testing
         #expect(placed["L.kp"]?.bytes == 6 * 4 * 2 && placed["M.kp"]?.place == .heap && placed["kp"] == nil)
         #expect(r.resolve("kp", input: true, group: d.groups[1], pass: d.passes[1], step: d.forms[0].steps[2], call: [:]) == .rows("M.kp", next: false, whole: false))
         #expect(r.resolve("k", input: true, group: d.groups[1], pass: d.passes[1], step: nil, call: ["k": .rows("kp")]) == .rows("M.kp", next: false, whole: false))
-        let called = Block.steps(d, [d.forms[0]], neural: 0, cut: nil)
+        let called = Block.steps(d, [d.forms[0]], neural: 0, unit: 64, cut: nil)
         #expect(called[Block.gpu("s", "heads", 16)] != nil && called[Block.gpu("s", "heads", 12)] != nil)
         #expect(Block.calls(0..<10, cut: nil, limit: 12) == [Block.Tile(start: 0, rows: 12)] && Block.calls(0..<10, cut: nil, limit: 10) == [Block.Tile(start: 0, rows: 10)])
         #expect(Block.steps(of: d.forms[0], until: "heads").map(\.element.name) == ["pre", "heads"])

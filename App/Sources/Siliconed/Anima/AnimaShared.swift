@@ -24,12 +24,13 @@ import SiliCore
 ///   - **the exact GELU** (erf) of the true value z = ĥ · F: GELU(clip(z, ±16)) + max(z − 16, 0), Φ being 1 or 0 in
 ///     f16 past ±16, so that the primitive never reads a value its range does not hold.
 ///
-/// Only the blocks whose ten products are codes take these forms (4 to 26 of the Compact: 0 and 27 are float weights, the
-/// MLP of 1 to 3 too); the others keep the GPU's guarded forms (`AnimaFunction`), the stream's factors carried between
-/// the two writings (`AnimaEvaluation`). **The Standard beside the ANE**: every block in these forms on its weights in
-/// f16 (`SharedWeights.half`), no input rotated (`product16`); block 0 among them, its branches written by `out-taps`,
-/// `crossout-taps` and `ffn-taps` (the GPU's, for a check listening, `Block.run`'s `tapped`): each product's true value
-/// before its gate, in f16.
+/// **Each product on what the file holds**: its codes where the file holds codes, else its weight in f16
+/// (`SharedWeights.half`, the publisher's bf16 rounded once), no input rotated (`product16`) — the Compact's blocks 0 and
+/// 27 all in f16, the MLP of 1 to 3 too, the others on codes; every product of the Standard beside the ANE in f16. Every
+/// block of both in these forms, the ANE beside on every one. (The Compact's five blocks with float products were the
+/// GPU's alone in guarded forms till 26/11/2026: 0.96 s of a step of 4.14 at 1024² on the M1 Pro, the ANE idle.) Block 0's
+/// branches written by `out-taps`, `crossout-taps` and `ffn-taps` (the GPU's, for a check listening, `Block.run`'s
+/// `tapped`): each product's true value before its gate, in f16.
 enum AnimaShared {
     typealias Argument = AnimaFunction.Argument
     static let d = AnimaFunction.d, heads = AnimaFunction.heads, hd = AnimaFunction.hd, hidden = AnimaFunction.hidden
@@ -43,12 +44,16 @@ enum AnimaShared {
     static let gains = ["shift1", "scale1", "gate1", "shift2", "scale2", "gate2", "shift3", "scale3", "gate3"]
     static let gateFactors = ["gate1_factor", "gate2_factor", "gate3_factor"]
 
-    static func arguments(_ f: String, rows: Int, keys: Int, context: Int, weights: SharedWeights, ranks: [String: Int], neural: Bool = false) -> [Argument] {
+    /// What product `name` reads: its codes where the block's file holds codes (`codes`), else its weight in f16.
+    static func weights(_ name: String, codes: Set<String>) -> SharedWeights { codes.contains(name) ? .codes : .half }
+
+    /// `codes`: the block's products the file holds as codes (`AnimaEvaluation.quantized`).
+    static func arguments(_ f: String, rows: Int, keys: Int, context: Int, codes: Set<String>, ranks: [String: Int], neural: Bool = false) -> [Argument] {
         let row = [1, 1, d], one = [1, 1, 1]
         let stream: [Argument] = [("x", [1, rows, d], .f16), ("x_factor", [1, rows, 1], .f16)]
         func weight(_ name: String) -> [Argument] {
             let (inn, out) = AnimaFunction.dims(name)
-            return weights.arguments(name, inn: inn, out: out, neural: neural)
+            return weights(name, codes: codes).arguments(name, inn: inn, out: out, neural: neural)
         }
         func gains(_ names: String...) -> [Argument] { names.map { ($0, $0.hasSuffix("_factor") || $0.hasSuffix("_target") ? one : row, .f16) } }
         let own: [Argument]
@@ -78,10 +83,10 @@ enum AnimaShared {
 
     /// `neural`: the ANE's function of a step both units take: its products q64 on the ANE's copy of the codes, the
     /// GPU's int8 × int8 (`Aicode.Module.product`).
-    static func module(_ function: String, rows: Int, keys: Int, context: Int, weights: SharedWeights, ranks: [String: Int],
+    static func module(_ function: String, rows: Int, keys: Int, context: Int, codes: Set<String>, ranks: [String: Int],
                        neural: Bool = false) -> Aicode.Module {
         let tapping = function.hasSuffix("-taps"), f = tapping ? String(function.dropLast(5)) : function
-        var m = Aicode.Module(arguments: arguments(f, rows: rows, keys: keys, context: context, weights: weights, ranks: ranks, neural: neural).map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
+        var m = Aicode.Module(arguments: arguments(f, rows: rows, keys: keys, context: context, codes: codes, ranks: ranks, neural: neural).map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
         let b = m.body
         let names = m.argumentNames
         func a(_ name: String) -> Int { names.firstIndex(of: name)! }
@@ -91,7 +96,12 @@ enum AnimaShared {
         func product(_ x: Int, _ name: String, input: Int) -> Int {
             m.product(x, name, input: input, adapted: (ranks[name] ?? 0) > 0, neural: neural, constants: &constants)
         }
-        func rotated(_ t: Int, for target: String) -> (unit: Int, factor: Int, input: Int) { b.rotated16(t, target: a(target), of: weights) }
+        /// t under the target of its products, rotated before codes (the products of one target all on codes or none).
+        func rotated(_ t: Int, for target: String) -> (unit: Int, factor: Int, input: Int) {
+            let of = targets.first { $0.name == target }!.products.map { weights($0, codes: codes) }
+            precondition(Set(of).count == 1, "\(target): products on codes and on floats")
+            return b.rotated16(t, target: a(target), of: of[0])
+        }
         /// LN(x̂ · X) · (1 + s) + t, the LN without affine (ε = 10⁻⁶).
         func modulated(_ x: Int, _ xf: Int, _ shift: String, _ scale: String) -> Int {
             b.binary(.add, b.binary(.mul, b.layerNorm16(x, xf, eps: 1e-6), a(scale)), a(shift))
@@ -148,7 +158,7 @@ enum AnimaShared {
             let r = rotated(modulated(a("x"), a("x_factor"), "shift3", "scale3"), for: "m1_target")
             let z = b.binary(.mul, product(r.unit, "m1", input: r.input), r.factor)
             let gelu = b.gelu16(z)
-            let (u, f2) = b.ranged16(b.rotation(gelu, of: weights), target: a("m2_target"))
+            let (u, f2) = b.ranged16(b.rotation(gelu, of: weights("m2", codes: codes)), target: a("m2_target"))
             let p = product(u, "m2", input: b.binary(.divide, gelu, f2))
             let (y, yf) = updated(a("x"), a("x_factor"), p, gate: "gate3", factors: [f2])
             m.outputs = [("y", y), ("y_factor", yf)] + (tapping ? [("ff", b.binary(.mul, p, f2))] : [])
@@ -158,11 +168,11 @@ enum AnimaShared {
     }
 
     /// Block i's weights in these forms: its modulation's (the GPU's guarded function reads them), each product's codes
-    /// (as `weights` lays them) or f16 weight and their target after them, the heads' gains in f16.
-    static func layer(_ i: Int, weights: SharedWeights) -> [Weights.Entry] {
+    /// (where the file holds codes, `codes`) or f16 weight and their target after them, the heads' gains in f16.
+    static func layer(_ i: Int, codes: Set<String>) -> [Weights.Entry] {
         let p = "blocks.\(i)."
         var all = AnimaEvaluation.modulationEntries(block: i)
-        for name in ["q", "k", "v", "o", "cq", "co", "m1", "m2"] { all.append(weights.entry(name, key: p + AnimaEvaluation.products[name]!)) }
+        for name in ["q", "k", "v", "o", "cq", "co", "m1", "m2"] { all.append(weights(name, codes: codes).entry(name, key: p + AnimaEvaluation.products[name]!)) }
         for t in targets { all.append((t.name, "", .target(t.products))) }
         for (name, key) in [("q_norm", "self_attn.q_norm"), ("k_norm", "self_attn.k_norm"), ("cq_norm", "cross_attn.q_norm")] {
             all.append((name, p + key + ".weight", .half))

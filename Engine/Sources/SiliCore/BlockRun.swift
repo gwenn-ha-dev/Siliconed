@@ -105,8 +105,9 @@ extension Block {
     /// **Group `group` over pass `pass`**: its weights acquired (kept, or the ring's next use), `before` (its edges: a
     /// modulation), then its form's steps in turn — a step of either unit the ANE's units of the shareable rows (each
     /// call after the ANE's call before it, and after the GPU's calls before it when the step before was the GPU's) and
-    /// one GPU call past them; a step of the GPU's one call over the pass, every ANE call before it done; its weights
-    /// released; the streams written swapped. `until`: the steps up to this one only (a pass whose last steps reach nothing:
+    /// one GPU call past them; a step of the GPU's one call over the pass, every ANE call before it done — two where the
+    /// ANE's next step reads it (`first`): the ANE's first unit, whose whole phase it then runs first, and the rest —; its
+    /// weights released; the streams written swapped. `until`: the steps up to this one only (a pass whose last steps reach nothing:
     /// the keys of a prefix's last layer); a stream no step wrote is not swapped. `tapped` (the declaration's `tapped`): the
     /// ANE left, the GPU alone over every row, each step that taps in its tapped form — a check listening inside the group.
     public func run(_ group: String, _ pass: String, until: String? = nil, before: (() async throws -> Void)? = nil,
@@ -168,42 +169,55 @@ extension Block {
             }
             launched = []
         }
+        /// The ANE's call of step `s` (the form's `index`) on unit `u`, after the ANE's call put before it and `gpu`.
+        func launch(_ u: Int, _ s: Step, _ index: Int, after gpu: Task<UInt64, Never>?) {
+            let previous = launched.last?.task, c = calls[u][s.name]!
+            let function = c.function, ready = copied
+            nonisolated(unsafe) let io = c.io
+            let task = Task { () async throws -> (start: UInt64, end: UInt64) in
+                _ = try await previous?.value
+                _ = await gpu?.value
+                _ = await ready?.value
+                let t = DispatchTime.now().uptimeNanoseconds
+                try await Run.neural(function, inputs: io.inputs, outputs: io.outputs)
+                return (t, DispatchTime.now().uptimeNanoseconds)
+            }
+            launched.append((s.name, index, task))
+        }
         do {
             try await before?()
             var afterGPU = true
-            for (i, s) in run {
+            // The first call of the `gpu` step just put on, where it is two (`first`): its rows the ANE's first unit's.
+            var firstDone: Task<UInt64, Never>? = nil, led = false
+            for (k, (i, s)) in run.enumerated() {
                 if s.unit == .either && shared {
                     // What the ANE reads of the GPU's: every GPU call before, when the step before was the GPU's.
                     let gpu = afterGPU ? last : nil
                     executed(ane: tiles.count * (signatures[Self.neural(g.form, s.name, ane)]?.flops ?? 0))
-                    for u in tiles.indices {
-                        let previous = launched.last?.task, c = calls[u][s.name]!
-                        let function = c.function, ready = copied
-                        nonisolated(unsafe) let io = c.io
-                        let task = Task { () async throws -> (start: UInt64, end: UInt64) in
-                            _ = try await previous?.value
-                            _ = await gpu?.value
-                            _ = await ready?.value
-                            let t = DispatchTime.now().uptimeNanoseconds
-                            try await Run.neural(function, inputs: io.inputs, outputs: io.outputs)
-                            return (t, DispatchTime.now().uptimeNanoseconds)
-                        }
-                        launched.append((s.name, i, task))
+                    if afterGPU, let first = firstDone {
+                        // The phase on the ANE's first unit, every step of it, once the GPU's first call is done; its other
+                        // units then, step by step, once the GPU's step is.
+                        for (n, (j, t)) in run[k...].prefix(while: { $0.element.unit == .either }).enumerated() { launch(0, t, j, after: n == 0 ? first : nil) }
+                        (firstDone, led) = (nil, true)
                     }
+                    for u in tiles.indices where !(led && u == 0) { launch(u, s, i, after: gpu) }
                 } else if s.unit == .gpu {
                     let idle = !launched.isEmpty
                     try await drain()
                     // The ANE has nothing in flight until the GPU's steps are done: the codes of its next stretch copied now.
                     if copying && idle { copied = copy(after: stretch, weights, reads); stretch += 1 }
+                    led = false
                 }
-                for t in Self.calls(form, s, p, neural: neural, cut: cut, limit: p.limit ?? declaration.rows) {
+                let split = Self.first(declaration, form, i, p, neural: neural, unit: ane) != nil
+                for (c, t) in Self.calls(declaration, form, i, p, neural: neural, unit: ane, cut: cut).enumerated() {
                     let f = Self.gpu(g.form, s.name, t.rows, tapped: tapped && s.taps)
                     let n = signatures[f]?.flops ?? 0
                     executed(gpu: n)
                     let timing = try await encode(f, views(f, start: t.start, group: g, pass: p, step: s, call: [:], neural: false, written: &written))
+                    if split && c == 0 { firstDone = timing.done }
                     if shared, case .inFlight = share {
                         record.append(Timed(kind: s.unit == .either ? .past : .fixed, step: s.name, phase: Self.phase(form, i), rows: t.rows, timing: timing,
-                                            flops: n))
+                                            flops: n, first: split && c == 0))
                     }
                     if traced {
                         let alone = s.unit == .gpu
@@ -302,7 +316,9 @@ extension Block {
             }
             ane = true
             let sig = signatures[Self.neural(g.form, s.name, unit)]!, outputs = Set(sig.outputs.map(\.0))
-            for (n, _, _) in sig.inputs {
+            // A weight read as codes (int8): a name may be codes in one form and f16 in another (a transformer whose file
+            // leaves some blocks' products in bf16).
+            for (n, _, type) in sig.inputs where type == .int8 {
                 if case .weight(let w) = resolver.resolve(n, input: true, shadowed: outputs.contains(n), group: g, pass: p, step: s, call: [:]),
                    copies.contains(w) { all[all.count - 1].insert(w) }
             }

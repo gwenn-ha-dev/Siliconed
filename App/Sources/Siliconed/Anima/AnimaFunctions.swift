@@ -5,9 +5,10 @@ import SiliCore
 /// an argument, written op by op. Two paths, one per variant:
 ///
 ///   - **bf16**, the Standard: every value in bf16 as diffusers runs it, the GPU alone;
-///   - **f16**, the Compact: int8 × int8 on Bedovyy's int8 `convrot` codes (the activation rotated by the file's
-///     Hadamard, then brought to int8 codes by its rows' peaks: `w8a8`), the products the file leaves in bf16 (blocks 0 and 27, the MLP of blocks 1 to 3) rounded once to f16, under the guard
-///     of f16 (`Guard.swift`): the residual stream kept as (x̂, X), each product's input brought under its target.
+///   - **f16**, the Compact's edges (context, embed, final; its blocks are the shared forms', `AnimaShared`): under the
+///     guard of f16 (`Guard.swift`), the residual stream kept as (x̂, X), each product's input brought under its target;
+///     the cross keys' and values' products int8 × int8 on Bedovyy's int8 `convrot` codes (the activation rotated by the
+///     file's Hadamard, then brought to int8 codes by its rows' peaks: `w8a8`).
 ///
 /// The one-row functions (`time`, `modulation`) compute in f32 on both paths, the bf16 weights widened inside (exact):
 /// their values are the reference's, rounded once at their outputs.
@@ -16,8 +17,8 @@ import SiliCore
 ///     modulation   embedded, temb → each sublayer's shift, 1 + scale, gate: self, cross, mlp [3, d]
 ///     context      the conditioner's context → each block's cross keys and values `ctx_k`, `ctx_v`, heads first (once a prompt)
 ///     embed        latent [16, h, w] → patchify → x_embedder → the residual stream's rows
-///     pre          a tile: LN · (1 + scale₁) + shift₁ → q, k, v (QK norm, RoPE); k, v into the whole sequence's
-///     post         a tile: self-attention · output_proj → x₁; cross-attention → x₂; GELU MLP → y
+///     pre          the Standard's, a tile: LN · (1 + scale₁) + shift₁ → q, k, v (QK norm, RoPE); k, v into the whole sequence's
+///     post         the Standard's, a tile: self-attention · output_proj → x₁; cross-attention → x₂; GELU MLP → y
 ///     final        LN · (1 + scale) + shift → final_layer.linear → unpatchify → velocity [16, h, w] f32
 ///
 /// Every tile's pre runs before any tile's post: post's attention reads the keys and values of every row. A block is
@@ -28,8 +29,8 @@ package struct AnimaFunction: Sendable {
 
     let kind: Kind
     let path: Path
-    /// The function's products on int8 codes (the Compact's, which leaves blocks 0 and 27 and the MLP of blocks 1 to 3 on
-    /// their bf16 weights); the others on float weights. Only the function's own (`products`).
+    /// The function's products on int8 codes (the Compact's cross keys and values, where the file holds them as codes);
+    /// the others on float weights. Only the function's own (`products`).
     var quantized: Set<String> = []
     /// pre, post: the tile's rows; embed, final: the image's tokens.
     var rows = 1
@@ -216,16 +217,6 @@ package struct AnimaFunction: Sendable {
         }
         /// A guarded product's result multiplied out, in f32: what an op its row factor cannot pass reads.
         func trueValue(_ r: Int, _ f: Int) -> Int { b.binary(.mul, b.cast(r, to: .f32), f) }
-        /// The residual stream's update by gate · branch (the branch true, f32): (x̂', X') `[rows, 1]`. The update is held
-        /// as high as the stream (`stream`), not under 1: `residual` brings both under C = 2 · max(X, 4G) by X / C and G / C
-        /// in f16, and a G of the update's size beside Anima's small stream (X ≈ 2⁻¹² at the embedder) put X / C under
-        /// f16's normals, which the GPU flushes: block 0 lost its stream (measured 18/11 on the M5 Pro, the Compact's
-        /// block0_out 1.11 from the oracle, the bf16 reference 0.16). Held high, X / C leaves the normals only for an
-        /// update 2¹³ times the stream.
-        func updated(_ x: Int, _ xf: Int, _ gate: String, _ branch: Int) -> (Int, Int) {
-            let (delta, g) = b.ranged(b.binary(.mul, branch, b.cast(a(gate), to: .f32)), under: b.stream)
-            return b.residual(x, xf, plus: delta, factor: g)
-        }
 
         switch kind {
         case .time:
@@ -283,56 +274,25 @@ package struct AnimaFunction: Sendable {
             let image = b.reshape(b.transpose(b.reshape(y, [h, w, p, p, Self.channels]), [4, 0, 2, 1, 3]), [Self.channels, height, width])
             m.outputs = [("velocity", image)]
         case .pre:
+            precondition(!guarded, "pre: the Standard's alone, the Compact's blocks are the shared forms'")
             let l = rows
-            if guarded {
-                let n = modulated(a("x"), "shift1", "scale1", epsilon: epsilon(a("x_factor"), l))
-                let (r, f) = guardedProducts(n, ["q", "k", "v"])
-                func normed(_ i: Int, _ gain: String) -> Int {
-                    headNorm(b.reshape(r[i], [l, heads, hd]), gain, epsilon: b.reshape(b.epsilon(f[i], 1e-5), [l, 1, 1]))
-                }
-                let v = b.cast(trueValue(r[2], f[2]), to: .f16)
-                m.outputs = [("q", headsFirst(rope(normed(0, "q_norm"), l), l)), ("k", tokenFirst(rope(normed(1, "k_norm"), l), l)),
-                             ("v", tokenFirst(b.reshape(v, [l, heads, hd]), l))]
-            } else {
-                let n = modulated(a("x"), "shift1", "scale1")
-                func normed(_ w: String, _ gain: String) -> Int { headNorm(b.reshape(product(n, w), [l, heads, hd]), gain) }
-                m.outputs = [("q", headsFirst(rope(normed("q", "q_norm"), l), l)), ("k", tokenFirst(rope(normed("k", "k_norm"), l), l)),
-                             ("v", tokenFirst(b.reshape(product(n, "v"), [l, heads, hd]), l))]
-            }
+            let n = modulated(a("x"), "shift1", "scale1")
+            func normed(_ w: String, _ gain: String) -> Int { headNorm(b.reshape(product(n, w), [l, heads, hd]), gain) }
+            m.outputs = [("q", headsFirst(rope(normed("q", "q_norm"), l), l)), ("k", tokenFirst(rope(normed("k", "k_norm"), l), l)),
+                         ("v", tokenFirst(b.reshape(product(n, "v"), [l, heads, hd]), l))]
         case .post:
+            precondition(!guarded, "post: the Standard's alone, the Compact's blocks are the shared forms'")
             let l = rows
             let o = attend(a("q"), b.transpose(a("k"), [0, 2, 1, 3]), b.transpose(a("v"), [0, 2, 1, 3]), a("mask"), l, symbol: "sdpa_self")
-            var taps: [(String, Int)] = []
-            if guarded {
-                let (r1, f1) = guardedProducts(o, ["o"])
-                let o1 = trueValue(r1[0], f1[0])
-                let (x1, x1f) = updated(a("x"), b.reshape(a("x_factor"), [l, 1]), "gate1", o1)
-                let n2 = modulated(x1, "shift2", "scale2", epsilon: b.epsilon(x1f, 1e-6))
-                let (rq, fq) = guardedProducts(n2, ["cq"])
-                let q2 = headNorm(b.reshape(rq[0], [l, heads, hd]), "cq_norm", epsilon: b.reshape(b.epsilon(fq[0], 1e-5), [l, 1, 1]))
-                let cross = attend(headsFirst(q2, l), a("ctx_k"), a("ctx_v"), a("ctx_mask"), l, symbol: "sdpa_cross")
-                let (r2, f2) = guardedProducts(cross, ["co"])
-                let o2 = trueValue(r2[0], f2[0])
-                let (x2, x2f) = updated(x1, x1f, "gate2", o2)
-                let n3 = modulated(x2, "shift3", "scale3", epsilon: b.epsilon(x2f, 1e-6))
-                let (r3, f3) = guardedProducts(n3, ["m1"])
-                // GELU of the true value, in f32: x · Φ(x) passes no row factor through Φ.
-                let (r4, f4) = guardedProducts(b.gelu(trueValue(r3[0], f3[0]), tanh: false), ["m2"])
-                let ff = trueValue(r4[0], f4[0])
-                let (y, yf) = updated(x2, x2f, "gate3", ff)
-                m.outputs = [("y", y), ("y_factor", b.reshape(yf, [1, l]))]
-                taps = [("attn1", o1), ("attn2", o2), ("ff", ff)]
-            } else {
-                let o1 = product(o, "o")
-                let x1 = b.binary(.add, a("x"), b.binary(.mul, a("gate1"), o1))
-                let n2 = modulated(x1, "shift2", "scale2")
-                let q2 = headNorm(b.reshape(product(n2, "cq"), [l, heads, hd]), "cq_norm")
-                let o2 = product(attend(headsFirst(q2, l), a("ctx_k"), a("ctx_v"), a("ctx_mask"), l, symbol: "sdpa_cross"), "co")
-                let x2 = b.binary(.add, x1, b.binary(.mul, a("gate2"), o2))
-                let ff = product(b.gelu(product(modulated(x2, "shift3", "scale3"), "m1"), tanh: false), "m2")
-                m.outputs = [("y", b.binary(.add, x2, b.binary(.mul, a("gate3"), ff)))]
-                taps = [("attn1", b.cast(o1, to: .f32)), ("attn2", b.cast(o2, to: .f32)), ("ff", b.cast(ff, to: .f32))]
-            }
+            let o1 = product(o, "o")
+            let x1 = b.binary(.add, a("x"), b.binary(.mul, a("gate1"), o1))
+            let n2 = modulated(x1, "shift2", "scale2")
+            let q2 = headNorm(b.reshape(product(n2, "cq"), [l, heads, hd]), "cq_norm")
+            let o2 = product(attend(headsFirst(q2, l), a("ctx_k"), a("ctx_v"), a("ctx_mask"), l, symbol: "sdpa_cross"), "co")
+            let x2 = b.binary(.add, x1, b.binary(.mul, a("gate2"), o2))
+            let ff = product(b.gelu(product(modulated(x2, "shift3", "scale3"), "m1"), tanh: false), "m2")
+            m.outputs = [("y", b.binary(.add, x2, b.binary(.mul, a("gate3"), ff)))]
+            let taps = [("attn1", b.cast(o1, to: .f32)), ("attn2", b.cast(o2, to: .f32)), ("ff", b.cast(ff, to: .f32))]
             if self.taps { m.outputs += taps }
         }
         return m

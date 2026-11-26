@@ -72,7 +72,8 @@ extension Block {
         func view(_ arg: String, _ shape: [Int], _ type: NDArray.ScalarType, input: Bool) -> View {
             switch resolver.resolve(arg, input: input, shadowed: input && outputs.contains(arg), group: group, pass: pass, step: step, call: call) {
             case .weight(let w):
-                if neural && copies.contains(w) { return stage.neuralView(Self.copy(w), shape, type) }
+                // Codes the ANE reads from its copy; a weight of the same name in f16 (another form's) as it lies.
+                if neural && type == .int8 && copies.contains(w) { return stage.neuralView(Self.copy(w), shape, type) }
                 guard let p = held?.weights.weights[w] ?? stage.residents[w] else { preconditionFailure("\(f): no weight \(w)") }
                 return stage.view(p, shape)
             case .tensor(let t, let row):

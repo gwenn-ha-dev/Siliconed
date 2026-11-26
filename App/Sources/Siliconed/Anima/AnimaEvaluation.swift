@@ -13,16 +13,16 @@ import SiliCore
 /// (−10⁴ on its keys), never read. The cross-attention's keys: the context's rows at a palier of 256, its padding
 /// masked (the reference's 512 rows, zeros past the prompt, are all attended: a context of 512 rows has no padding).
 ///
-/// **The residual stream** `x` is two buffers in turn; under the guard of f16 (the Compact) beside its row factors, in
-/// f32 for the guarded forms (`f`), in f16 for the shared forms (`x_factor`): a block reads one buffer and writes the
-/// other. The padding's rows are held under a factor of 1: x̂ = 0 normalizes to 0, never to a NaN its keys would spread.
+/// **The residual stream** `x` is two buffers in turn; under the guard of f16 beside its row factors, in f32 at the
+/// edges (`f`: the embedder writes it, the final layer reads it), in f16 for the shared forms (`x_factor`): a block
+/// reads one buffer and writes the other. The padding's rows are held under a factor of 1: x̂ = 0 normalizes to 0, never to a NaN its keys would spread.
 ///
-/// **The forms**: one a layout of the blocks' weights — the Standard's bf16, the Compact's on codes but for the
-/// products it leaves in bf16 (blocks 0 and 27, the MLP of 1 to 3) —, each `pre` then `post` on the GPU. **With the
-/// Neural Engine on**, the blocks whose ten products are codes take the shared forms (`AnimaShared`): the ANE pre, out,
-/// crossout and ffn on units of the image's first rows (`Block.Share`: a control's rows, or found in flight), the GPU
-/// the rest; the stream's factors pass from f32 to f16 entering a shared block and back leaving it, every factor a
-/// power of two (exact), on the CPU before the block, as the gates' factors are.
+/// **The forms**: the Standard on the GPU alone, its blocks' bf16 in guarded forms, each `pre` then `post`; every other
+/// block in the shared forms (`AnimaShared`), a form a set of products on codes (the Compact's blocks 0 and 27 none, 1
+/// to 3 all but the MLP, the others all; the Standard beside the ANE none): **with the Neural Engine on**, the ANE pre,
+/// out, crossout and ffn on units of the image's first rows (`Block.Share`: a control's rows, or found in flight), the
+/// GPU the rest. The stream's factors pass from f32 to f16 entering block 0 and back before the final layer, every
+/// factor a power of two (exact), on the CPU, as the gates' factors are.
 package final class AnimaEvaluation {
     typealias Path = AnimaFunction.Path
 
@@ -52,17 +52,11 @@ package final class AnimaEvaluation {
     /// The guarded forms' path: the Standard's bf16, f16 otherwise.
     static func path(_ a: Arithmetic) -> Path { a == .standard ? .bf16 : .f16 }
 
-    /// **The blocks the shared forms take**: the Compact's whose ten products are codes, beside the ANE or on the GPU
-    /// alone (0 and 27 are float weights, the MLP of 1 to 3 too: the guarded forms'), every block of the Standard's in
-    /// f16. On the GPU alone the Compact's blocks of codes went 10 % faster in the shared forms than in the guarded
-    /// ones, for 112 MiB more of arena (the M5 Pro at 1024², 22/11/2026).
-    static func sharedBlocks(_ a: Arithmetic, _ quantized: [Set<String>]) -> Set<Int> {
-        switch a {
-        case .standard: []
-        case .shared(.half, _): Set(quantized.indices)
-        case .shared(.codes, _): Set(quantized.indices.filter { quantized[$0] == Set(products.keys) })
-        }
-    }
+    /// **The blocks the shared forms take**: every block but the Standard's on the GPU alone (bf16, the guarded forms) —
+    /// the Compact's beside the ANE or on the GPU alone, each product on its codes or its f16 weight (`AnimaShared`), the
+    /// Standard's beside the ANE in f16. On the GPU alone the Compact's blocks of codes went 10 % faster in the shared
+    /// forms than in the guarded ones, for 112 MiB more of arena (the M5 Pro at 1024², 22/11/2026).
+    static func sharedBlocks(_ a: Arithmetic) -> Set<Int> { a == .standard ? [] : Set(blocks.indices) }
 
     let g: Geometry
     let arithmetic: Arithmetic
@@ -86,7 +80,7 @@ package final class AnimaEvaluation {
 
     private init(_ block: Block, _ g: Geometry, _ arithmetic: Arithmetic, quantized: [Set<String>], taps: Bool) async {
         (self.block, self.g, self.arithmetic, self.quantized, self.taps) = (block, g, arithmetic, quantized, taps)
-        (path, sharedBlocks) = (Self.path(arithmetic), Self.sharedBlocks(arithmetic, quantized))
+        (path, sharedBlocks) = (Self.path(arithmetic), Self.sharedBlocks(arithmetic))
         let shared = sharedBlocks
         // The padding's rows under a factor of 1, in both buffers of each stream of factors.
         for (name, f16) in [("f", false), ("x_factor", true)] where guarded && (!f16 || !shared.isEmpty) {
@@ -247,7 +241,7 @@ package final class AnimaEvaluation {
 
     // MARK: - The shared forms' borders
 
-    /// The stream's factors as the guarded forms read them (f32 `f`), from the shared forms' (f16): powers of two, exact.
+    /// The stream's factors as the edges read them (f32 `f`), from the shared forms' (f16): powers of two, exact.
     private func wide() async {
         guard half else { return }
         let from = await block.rows("x_factor").assumingMemoryBound(to: Float16.self), to = await block.rows("f").assumingMemoryBound(to: Float.self)
@@ -255,7 +249,7 @@ package final class AnimaEvaluation {
         half = false
     }
 
-    /// The stream's factors as the shared forms read them (f16), from the guarded forms' (f32). A factor under f16's
+    /// The stream's factors as the shared forms read them (f16), from the edges' (f32). A factor under f16's
     /// smallest normal — the embedded stream straight into a shared block 0, the Standard's beside the ANE: 2⁻¹⁵ at 512²
     /// — is brought to 2⁻¹⁴, the power of two it lacks moved into its row of x̂ (exact while x̂ stays among f16's normals:
     /// x̂ lies within [2¹³, 2¹⁴]); a factor past 2¹⁵ (a stream past 2²⁹) is refused. Never a factor rounded.

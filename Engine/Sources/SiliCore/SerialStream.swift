@@ -17,6 +17,13 @@ import Synchronization
 ///
 /// So the calls are put on under a lock, and the waits run on an executor of their own, a serial queue whose every job
 /// holds that lock: only Core AI's code of a wait runs there, so a job never waits for another.
+///
+/// **A wait's point is the calls before it**: `currentWorkCompleted` waits for « all previous work encoded to this
+/// stream » when its task runs, not when `done` is asked — and the task runs once the queue gets to it, under the lock
+/// the next call's encoding holds. Two calls put on back to back, the first's wait was often the second's: a
+/// transformer's attention, put on right after its heads, read at 10.45 TFLOP/s on a GPU of 4.6 at most, its time
+/// counted in the heads' (26/11 on the M1 Pro). So a call is put on once every job put on the queue before it has run
+/// (`settle`).
 public final class SerialStream: @unchecked Sendable {
     private let stream: ComputeStream
     private let lock = NSLock()
@@ -27,9 +34,10 @@ public final class SerialStream: @unchecked Sendable {
         executor = Waits(lock)
     }
 
-    /// `body` given the stream, alone on it.
+    /// `body` given the stream, alone on it, every wait asked for before it at its point.
     func encode<T>(_ body: (ComputeStream) throws -> T) rethrows -> T {
-        try lock.withLock { try body(stream) }
+        executor.settle()
+        return try lock.withLock { try body(stream) }
     }
 
     /// **A task done once every call put on the stream so far is**, its value when (`uptimeNanoseconds`); written also
@@ -57,5 +65,7 @@ public final class SerialStream: @unchecked Sendable {
             let job = UnownedJob(job)
             queue.async { self.lock.withLock { job.runSynchronously(on: self.asUnownedTaskExecutor()) } }
         }
+        /// Every job put on the queue so far run. Never from the queue itself, nor under the lock.
+        func settle() { queue.sync {} }
     }
 }

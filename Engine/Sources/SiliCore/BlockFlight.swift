@@ -52,15 +52,17 @@ extension Block {
         var timing: Timing? = nil
         /// What the call executed (`Signature.flops`).
         var flops = 0
+        /// The first call of a `gpu` step in two (`Block.first`): the rows of the ANE's first unit.
+        var first = false
 
         /// A group's calls summed by step and unit, in their order: what `predicted` reads of them, whatever the count of
-        /// calls a share makes.
+        /// calls a share makes. A step's first call apart.
         static func summed(_ record: [Timed]) -> [Timed] {
             var order: [String] = [], by: [String: Timed] = [:]
             for t in record {
-                let k = "\(t.kind) \(t.step)"
+                let k = "\(t.kind) \(t.step)\(t.first ? " first" : "")"
                 if var s = by[k] { (s.rows, s.seconds, s.flops) = (s.rows + t.rows, s.seconds + t.seconds, s.flops + t.flops); by[k] = s }
-                else { order.append(k); by[k] = Timed(kind: t.kind, step: t.step, phase: t.phase, rows: t.rows, seconds: t.seconds, flops: t.flops) }
+                else { order.append(k); by[k] = Timed(kind: t.kind, step: t.step, phase: t.phase, rows: t.rows, seconds: t.seconds, flops: t.flops, first: t.first) }
             }
             return order.map { by[$0]! }
         }
@@ -105,7 +107,7 @@ extension Block {
         smooth(records, at: a0)
         try admit()
         let kappa = alone ?? 1
-        func predicted(_ u: Int) -> Double { Self.predicted(smoothed, measured: a0, rows: u * unit, alone: kappa) }
+        func predicted(_ u: Int) -> Double { Self.predicted(smoothed, measured: a0, rows: u * unit, unit: unit, alone: kappa) }
         let best = Self.bestShare(smoothed, measured: a0, unit: unit, shareable: shareable, admitted: admitted ?? [], alone: kappa).rows / unit
         // The share of none, visited where κ is unknown (`zero` due: the visit measures it), or where the curve predicts it
         // the fastest and the move pays — once a block: its own κ is the visit's from then on.
@@ -120,7 +122,7 @@ extension Block {
     /// share and this block's κ, faster than the best share's, and the move there paying over the cycles left.
     private func shouldVisitZero(than best: Double, now: Double) -> Bool {
         guard let alone, !zeroVisited, let at = smoothedAt else { return false }
-        let zero = Self.predicted(smoothed, measured: at, rows: 0, alone: alone)
+        let zero = Self.predicted(smoothed, measured: at, rows: 0, unit: unit, alone: alone)
         return zero < best && pays(now - zero)
     }
 
@@ -129,7 +131,7 @@ extension Block {
     /// `gpu` steps (which run alone at any share). Nil where the cycle is no longer than those steps.
     static func aloneRate(_ records: [[Timed]], measured a0: Int, zero: Double) -> Double? {
         let fixed = records.joined().filter { $0.kind == .fixed }.reduce(0) { $0 + $1.seconds }
-        let beside = predicted(records, measured: a0, rows: 0) - fixed
+        let beside = predicted(records, measured: a0, rows: 0, unit: 0) - fixed
         guard zero > fixed, beside > 0 else { return nil }
         return beside / (zero - fixed)
     }
@@ -194,7 +196,7 @@ extension Block {
         if ane.seconds > 0, gpu.seconds > 0, gpu.flops > 0 {
             ratio = Self.smoothing(ratio, (Double(ane.flops) / ane.seconds) / (Double(gpu.flops) / gpu.seconds))
         }
-        func shape(_ r: [[Timed]]) -> [[String]] { r.map { $0.map { "\($0.kind) \($0.step) \($0.phase)" } } }
+        func shape(_ r: [[Timed]]) -> [[String]] { r.map { $0.map { "\($0.kind) \($0.step) \($0.phase) \($0.first)" } } }
         guard shape(smoothed) == shape(records), let before = smoothedAt else { (smoothed, smoothedAt) = (records, a0); return }
         // Each call's seconds a row now, from the smoothed ones at the share they were taken at.
         func perRow(_ t: Timed, _ a: Int) -> Double {
@@ -225,7 +227,7 @@ extension Block {
     static func bestShare(_ records: [[Timed]], measured a0: Int, unit: Int, shareable: Int, admitted: Set<Int> = [],
                           alone: Double = 1) -> (seconds: Double, rows: Int) {
         let all = Array(1..<max(shareable / unit, 2)), within = all.filter(admitted.contains)
-        func t(_ k: Int) -> Double { predicted(records, measured: a0, rows: k * unit, alone: alone) }
+        func t(_ k: Int) -> Double { predicted(records, measured: a0, rows: k * unit, unit: unit, alone: alone) }
         let k = (within.isEmpty ? all : within).min { (t($0), $0) < (t($1), $1) }!
         return (t(k), k * unit)
     }
@@ -379,8 +381,13 @@ extension Block {
     /// phase lasts the longer of its two units' calls — the GPU's past the ANE's rows at their seconds a row, the ANE's
     /// at theirs (`neural` times them: another unit's cost a row); the `gpu` steps' calls, in turn. (A balance of the
     /// pass's sums, f = 1 / (1 + r), overlaps the ANE with every `gpu` step: 7 units of 256 at 1024² predicted 1.99 s, run
-    /// in 2.60; this, 2.57 — measured 19/11 on the mini.)
-    static func predicted(_ records: [[Timed]], measured a0: Int, rows a: Int, neural: Double = 1, alone: Double = 1) -> Double {
+    /// in 2.60; this, 2.57 — measured 19/11 on the mini.) A `gpu` step in two (`Block.first`) and the phase after it, as
+    /// one: the GPU's step then its calls of the phase, against the step's first call, then the ANE's first unit (`unit`
+    /// rows: the records summed by step tell the share's rows, not a call's) over the whole phase or the step's rest, the
+    /// longer, then its other units. (The unit read from the summed records, the share's 2560 rows: the whole phase seen
+    /// beside the step's rest, a share of 3072 predicted the faster, run 11.39 s a cycle against 10.13 at 2560 — 26/11/2026
+    /// on the M1 Pro.)
+    static func predicted(_ records: [[Timed]], measured a0: Int, rows a: Int, unit: Int, neural: Double = 1, alone: Double = 1) -> Double {
         // **The GPU's seconds a row past the ANE's, against those measured at `a0`**: at 0 rows it runs every row alone, at
         // 1/κ of them (`ThisMac.Capacity.alone`); between none and the share measured, on the straight line between the two
         // — the GPU slows as the ANE beside it takes more (a transformer of 13 billion weights in f16 on the M5 Pro,
@@ -389,21 +396,32 @@ extension Block {
         // measured everywhere.
         let factor = a >= a0 || a0 <= 0 ? 1 : 1 / alone + (1 - 1 / alone) * Double(a) / Double(a0)
         return records.reduce(0) { sum, r in
-            var steps: [String: (kind: Timed.Kind, phase: Int, seconds: Double, rows: Int)] = [:]
+            var steps: [String: (kind: Timed.Kind, step: String, phase: Int, seconds: Double, rows: Int, first: Bool)] = [:]
             for c in r {
-                let k = "\(c.kind) \(c.step)"
-                steps[k, default: (c.kind, c.phase, 0, 0)].seconds += c.seconds
-                steps[k, default: (c.kind, c.phase, 0, 0)].rows += c.rows
+                let k = "\(c.kind) \(c.step)\(c.first ? " first" : "")"
+                steps[k, default: (c.kind, c.step, c.phase, 0, 0, c.first)].seconds += c.seconds
+                steps[k, default: (c.kind, c.step, c.phase, 0, 0, c.first)].rows += c.rows
             }
-            var gpu: [Int: Double] = [:], ane: [Int: Double] = [:], serial = 0.0
+            // The `gpu` steps in two, by the phase they lead into: their first call's seconds, and all of theirs.
+            let two = Set(r.filter(\.first).map(\.step))
+            var gpu: [Int: Double] = [:], ane: [Int: Double] = [:], serial = 0.0, led: [Int: (first: Double, all: Double)] = [:]
             for s in steps.values {
                 switch s.kind {
                 case .neural: ane[s.phase, default: 0] += s.seconds * neural * Double(a) / Double(max(a0, 1))
                 case .past: gpu[s.phase, default: 0] += s.seconds / Double(s.rows) * Double(max(s.rows - (a - a0), 0)) * factor
+                case .fixed where two.contains(s.step):
+                    led[s.phase + 1, default: (0, 0)].all += s.seconds
+                    if s.first { led[s.phase + 1, default: (0, 0)].first += s.seconds }
                 case .fixed: serial += s.seconds
                 }
             }
-            return sum + serial + Set(gpu.keys).union(ane.keys).reduce(0) { $0 + max(gpu[$1] ?? 0, ane[$1] ?? 0) }
+            return sum + serial + Set(gpu.keys).union(ane.keys).union(led.keys).reduce(0) { total, k in
+                let g = gpu[k] ?? 0, n = ane[k] ?? 0
+                guard let step = led[k] else { return total + max(g, n) }
+                // The ANE's first unit over the phase, at `a` rows.
+                let lead = a > 0 ? n * Double(min(unit, a)) / Double(a) : 0
+                return total + max(step.all + g, step.first + max(lead, step.all - step.first) + n - lead)
+            }
         }
     }
 
@@ -412,7 +430,7 @@ extension Block {
     /// built and named (not written).
     private func form(units: Int, cut: Int?) throws -> (key: String, extent: Stage.Extent) {
         var loaded = stage.plan.declaration.functions.filter { functions[$0.key] != nil && ($0.key.hasPrefix("edge-") || $0.key.hasPrefix("ane-")) }
-        for (name, spec) in Self.steps(declaration, declaration.used, neural: units * unit, cut: cut) {
+        for (name, spec) in Self.steps(declaration, declaration.used, neural: units * unit, unit: unit, cut: cut) {
             nonisolated(unsafe) let m = try Self.module(spec)
             loaded[name] = Stage.Function(Functions.name(m, prefix: "block"), unit: .gpu) { m }
         }
@@ -432,7 +450,7 @@ extension Block {
     /// **The GPU's functions of the share now**, each built, named and loaded where it is not, the others let go once
     /// their calls are done. Their shares are no larger than those P counts, at the tallest calls. Whether one compiled.
     private func load() async throws -> Bool {
-        let need = Self.steps(declaration, declaration.used, neural: units * unit, cut: cut)
+        let need = Self.steps(declaration, declaration.used, neural: units * unit, unit: unit, cut: cut)
         var compiled = false
         for (name, spec) in need.sorted(by: { $0.key < $1.key }) where functions[name] == nil {
             let m = try Self.module(spec)
