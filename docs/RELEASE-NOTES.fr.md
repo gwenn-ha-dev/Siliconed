@@ -2,6 +2,40 @@
 
 # Siliconed — notes de version
 
+## 0.33 · Rhossili
+
+Ouah, vous êtes nombreux à utiliser Siliconed, et j'en suis le premier surpris. Désolé de vous infliger autant de changements au fond du moteur, version après version : j'explore Core AI comme un petit fou. En même temps, c'est un logiciel open source en 0.x : on assume !
+
+Toujours sur le sable de Rhossili, où la marée refait la plage deux fois par jour : la 0.33 ne s'arrête plus au deuxième rendu sur les Mac de 16 Go, compile les fonctions de Core AI avant que vous rendiez plutôt que pendant le rendu, finit plus tôt le premier rendu d'un Mac, et montre la machine au travail dans une fenêtre à elle.
+
+### Corrigé
+
+- **Le deuxième rendu n'arrête plus le moteur sur les Mac de 16 Go.** La 0.32 pouvait mourir au deuxième rendu de Krea 2 et de Qwen-Image-2.1 en Compacte sur un M1 Pro de 16 Go, et une fois au Mac mini : deux fils attendaient en même temps sur le flux de Core AI. Le flux n'est plus touché que par un fil à la fois.
+
+### Plus rapide
+
+- **Core AI compile avant que vous rendiez.** Dès que le formulaire reste une seconde et demie sur un modèle et une taille, le moteur compile au fond ce dont ce rendu aura besoin ; après une mise à jour de l'app ou de macOS, chaque modèle installé est compilé au lancement pour le 1024², sur batterie aussi. Un premier rendu n'attend plus Core AI : le premier rendu d'Anima Standard en 1024² au Mac mini, 19,1 → 12,5 s (8,8 s à chaud). La lumière de Core AI, au pied de la colonne, dit quand il compile.
+- **Le premier rendu d'un Mac ne chronomètre plus le GPU seul là où il ne peut pas gagner.** Chaque Mac mesure une fois de combien son GPU va plus vite seul qu'à côté du Neural Engine, et le GPU seul n'est essayé que là où ça pourrait payer : au M1 Pro de 16 Go, Z-Image ne l'essaie jamais. Il y prenait deux des huit pas d'un rendu, chacun 90 % plus lent : Z-Image Compacte en 1024² au M1 Pro, le premier rendu à une taille neuve 84,0 → 68,1 s, le tout premier rendu du Mac 89,6 → 73,6 s.
+- **Le décodeur rend à ses plus larges bandes dès la première image d'un Mac** : la préparation lit une fois ce que ses bandes tiennent sur ce Mac, là où le premier rendu se rabattait sur les plus fines. Le premier rendu de Z-Image Compacte au Mac mini sous une limite mémoire de 10 Go, 24,2 → 21,0 s.
+- **La part du Neural Engine est suivie à chaque pas**, sur une courbe de ce que coûte chaque part, et se déplace là où le gain paie sur les pas qui restent.
+- **Le Neural Engine part plus tôt dans chaque pas** : le travail du GPU qui mène à lui se fait en deux appels, et les rangées du premier passent au Neural Engine dès qu'elles sont prêtes. Qwen-Image-2.1 Compacte en 1024² au M1 Pro, 5,2 % plus rapide le pas.
+- **Anima Compacte partage chaque bloc avec le Neural Engine** : 3,6 % plus rapide le pas au M1 Pro, et 4,9 → 4,5 Go de mémoire au plus.
+- **Moins de temps entre les étages** : le DiT s'ouvre pendant que l'encodeur de texte tourne et le décodeur à côté du dernier pas, là où la limite mémoire tient les deux ; la fermeture d'un étage n'attend plus rien. Hors du calcul, environ 2,6 s de moins pour Qwen-Image-2.1 Compacte au M1 Pro et 1,8 s de moins pour Anima Compacte ; Qwen-Image-2.1 Compacte au Mac mini, 1,63 → 0,63 s.
+- **Temps** au Mac mini M5 Pro, 1024², 8 pas, le modèle chargé, en Compacte : Z-Image 16,2 → 16,3 s, Anima 8,2 → 8,5, Krea 2 27,8 → 27,8, MOSS-Image 18,1 → 18,0, Qwen-Image-2.1 21,0 → 21,6. Au M1 Pro de 16 Go, en Compacte, enfin remesuré : Z-Image 74,3 → 72,0 s, Anima 37,2 → 35,0, MOSS-Image 84,4 → 74,0, et Krea 2 118,1 s et Qwen-Image-2.1 87,8 s là où la 0.32 s'arrêtait au deuxième rendu ([Chiffres](ENGINE.fr.md#les-chiffres)).
+
+### Plus lent, et on le dit : la Standard sous le Neural Engine
+
+- **Neural Engine allumé, la Standard calcule désormais en f16 de bout en bout**, ses fonctions partagées par le GPU et le Neural Engine, là où la 0.32 pouvait encore garder le bf16 au GPU seul quand il allait plus vite. Au Mac mini, la Standard : Z-Image 21,7 → 23,8 s, Anima 7,7 → 8,6, Qwen-Image-2.1 29,4 → 31,2, Krea 2 41,1 → 41,9, MOSS-Image 21,7 → 22,1. Pour Anima Standard, le Neural Engine éteint (Réglages › Général) la rend en bf16 au GPU : 0,84 s le pas contre 0,95. La règle repasse sur la table pour la 0.34.
+
+### L'app
+
+- **La fenêtre Machine** (⌥⌘U, Fenêtre › Machine, ou un clic sur la lumière de Core AI) : le Mac (son modèle, sa puce, sa mémoire et son macOS) et ce que Siliconed peut en tenir ; Core AI, ce qui compile maintenant et ensuite, ce qui est compilé pour ce Mac, son poids et Effacer… ; et le rendu sur un seul axe du temps, sa mémoire (le socle, les poids du modèle, les intermédiaires, sous la limite de Siliconed) et son calcul en TFLOP/s : celui de l'encodeur de texte, celui de chaque pas du DiT avec le Neural Engine et le GPU à part, et celui du VAE.
+- **La lumière de Core AI** au pied de la colonne, face à Générer : allumée pendant que Core AI compile, le mot « compile » se remplissant au fil d'une préparation. Les lignes de la préparation dans le rack et à l'accueil sont parties.
+- **Debug live** (dans la fenêtre Machine, ou `silicontrol set debug-live on`) : la trace d'un rendu par le moteur, le temps occupé de chaque unité et où elle a attendu, lue par `silicontrol trace`. Éteint à chaque lancement ; aucun coût mesurable (+0,05 % le pas).
+- **L'inspecteur de la chaîne** garde les étages, la file, la dernière image et la session, et la barre de la part du Neural Engine.
+- **`silicontrol status`** dit `preparing` (ce que Core AI compile, n sur N, les modèles après lui) et le dernier pas (`cycle` : les rangées du Neural Engine, les secondes, les TFLOP/s) ; `calibrating` est parti.
+- **Rendre sur un autre Mac** : les deux Mac en 0.33.
+
 ## 0.32 · Rhossili
 
 Toujours sur le sable de Rhossili : la 0.32 rend le rédacteur de l'Atelier de prompts aux Mac de 16 Go, rend les fine-tunes que Civitai publie en fp8 et en fp16, et finit plus tôt le premier rendu d'un modèle sur un Mac.

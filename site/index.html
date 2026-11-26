@@ -24,7 +24,7 @@
  "operatingSystem":"macOS 27 or later (Apple silicon)","applicationCategory":"MultimediaApplication",
  "description":"Local text-to-image generation and image editing on Apple silicon Macs: Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1, Anima Turbo and MOSS-Image in Swift on Core AI, read from their publishers' files, each render planned under a fixed memory budget.",
  "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://www.apache.org/licenses/LICENSE-2.0",
- "downloadUrl":"https://github.com/gwenn-ha-dev/Siliconed/releases/download/v0.32/Siliconed-0.32.dmg",
+ "downloadUrl":"https://github.com/gwenn-ha-dev/Siliconed/releases/download/v0.33/Siliconed-0.33.dmg",
  "codeRepository":"https://github.com/gwenn-ha-dev/Siliconed","image":"https://gwenn-ha-dev.github.io/Siliconed/images/window.jpg"}
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -201,7 +201,7 @@
 <body>
 <div class="wrap bar">
   <a class="brand" href="#top"><img src="images/icon.svg" width="40" height="40" alt="">Siliconed</a>
-  <a class="pill" href="https://github.com/gwenn-ha-dev/Siliconed/releases/download/v0.32/Siliconed-0.32.dmg">Download</a>
+  <a class="pill" href="https://github.com/gwenn-ha-dev/Siliconed/releases/download/v0.33/Siliconed-0.33.dmg">Download</a>
 </div>
 
 <header class="wrap hero" id="top">
@@ -215,13 +215,13 @@
       <path d="M 40 830 L 560 830 A 310 310 0 0 0 560 210 A 310 310 0 0 0 250 520"/>
     </g>
   </svg>
-  <p class="eyebrow h-fade">v0.32 · the Rhossili edition · free · open source</p>
+  <p class="eyebrow h-fade">v0.33 · the Rhossili edition · free · open source</p>
     <h1 class="h-fade d1"><span class="grad">Apple wrote the kernels.<br>We brought the models.</span><span class="sub">And a plan that fits them in <em>your</em> Mac's memory.</span></h1>
     <p class="lead h-fade d2">Five image models written as Core AI functions, on the very files their publishers released.
       Core AI computes them on your Mac's GPU and Neural Engine; Siliconed plans every byte under your Mac's memory
       limit and checks every stage against the original code. No Python. No server. No cloud. No excuses.</p>
   <div class="cta h-fade d3">
-    <a class="btn primary" href="https://github.com/gwenn-ha-dev/Siliconed/releases/download/v0.32/Siliconed-0.32.dmg">Download for macOS</a>
+    <a class="btn primary" href="https://github.com/gwenn-ha-dev/Siliconed/releases/download/v0.33/Siliconed-0.33.dmg">Download for macOS</a>
     <a class="btn" href="https://github.com/gwenn-ha-dev/Siliconed">Source on GitHub</a>
   </div>
   <p class="req">Apache 2.0 · macOS 27 or later · Apple silicon · signed and notarized · also <a href="https://huggingface.co/gwenn-ha-dev/Siliconed/resolve/main/Siliconed.dmg?download=true">from Hugging Face</a></p>
@@ -239,7 +239,7 @@
     <div class="text reveal">
       <p class="kicker">Five models · the heavy one first</p>
       <h2><span class="grad">Krea 2 Turbo.</span><br>Too big for your Mac. Runs anyway.</h2>
-      <p class="punch">12.8 billion parameters on a 16 GB M1 Pro, under a 10 GB limit: just over two minutes, and not a byte over.</p>
+      <p class="punch">12.8 billion parameters on a 16 GB M1 Pro, under a 10 GB limit: just under two minutes, and not a byte over.</p>
       <p>Aesthetic images, from photography to painting. The whole 8-step recipe on the publisher's bf16
         weights, read as published. Heavier than a 16 GB Mac's memory, so the engine keeps the weights that fit and
         reads the others from disk in turn while it computes: same values, more time.</p>
@@ -277,7 +277,7 @@
       <tr><td><a href="https://huggingface.co/circlestone-labs/Anima">Anima Turbo</a></td><td>text-to-image (illustration, painting, anime), LoRA</td><td>CircleStone Labs Non-Commercial (the images may be used commercially)</td></tr>
       <tr><td><a href="https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT">MOSS-Image</a></td><td>text-to-image, LoRA; beta, under the community's 8-step LoRA</td><td>Apache 2.0</td></tr>
     </table></div>
-    <p class="times">At 1024², 8 steps, seed 42, the model loaded: on a Mac mini M5 Pro with 64 GB, Standard, Krea 2 Turbo 41.1 s, Z-Image Turbo 21.7 s, Qwen-Image-2.1 Turbo 29.4 s, Anima Turbo 7.7 s, MOSS-Image 21.7 s; on a 16 GB M1 Pro, Compact, in 0.30, 128.1 s, 75.9 s, 97.7 s, 33.6 s, 76.4 s. The first render at a size also compiles, once. <a href="https://github.com/gwenn-ha-dev/Siliconed/blob/main/docs/ENGINE.md#numbers">All the numbers</a>; yours are welcome, the 8 GB Macs first: <a href="https://github.com/gwenn-ha-dev/Siliconed/issues/new?template=times.yml">one command, one form</a>.</p>
+    <p class="times">At 1024², 8 steps, seed 42, the model loaded: on a Mac mini M5 Pro with 64 GB, Standard, Krea 2 Turbo 41.9 s, Z-Image Turbo 23.8 s, Qwen-Image-2.1 Turbo 31.2 s, Anima Turbo 8.6 s, MOSS-Image 22.1 s; on a 16 GB M1 Pro, Compact, 118.1 s, 72.0 s, 87.8 s, 35.0 s, 74.0 s. Core AI compiles ahead, in the background. <a href="https://github.com/gwenn-ha-dev/Siliconed/blob/main/docs/ENGINE.md#numbers">All the numbers</a>; yours are welcome, the 8 GB Macs first: <a href="https://github.com/gwenn-ha-dev/Siliconed/issues/new?template=times.yml">one command, one form</a>.</p>
   </div>
   <div class="split rev" id="moss" style="margin-top:clamp(64px, 9vw, 112px)">
     <div class="text reveal">
@@ -324,13 +324,13 @@
         and reads the others from disk while it computes; what Core AI holds for its functions is read in flight,
         every millisecond; a large image is decoded in bands; a size never rendered is judged from the ones that were; what truly does not fit is refused up front, and told why.</p>
     </div>
-    <div class="map reveal" role="img" aria-label="The app's memory peak at 1024² on a 16 GB M1 Pro, Compact, in 0.30, under its 10 GiB limit: Krea 2 Turbo 9.8 GiB, Z-Image Turbo 8.2 GiB, Qwen-Image-2.1 Turbo 9.7 GiB, Anima Turbo 5.1 GiB, MOSS-Image 7.5 GiB.">
-      <p class="head">peak at 1024² · a real 16 GB M1 Pro · Compact · 0.30</p>
-      <div class="row"><span>Krea 2 Turbo</span><span class="on">9.8 GiB</span><span class="gain">of 10</span></div>
-      <div class="row"><span>Z-Image Turbo</span><span class="on">8.2 GiB</span><span class="gain">of 10</span></div>
-      <div class="row"><span>Qwen-Image-2.1</span><span class="on">9.7 GiB</span><span class="gain">of 10</span></div>
-      <div class="row"><span>Anima Turbo</span><span class="on">5.1 GiB</span><span class="gain">of 10</span></div>
-      <div class="row"><span>MOSS-Image</span><span class="on">7.5 GiB</span><span class="gain">of 10</span></div>
+    <div class="map reveal" role="img" aria-label="The app's memory peak at 1024² on a 16 GB M1 Pro, Compact, in 0.33, under its 10 GiB limit: Krea 2 Turbo 9.4 GiB, Z-Image Turbo 8.6 GiB, Qwen-Image-2.1 Turbo 9.5 GiB, Anima Turbo 5.7 GiB, MOSS-Image 7.7 GiB.">
+      <p class="head">peak at 1024² · a real 16 GB M1 Pro · Compact · 0.33</p>
+      <div class="row"><span>Krea 2 Turbo</span><span class="on">9.4 GiB</span><span class="gain">of 10</span></div>
+      <div class="row"><span>Z-Image Turbo</span><span class="on">8.6 GiB</span><span class="gain">of 10</span></div>
+      <div class="row"><span>Qwen-Image-2.1</span><span class="on">9.5 GiB</span><span class="gain">of 10</span></div>
+      <div class="row"><span>Anima Turbo</span><span class="on">5.7 GiB</span><span class="gain">of 10</span></div>
+      <div class="row"><span>MOSS-Image</span><span class="on">7.7 GiB</span><span class="gain">of 10</span></div>
       <p class="note">The limit is ¾ of the Mac's memory minus 2 GB: 10 GB on 16 GB. Nothing swapped.</p>
     </div>
   </div>
@@ -498,7 +498,7 @@
   <div class="wrap">
     <h2 class="reveal"><span class="grad">Your Mac can take it.</span></h2>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/gwenn-ha-dev/Siliconed/releases/download/v0.32/Siliconed-0.32.dmg">Download the .dmg</a>
+      <a class="btn primary" href="https://github.com/gwenn-ha-dev/Siliconed/releases/download/v0.33/Siliconed-0.33.dmg">Download the .dmg</a>
       <a class="btn" href="https://github.com/gwenn-ha-dev/Siliconed#readme">Read the README</a>
       <a class="btn" href="https://github.com/gwenn-ha-dev/Siliconed/blob/main/README.fr.md">En français</a>
     </div>

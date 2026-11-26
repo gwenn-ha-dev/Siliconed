@@ -12,11 +12,11 @@ Tout n'est pas vert, et cette page le dit : quelques mesures sortent rouges de q
 
 ## Mise en place
 
-Il faut un Mac Apple silicon sous macOS 27, l'app (0.32), Python 3.12, et ce dépôt à la version de l'app (Siliconed → À propos de Siliconed l'affiche). `siliconed` est livré dans l'app : c'est le moteur même avec lequel l'app rend, et il tourne sans Xcode.
+Il faut un Mac Apple silicon sous macOS 27, l'app (0.33), Python 3.12, et ce dépôt à la version de l'app (Siliconed → À propos de Siliconed l'affiche). `siliconed` est livré dans l'app : c'est le moteur même avec lequel l'app rend, et il tourne sans Xcode.
 
 ```sh
 alias siliconed=/Applications/Siliconed.app/Contents/Helpers/siliconed
-git clone --branch v0.32 https://github.com/gwenn-ha-dev/Siliconed && cd Siliconed/App
+git clone --branch v0.33 https://github.com/gwenn-ha-dev/Siliconed && cd Siliconed/App
 python3.12 -m venv oracle-env && oracle-env/bin/pip install -r tools/oracle/requirements.txt
 ```
 

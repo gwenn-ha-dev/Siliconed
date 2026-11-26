@@ -63,17 +63,17 @@ Siliconed ne s'accorde jamais plus que son budget : par défaut ¾ de la mémoir
 
 ## Les chiffres
 
-Les cinq modèles à 1024², 8 pas, graine 42, réglages par défaut de l'app, sous le budget par défaut. Le temps est celui du rendu, le modèle chargé ; le premier rendu à une taille compile aussi (plus haut), son temps entre parenthèses là où il a été pris.
+Les cinq modèles à 1024², 8 pas, graine 42, réglages par défaut de l'app, sous le budget par défaut. Le temps est celui du rendu, le modèle chargé ; entre parenthèses là où il a été pris, le premier rendu d'un Mac qui n'a encore rien appris (sa carte vide, les compilations de Core AI faites au fond avant lui).
 
-| | Mac mini M5 Pro, 64 Go · Standard | Mac mini M5 Pro, 64 Go · Compact | M1 Pro, 16 Go · Compact, 0.30 |
+| | Mac mini M5 Pro, 64 Go · Standard | Mac mini M5 Pro, 64 Go · Compact | M1 Pro, 16 Go · Compact |
 |---|---:|---:|---:|
-| Z-Image Turbo | 21,7 s | 16,2 s | 75,9 s (93,5) |
-| Anima Turbo | 7,7 s | 8,2 s | 33,6 s (45,8) |
-| Krea 2 Turbo | 41,1 s | 27,8 s | 128,1 s (149,6) |
-| MOSS-Image | 21,7 s | 18,1 s | 76,4 s (99,3) |
-| Qwen-Image-2.1 Turbo | 29,4 s | 21,0 s | 97,7 s (120,7) |
+| Z-Image Turbo | 23,8 s | 16,3 s | 72,0 s (83,3) |
+| Anima Turbo | 8,6 s | 8,5 s | 35,0 s |
+| Krea 2 Turbo | 41,9 s | 27,8 s | 118,1 s (143,8) |
+| MOSS-Image | 22,1 s | 18,0 s | 74,0 s (90,6) |
+| Qwen-Image-2.1 Turbo | 31,2 s | 21,6 s | 87,8 s (104,3) |
 
-La colonne du M1 Pro est encore celle de la 0.30, jusqu'à sa prochaine mesure.
+Neural Engine allumé, la Standard calcule en f16 de bout en bout ; éteint, en bf16 au GPU seul, ce qui rend Anima Standard plus vite au Mac mini (0,84 s le pas contre 0,95).
 
 **La Compact lit moitié moins d'octets que la Standard**, sur le disque comme en mémoire, et là où le GPU multiplie l'int8 en int32, elle calcule aussi plus vite : au Mac mini, un pas de son DiT à 1024² va de 10 à 40 % plus vite qu'en 0.30, son int8 × int8 contre le W8A16 de la 0.30. Là où le budget ne tient pas les poids de la Standard, c'est la version qui lit le moins.
 

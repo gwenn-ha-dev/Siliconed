@@ -63,17 +63,17 @@ Siliconed never grants itself more than its budget: ¾ of the Mac's memory minus
 
 ## Numbers
 
-The five models at 1024², 8 steps, seed 42, the app's default settings, under the default budget. The time is the render's, the model loaded; the first render at a size also compiles (above), its time in brackets where it was taken.
+The five models at 1024², 8 steps, seed 42, the app's default settings, under the default budget. The time is the render's, the model loaded; in brackets where it was taken, the first render on a Mac that has learned nothing yet (its map empty, Core AI's compilations made in the background before it).
 
-| | Mac mini M5 Pro, 64 GB · Standard | Mac mini M5 Pro, 64 GB · Compact | M1 Pro, 16 GB · Compact, 0.30 |
+| | Mac mini M5 Pro, 64 GB · Standard | Mac mini M5 Pro, 64 GB · Compact | M1 Pro, 16 GB · Compact |
 |---|---:|---:|---:|
-| Z-Image Turbo | 21.7 s | 16.2 s | 75.9 s (93.5) |
-| Anima Turbo | 7.7 s | 8.2 s | 33.6 s (45.8) |
-| Krea 2 Turbo | 41.1 s | 27.8 s | 128.1 s (149.6) |
-| MOSS-Image | 21.7 s | 18.1 s | 76.4 s (99.3) |
-| Qwen-Image-2.1 Turbo | 29.4 s | 21.0 s | 97.7 s (120.7) |
+| Z-Image Turbo | 23.8 s | 16.3 s | 72.0 s (83.3) |
+| Anima Turbo | 8.6 s | 8.5 s | 35.0 s |
+| Krea 2 Turbo | 41.9 s | 27.8 s | 118.1 s (143.8) |
+| MOSS-Image | 22.1 s | 18.0 s | 74.0 s (90.6) |
+| Qwen-Image-2.1 Turbo | 31.2 s | 21.6 s | 87.8 s (104.3) |
 
-The M1 Pro's column is still 0.30's, until it is measured again.
+With the Neural Engine on, the Standard computes in f16 from end to end; with it off, in bf16 on the GPU alone, which renders Anima Standard faster on the Mac mini (0.84 s a step against 0.95).
 
 **The Compact reads half the bytes of the Standard**, from disk and in memory, and where the GPU multiplies int8 into int32 it computes faster as well: on the Mac mini, a step of its DiT at 1024² is 10 to 40 % faster than in 0.30, its int8 × int8 against 0.30's W8A16. Where the budget cannot hold the Standard's weights, it is the version that reads the least.
 

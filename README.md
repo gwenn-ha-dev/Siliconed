@@ -41,9 +41,9 @@ English · [Français](README.fr.md)
 Siliconed used to carry its own Metal kernels, tuned chip by chip. Since 0.30 it computes on **Core AI**, the runtime Apple ships with macOS 27: Apple writes and tunes the kernels for every chip, the GPU and the Neural Engine alike, and Siliconed keeps what is its own — the models, their memory, their proof.
 
 - **Apple writes the kernels; Siliconed writes the models.** Each model is a few Core AI functions written in Swift and the loop that calls them. No kernel of ours to maintain, no table of chips, nothing to measure before the first render: a new Mac or a new macOS, and Core AI brings what suits it. [The engine](docs/ENGINE.md#core-ai).
-- **The Neural Engine pitches in, on all five models.** Its share of each block is found while the image renders, step after step, and moves to whichever unit finishes first. The Standard uses it too, its bf16 weights rounded once to f16 — the engine times both ways on your Mac and keeps the faster.
+- **The Neural Engine pitches in, on all five models.** Its share of each block is found while the image renders, step after step, and moves to whichever unit finishes first. The Standard uses it too, its bf16 weights rounded once to f16; with the Neural Engine off, it computes in bf16 on the GPU alone.
 - **The publishers' files, read as they are.** The publisher's bf16 for the Standard, published int8 for the Compact, at half the disk. An installation is a download; there is nothing to convert, ever.
-- **Compiled once, then off it goes.** Core AI compiles a function for its shapes: the first render at a new size pays for it once, and the Chain says so. Z-Image on a 16 GB M1 Pro: 93 s the first time, 76 s after that.
+- **Compiled ahead, then off it goes.** Core AI compiles a function for its shapes: Siliconed has it done in the background while you write the prompt, so that the first render no longer waits on it, and Core AI's light says when it compiles. Z-Image on a 16 GB M1 Pro: 83 s for the very first render on the Mac, 72 s after that.
 - **LoRAs beside the weights, never melted into them**, so their small touches survive the int8 codes.
 
 ## Big models, small Mac
@@ -52,13 +52,13 @@ A 12.8-billion-parameter model on a 16 GB Mac sounds like a bad idea. Siliconed 
 
 <p align="center"><img src="docs/images/budget.svg" width="900" alt="A stage under the memory limit: the floor, the arena, the ring fed from the published files, the weights kept, Core AI's share read in flight; a block's rows shared between the Neural Engine and the GPU."></p>
 
-| 1024², 8 steps | Mac mini M5 Pro, 64 GB | M1 Pro, 16 GB · Compact, 0.30 |
+| 1024², 8 steps | Mac mini M5 Pro, 64 GB | M1 Pro, 16 GB · Compact |
 |---|---:|---:|
-| Z-Image Turbo | 21.7 s | 75.9 s |
-| Anima Turbo | 7.7 s | 33.6 s |
-| Krea 2 Turbo | 41.1 s | 128.1 s |
-| MOSS-Image | 21.7 s | 76.4 s |
-| Qwen-Image-2.1 Turbo | 29.4 s | 97.7 s |
+| Z-Image Turbo | 23.8 s | 72.0 s |
+| Anima Turbo | 8.6 s | 35.0 s |
+| Krea 2 Turbo | 41.9 s | 118.1 s |
+| MOSS-Image | 22.1 s | 74.0 s |
+| Qwen-Image-2.1 Turbo | 31.2 s | 87.8 s |
 
 *The Mac mini in Standard, the M1 Pro in Compact under its 10 GB limit; the model loaded, compilation done. Both versions, the first renders and how to take your own: [Numbers](docs/ENGINE.md#numbers).*
 

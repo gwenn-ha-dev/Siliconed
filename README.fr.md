@@ -41,9 +41,9 @@
 Siliconed portait ses propres noyaux Metal, réglés puce par puce. Depuis la 0.30, il calcule sur **Core AI**, le runtime qu'Apple livre avec macOS 27 : Apple écrit et règle les noyaux pour chaque puce, le GPU comme le Neural Engine, et Siliconed garde ce qui est à lui — les modèles, leur mémoire, leur preuve.
 
 - **Apple écrit les noyaux ; Siliconed écrit les modèles.** Chaque modèle est quelques fonctions Core AI écrites en Swift et la boucle qui les appelle. Aucun noyau à nous à entretenir, aucune table de puces, rien à mesurer avant le premier rendu : un Mac neuf ou un macOS neuf, et Core AI apporte ce qui lui va. [Le moteur](docs/ENGINE.fr.md#core-ai).
-- **Le Neural Engine met la main à la pâte, sur les cinq modèles.** Sa part de chaque bloc se trouve pendant que l'image se calcule, pas après pas, et passe à l'unité qui finit la première. La Standard s'en sert aussi, ses poids bf16 arrondis une fois en f16 — le moteur chronomètre les deux façons sur votre Mac et garde la plus rapide.
+- **Le Neural Engine met la main à la pâte, sur les cinq modèles.** Sa part de chaque bloc se trouve pendant que l'image se calcule, pas après pas, et passe à l'unité qui finit la première. La Standard s'en sert aussi, ses poids bf16 arrondis une fois en f16 ; Neural Engine éteint, elle calcule en bf16 au GPU seul.
 - **Les fichiers des éditeurs, lus tels quels.** Les bf16 de l'éditeur pour la Standard, des int8 publiés pour la Compact, à moitié moins de disque. Une installation est un téléchargement ; rien à convertir, jamais.
-- **Compilé une fois, et c'est parti.** Core AI compile une fonction pour ses formes : le premier rendu à une taille neuve le paie une fois, et la Chaîne le dit. Z-Image sur un M1 Pro de 16 Go : 93 s la première fois, 76 s ensuite.
+- **Compilé d'avance, et c'est parti.** Core AI compile une fonction pour ses formes : Siliconed le lui fait faire au fond pendant que vous écrivez le prompt, si bien que le premier rendu ne l'attend plus, et la lumière de Core AI dit quand il compile. Z-Image sur un M1 Pro de 16 Go : 83 s pour le tout premier rendu du Mac, 72 s ensuite.
 - **Les LoRA à côté des poids, jamais fondues dedans**, pour que leurs petites retouches survivent aux codes int8.
 
 ## Gros modèles, petit Mac
@@ -52,13 +52,13 @@ Un modèle de 12,8 milliards de paramètres sur un Mac de 16 Go, ça sent la mau
 
 <p align="center"><img src="docs/images/budget.svg" width="900" alt="Un étage sous la limite de mémoire : le plancher, l'arène, l'anneau nourri par les fichiers publiés, les poids gardés, la part de Core AI lue en vol ; les rangées d'un bloc partagées entre le Neural Engine et le GPU."></p>
 
-| 1024², 8 pas | Mac mini M5 Pro, 64 Go | M1 Pro, 16 Go · Compact, 0.30 |
+| 1024², 8 pas | Mac mini M5 Pro, 64 Go | M1 Pro, 16 Go · Compact |
 |---|---:|---:|
-| Z-Image Turbo | 21,7 s | 75,9 s |
-| Anima Turbo | 7,7 s | 33,6 s |
-| Krea 2 Turbo | 41,1 s | 128,1 s |
-| MOSS-Image | 21,7 s | 76,4 s |
-| Qwen-Image-2.1 Turbo | 29,4 s | 97,7 s |
+| Z-Image Turbo | 23,8 s | 72,0 s |
+| Anima Turbo | 8,6 s | 35,0 s |
+| Krea 2 Turbo | 41,9 s | 118,1 s |
+| MOSS-Image | 22,1 s | 74,0 s |
+| Qwen-Image-2.1 Turbo | 31,2 s | 87,8 s |
 
 *Le Mac mini en Standard, le M1 Pro en Compact sous sa limite de 10 Go ; le modèle chargé, la compilation faite. Les deux versions, les premiers rendus et comment prendre les vôtres : [Les chiffres](docs/ENGINE.fr.md#les-chiffres).*
 
