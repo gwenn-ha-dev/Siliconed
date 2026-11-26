@@ -298,6 +298,8 @@ extension Block {
 
     /// The ANE's share said, as the fraction of the shareable rows it computes.
     func told() {
-        if total > 0 && (units > 0 || share == .inFlight) { Stages.computed(neuralEngine: Double(units) / Double(total)) }
+        if total > 0 && (units > 0 || share == .inFlight) {
+            Stages.computed(stage: stage.plan.declaration.name, neuralEngine: Double(units) / Double(total))
+        }
     }
 }

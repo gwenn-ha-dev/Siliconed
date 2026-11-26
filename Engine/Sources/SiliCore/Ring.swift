@@ -198,6 +198,14 @@ public final class Ring: @unchecked Sendable {
         condition.unlock()
     }
 
+    /// **Whether the reader may still keep a group in flight**: one it may keep (`keeps`) never read into a place of its
+    /// own, while it reads.
+    public var deciding: Bool {
+        condition.lock(); defer { condition.unlock() }
+        guard let w = work, !finished, !stopped else { return false }
+        return !w.keeps.isSubset(of: read)
+    }
+
     /// The groups kept so far, in the order read.
     public var keptGroups: [String] {
         condition.lock(); defer { condition.unlock() }

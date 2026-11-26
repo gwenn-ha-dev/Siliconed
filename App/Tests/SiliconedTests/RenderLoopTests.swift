@@ -77,14 +77,15 @@ final class RenderLoopTests: XCTestCase {
         XCTAssertEqual(Self.script.told, [6, 5, 4, 3, 2, 1])
     }
 
-    /// Image 0's times hold the text and the DiT's opening; another's, its own denoising and decoding alone.
+    /// Image 0's times hold the text and the DiT's opening (beside the text, from the tokens on: what is left of it once
+    /// the text is done is image 0's denoising); another's, its own denoising and decoding alone.
     func testImageZerosTimesHoldTheTextAndTheOpening() throws {
         let (renders, _) = try run(seeds: [1, 2])
         XCTAssertEqual(renders.count, 2)
         let (first, second) = (renders[0].timings, renders[1].timings)
         XCTAssertGreaterThanOrEqual(first.tokenizer, Self.pause)
         XCTAssertGreaterThanOrEqual(first.text, first.tokenizer)
-        XCTAssertGreaterThanOrEqual(first.denoising, Self.pause, "the DiT's opening is image 0's denoising")
+        XCTAssertGreaterThanOrEqual(first.total, 2 * Self.pause, "the DiT's opening, from the tokens on, is image 0's")
         XCTAssertGreaterThanOrEqual(first.total, first.text + first.denoising + first.decoding)
         XCTAssertEqual(second.text, 0)
         XCTAssertEqual(second.tokenizer, 0)
@@ -162,12 +163,13 @@ private struct LoopParts: RenderParts {
         RenderLoopTests.script.tokenized += 1
         return 3
     }
-    mutating func encode() throws -> Bool { false }
-    mutating func image() throws -> Latent? { nil }
+    mutating func encode(ahead: Stage.Ahead?) throws -> Bool { false }
+    mutating func image(ahead: Stage.Ahead?) throws -> Latent? { nil }
     func denoiser(height: Int, width: Int) throws -> any RenderDenoiser {
         Thread.sleep(forTimeInterval: RenderLoopTests.pause)
         return LoopDiT()
     }
+    func give(_ dit: any RenderDenoiser) throws {}
     func prepare(height: Int, width: Int) throws -> [Functions.Specialization] {
         XCTAssertEqual(RenderLoopTests.script.tokenized, 1, "prepared after its tokens")
         RenderLoopTests.script.prepared.append("part \(height)×\(width)")

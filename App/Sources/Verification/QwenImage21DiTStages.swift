@@ -15,7 +15,8 @@ extension QwenImage21Stages {
         let sequence = try QwenImage21DiT.Sequence(slots: [Bool](repeating: false, count: textRows), references: [], height: h, width: w)
         let text = HostTensor([textRows, c.context], floats: Pace.noise(textRows * c.context, seed: 1))
         return try Pace.run(invocation, title: "\(model) pace\(compact ? " compact" : "") \(invocation.size)") {
-            let d = try QwenImage21Render.Denoiser(map: map, sequence: sequence, text: text, references: nil)
+            let d = try QwenImage21Render.Denoiser(map: map, sequence: sequence)
+            try d.prompt(text: text, references: nil)
             print("\(model) pace: " + d.described)
             return d
         } evaluate: { d, e, time in

@@ -546,3 +546,90 @@ import Testing
         #expect(a.kin != Stage.Extent(["f#0 x f32", "f#0 y out f16"], inFlight: 2, elements: [:]).kin)
     }
 }
+
+/// **A stage opened beside the one that runs** (`Stage.beside`, `Ahead`, `planned`), on a simulated footprint: the one
+/// that runs, its share read at 10 MiB on this Mac and 2 MiB now; beside it, a stage of the same socle.
+@Suite struct StageBesides {
+    static let share = 2 << 20, reading = 10 << 20
+
+    /// The one that runs (`inFlight` naming its key apart from every other test's), its footprint at its floor, then past
+    /// its arena by `share`.
+    static func running(_ device: MTLDevice, inFlight: Int, read: Bool = true) async throws -> (Stage, StageSignals.Footprint, ThisMac) {
+        var d = StagePlans.declaration("running")
+        d.functions = [:]
+        d.inFlight = inFlight
+        d.cycle = []
+        d.once = ["first", "g0", "g1", "g2", "g3"]
+        let plan = try Stage.plan(d, files: [StagePlans.file], budget: 1 << 40, floor: StagePlans.floor)
+        var measured = ThisMac()
+        if read { measured.readings = [Stage.key(d): reading] }
+        let footprint = StageSignals.Footprint()
+        footprint.base = StagePlans.floor
+        let stage = try await Stage(device, plan: plan, files: [StagePlans.file], measured: measured) { footprint.bytes }
+        let allocated = stage.arena.allocated
+        footprint.lock.withLock { (footprint.arena, footprint.start, footprint.base) = (stage.arena, allocated, StagePlans.floor + allocated + share) }
+        return (stage, footprint, measured)
+    }
+
+    /// The one opened beside: its socle, its key read on this Mac or not.
+    static func opened(inFlight: Int, read: Bool = true) throws -> (socle: Stage.Plan, measured: ThisMac) {
+        var d = StagePlans.declaration("beside")
+        d.functions = [:]
+        d.inFlight = inFlight
+        var measured = ThisMac()
+        if read { measured.readings = [Stage.key(d): 4 << 20] }
+        return (try Stage.socle(d, files: [StagePlans.file], budget: 1 << 40), measured)
+    }
+
+    /// Beside it where B holds both: planned on its peak (its footprint now, its share grown to its reading), both
+    /// frozen until it closes, the second thawed then.
+    @Test func aStageOpensBesideTheOneThatRunsWhereBHoldsBoth() async throws {
+        guard let device = MTLCreateSystemDefaultDevice() else { return }
+        let (running, footprint, _) = try await Self.running(device, inFlight: 71)
+        let (socle, measured) = try Self.opened(inFlight: 73)
+        let ahead = Stage.Ahead()
+        ahead.resolve(.stage(Stage.WeakStage(running)))
+        let p = try Stage.$ahead.withValue(ahead) { try Stage.planned(measured: measured) { floor in ((), try socle.on(floor: floor)) } }
+        #expect(p.opening.beside != nil && p.opening.trailing)
+        #expect(p.plan.floor == footprint.bytes + Self.reading - Self.share)
+        #expect(running.lock.withLock { running.frozen && running.frozenShare == Self.share })
+        // Frozen, it keeps nothing in flight, and reads nothing of what the other takes.
+        #expect(!running.holds(expects: 0))
+        footprint.lock.withLock { footprint.base += 500 << 20 }
+        running.observe()
+        #expect(running.lock.withLock { running.largest } == Int.min)
+        let beside = try await Stage(device, plan: p.plan, files: [StagePlans.file], measured: measured, opening: p.opening) { footprint.bytes }
+        #expect(beside.lock.withLock { beside.frozen })
+        running.close()
+        #expect(!beside.lock.withLock { beside.frozen })
+        beside.close()
+    }
+
+    /// After it, as alone, where a set of functions was never read here, or where it may still keep a group in flight:
+    /// the one that runs thawed, the opening waits for its close.
+    @Test func aStageOpensAfterTheOneThatRunsWhereNothingWasRead() async throws {
+        guard let device = MTLCreateSystemDefaultDevice() else { return }
+        for (runningRead, besideRead) in [(false, true), (true, false)] {
+            let (running, _, _) = try await Self.running(device, inFlight: 75, read: runningRead)
+            let (socle, measured) = try Self.opened(inFlight: 77, read: besideRead)
+            #expect(running.beside(measured: measured) { floor in ((), try socle.on(floor: floor)) } == nil)
+            #expect(!running.lock.withLock { running.frozen })
+            let ahead = Stage.Ahead()
+            ahead.resolve(.stage(Stage.WeakStage(running)))
+            let closing = Task { try await Task.sleep(nanoseconds: 50_000_000); running.close() }
+            let p = try Stage.$ahead.withValue(ahead) { try Stage.planned(measured: measured) { floor in ((), try socle.on(floor: floor)) } }
+            try await closing.value
+            #expect(p.opening.beside == nil && p.opening.after >= 0.04)
+        }
+    }
+
+    /// No stage comes: alone; the render fails meanwhile: the opening throws.
+    @Test func anOpeningAheadGoesAloneOrStops() throws {
+        let alone = Stage.Ahead()
+        alone.end()
+        guard case .alone = try alone.wait() else { Issue.record("not alone"); return }
+        let stopped = Stage.Ahead()
+        stopped.end(cancelled: true)
+        #expect(throws: CancellationError.self) { try stopped.wait() }
+    }
+}

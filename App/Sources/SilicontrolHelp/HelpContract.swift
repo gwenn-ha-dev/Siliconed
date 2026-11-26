@@ -475,7 +475,7 @@ extension RemoteControlHelp {
 
         Answer:
           {"ok": true, "debug_live": true,
-           "stages": [{"stage": "text", "work": [{"tflops": 2.1, "seconds": 0.42, "end": 1.03, "ane_fraction": 0}],
+           "stages": [{"stage": "text", "compiled_s": 0, "work": [{"tflops": 2.1, "seconds": 0.42, "end": 1.03, "ane_fraction": 0}],
                        "engine_stages": [{"name": "…", "opened": 0.31, "closed": 1.10,
                                           "opening": [{"name": "plan", "seconds": 0.04}, {"name": "arena", "seconds": 0.01}, …],
                                           "closing": [{"name": "let go", "seconds": 0.02}],
@@ -490,6 +490,7 @@ extension RemoteControlHelp {
                                                             "seconds": 1.9, "tflops": 3.6}, …]}}, …]},
                       {"stage": "decoding", "work": […], "engine_stages": […]}]}
 
+        compiled_s     : the seconds Core AI compiled functions its cache did not hold, while the render was at that stage.
         work           : in every render, what each engine stage's calls executed over their span — from the first call
                          to the last done, the waits between included: a text encoder's, a decoder's for each image, the
                          DiT's whole —, its TFLOP/s, its seconds, its end, the Neural Engine's fraction of its FLOP.
@@ -503,7 +504,10 @@ extension RemoteControlHelp {
         engine_stages  : under Debug Live, each engine stage's opening (its plan, the wait for the memory the stages
                          before let go where it waited, arena, residents, ring, functions) and close (let go), in
                          seconds, from "opened" and "closed" on the render's clock; its "runs", its calls outside the
-                         DiT's steps (a text encoder's layers, a decoder's bands).
+                         DiT's steps (a text encoder's layers, a decoder's bands). A stage opened beside the one that ran
+                         says so: "ahead" (the wait for that one to open), then "beside", or "after" (the wait for its
+                         close, where B could not hold both). A stage is the render's stage it made its first call in:
+                         the DiT opened during the text is the denoising's.
 
         Seconds on the render's clock, from its start (the Machine window's). Debug Live (help set) is read as a render
         is asked: turned on during one, it records from the next. What it records stays in memory, the last render's.
@@ -514,7 +518,7 @@ extension RemoteControlHelp {
 
         Réponse :
           {"ok": true, "debug_live": true,
-           "stages": [{"stage": "text", "work": [{"tflops": 2.1, "seconds": 0.42, "end": 1.03, "ane_fraction": 0}],
+           "stages": [{"stage": "text", "compiled_s": 0, "work": [{"tflops": 2.1, "seconds": 0.42, "end": 1.03, "ane_fraction": 0}],
                        "engine_stages": [{"name": "…", "opened": 0.31, "closed": 1.10,
                                           "opening": [{"name": "plan", "seconds": 0.04}, {"name": "arena", "seconds": 0.01}, …],
                                           "closing": [{"name": "let go", "seconds": 0.02}],
@@ -529,6 +533,7 @@ extension RemoteControlHelp {
                                                             "seconds": 1.9, "tflops": 3.6}, …]}}, …]},
                       {"stage": "decoding", "work": […], "engine_stages": […]}]}
 
+        compiled_s     : les secondes où Core AI a compilé des fonctions absentes de son cache, le rendu à cette étape.
         work           : dans tout rendu, ce qu'ont exécuté les appels de chaque étage du moteur sur leur durée — du premier
                          appel au dernier fini, les attentes entre eux comprises : d'un encodeur de texte, d'un décodeur à
                          chaque image, du DiT entier —, ses TFLOP/s, ses secondes, sa fin, la part de ses FLOP au Neural Engine.
@@ -543,7 +548,10 @@ extension RemoteControlHelp {
         engine_stages  : sous Debug live, l'ouverture de chaque étage du moteur (son plan, l'attente de la mémoire lâchée
                          par les étages d'avant là où il a attendu, arène, résidents, anneau, fonctions) et sa fermeture
                          (tout lâcher), en secondes, depuis "opened" et "closed" sur l'horloge du rendu ; ses "runs", ses
-                         appels hors des pas du DiT (les couches d'un encodeur de texte, les bandes d'un décodeur).
+                         appels hors des pas du DiT (les couches d'un encodeur de texte, les bandes d'un décodeur). Un étage
+                         ouvert à côté de celui qui tournait le dit : "ahead" (l'attente de l'ouverture de celui-ci), puis
+                         "beside", ou "after" (l'attente de sa fermeture, là où B ne tenait pas les deux). Un étage est celui
+                         de l'étape du rendu où il a fait son premier appel : le DiT ouvert pendant le texte est du débruitage.
 
         Secondes sur l'horloge du rendu, depuis son début (celle de la fenêtre Machine). Debug live (help set) se lit quand
         un rendu est demandé : allumé pendant l'un, il enregistre à partir du suivant. Ce qu'il enregistre reste en mémoire,

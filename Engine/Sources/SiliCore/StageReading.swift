@@ -53,7 +53,8 @@ extension Stage {
             // The watch's peak read under the lock: a `rekey` resets it there, and no peak of the functions before it
             // reaches the new key's reading.
             let peak = max(share, watch?.peak ?? share)
-            if loads == 0 {
+            // Frozen (`beside`): the footprint holds another stage's, nothing of it is this one's reading.
+            if loads == 0 && !frozen {
                 largest = max(largest, peak)
                 keyed = max(keyed, peak)
             }
@@ -71,7 +72,7 @@ extension Stage {
 
     /// Under `lock`: what is left to come of Core AI's share at `share` — of the reserve, what it has not grown since
     /// the first signal; past a climb, of the growth it expects, what it has not grown since.
-    private func left(_ share: Int) -> Int {
+    func left(_ share: Int) -> Int {
         max((reserve ?? 0) - (share - (first ?? share)), 0) + (climbed.map { max($0.expects - (share - $0.share), 0) } ?? 0)
     }
 
@@ -100,14 +101,15 @@ extension Stage {
     public func holds(expects: Int) -> Bool {
         let (share, now, current) = read()
         let extra = max(expects, 0)
-        return lock.withLock { now + (share - current) + promised + extra + left(share) + max(Stage.margin, (share + extra) / 20) <= plan.budget }
+        // Frozen (`beside`): nothing more taken in flight — the stage beside was judged on what this one holds now.
+        return lock.withLock { !frozen && now + (share - current) + promised + extra + left(share) + max(Stage.margin, (share + extra) / 20) <= plan.budget }
     }
 
     private func rekeyed(_ key: String, expects: Int, extent: Extent?) -> Bool {
         let (share, now, current) = read()
         let reserve = measured.reserves?[key], extra = max(expects, 0)
         let old = lock.withLock { () -> (key: String, reading: Int, extent: Extent?)? in
-            guard now + (share - current) + promised + extra + left(share) + max(Stage.margin, (share + extra) / 20) <= plan.budget
+            guard !frozen, now + (share - current) + promised + extra + left(share) + max(Stage.margin, (share + extra) / 20) <= plan.budget
             else { return nil }
             let old = (readingKey, keyed, readingExtent)
             watch?.reset()
@@ -285,7 +287,7 @@ extension Stage {
         let wired = Arena.wiredBytes
         return lock.withLock {
             let group = Arena.allocation(bytes: bytes)
-            guard keeping && loads == 0,
+            guard keeping && loads == 0 && !frozen,
                   now + (share - current) + promised + pending + group + left(share) + max(Stage.keepClear, share / 20) <= plan.budget,
                   wired + promised + group <= Memory.wireLimit
             else { return false }
@@ -307,6 +309,8 @@ extension Stage {
     /// this stage's reading kept at its close (20/11: kept from the second turn, the share grew 156 MiB past a margin of
     /// 91 as a step's edges took their working memory, and the fuse stopped a run at B = 4). Given, never waited for.
     public func signal() {
+        // Frozen (`beside`): the share holds the stage beside; no reserve counts from it.
+        guard !lock.withLock({ frozen }) else { return }
         let (share, _, _) = read()
         let on = lock.withLock { () -> Bool in
             if first == nil { first = share }

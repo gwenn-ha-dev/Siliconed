@@ -18,7 +18,8 @@ import SiliCore
 ///   - **The DiT is told `(t / 1000).to(bf16)`** (`pipeline_krea2.py:644`), `t = σ · 1000` in f32, or the integer timestep under
 ///     DPM++ and UniPC: `Krea2Transformer.modelTime`. Turbo has no guidance: one evaluation a step.
 ///   - **The decoder's normalization is bf16 and per channel** (`latents / latents_std + latents_mean`): `QwenImageVAEDecoder.normalized`.
-///   - **Three sessions, one after the other**, each planned under B and let go before the next.
+///   - **Three sessions, each planned under B**: the DiT after the text (the fusion holds the text's stage), the decoder
+///     beside the DiT's last evaluation where B holds both (`RenderLoop`).
 ///
 /// An image to start from goes through the VAE's encoder first (`QwenImageVAEEncoder`), then the same loop from its step.
 package enum Krea2Render {
@@ -40,7 +41,7 @@ package enum Krea2Render {
             return promptTokens
         }
 
-        mutating func encode() throws -> Bool {
+        mutating func encode(ahead: Stage.Ahead?) throws -> Bool {
             let (ids, text) = (ids, inputs.text)
             var key = RenderCache.Key("Krea2Render.encode")
             try key.file(text.map)
@@ -51,12 +52,18 @@ package enum Krea2Render {
             return cached
         }
 
-        func image() throws -> Latent? { try inputs.image { try QwenImageVAEEncoder.latent(of: $0, path: $1.path) } }
+        func image(ahead: Stage.Ahead?) throws -> Latent? { try inputs.image(ahead: ahead) { try QwenImageVAEEncoder.latent(of: $0, path: $1.path) } }
+
+        /// Its text fused before its DiT opens, their stages one after the other: the DiT opens after the text.
+        var opensAhead: Bool { false }
 
         func denoiser(height: Int, width: Int) throws -> any RenderDenoiser {
             guard let taps else { preconditionFailure("the text before the DiT") }
             return try Denoiser(map: inputs.denoising.map, loras: inputs.loras, taps: taps, latentHeight: height, latentWidth: width)
         }
+
+        /// The fused text given as the DiT opened (`Denoiser`).
+        func give(_ dit: any RenderDenoiser) throws {}
 
         /// The text's rows past the template (`assemble`): what the fusion and the DiT read.
         func prepare(height: Int, width: Int) throws -> [Functions.Specialization] {

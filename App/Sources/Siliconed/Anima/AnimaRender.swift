@@ -16,7 +16,8 @@ import SiliCore
 ///   - **The DiT is told `bf16(bf16(t) / 1000)`** (`AnimaDenoiserInputStep`: `t.expand(...).to(dtype)`, then `/ num_train_timesteps`),
 ///     with `t = σ · 1000` in f32 (the scheduler's `timesteps`), or the integer timestep under DPM++ and UniPC: `modelTime`.
 ///   - **The decoder's normalization is bf16 and per channel** (`AnimaVaeDecoderStep`): `QwenImageVAEDecoder.normalized`.
-///   - **Four sessions, one after the other**, each planned under B and let go before the next: a plan holds its weights.
+///   - **Four sessions, each planned under B**, the DiT opened beside the conditioner and the decoder beside the DiT's
+///     last evaluation only where B holds both at their peaks (`RenderLoop`): a plan holds its weights.
 ///
 /// An image to start from goes through the VAE's encoder first (`QwenImageVAEEncoder`), then the same loop from its step.
 package enum AnimaRender {
@@ -37,7 +38,7 @@ package enum AnimaRender {
             return qwenIds.count
         }
 
-        mutating func encode() throws -> Bool {
+        mutating func encode(ahead: Stage.Ahead?) throws -> Bool {
             let (qwenIds, t5Ids, text) = (qwenIds, t5Ids, inputs.text)
             var key = RenderCache.Key("AnimaRender.encode")
             try key.file(text.map)
@@ -45,19 +46,23 @@ package enum AnimaRender {
             key.integers(qwenIds)
             key.integers(t5Ids)
             let (context, cached) = try RenderCache.conditioning(key, of: inputs.model) {
-                try AnimaRender.encode(qwenIds: qwenIds, t5Ids: t5Ids, encoder: text.map, adapter: text.adapter)
+                try AnimaRender.encode(qwenIds: qwenIds, t5Ids: t5Ids, encoder: text.map, adapter: text.adapter, ahead: ahead)
             }
             self.context = context
             return cached
         }
 
-        func image() throws -> Latent? { try inputs.image { try QwenImageVAEEncoder.latent(of: $0, path: $1.path) } }
+        func image(ahead: Stage.Ahead?) throws -> Latent? { try inputs.image(ahead: ahead) { try QwenImageVAEEncoder.latent(of: $0, path: $1.path) } }
 
         func denoiser(height: Int, width: Int) throws -> any RenderDenoiser {
-            guard let context else { preconditionFailure("the text before the DiT") }
-            let dit = try Denoiser(map: inputs.denoising.map, loras: inputs.loras, latentHeight: height, latentWidth: width, textLength: context.shape[0])
+            // The conditioner's rows, from the tokens: what its context will be.
+            let rows = AnimaConditioner(targetLength: t5Ids.count, sourceLength: qwenIds.count).rows
+            return try Denoiser(map: inputs.denoising.map, loras: inputs.loras, latentHeight: height, latentWidth: width, textLength: rows)
+        }
+
+        func give(_ dit: any RenderDenoiser) throws {
+            guard let context, let dit = dit as? Denoiser else { preconditionFailure("the text before Anima's DiT") }
             try dit.give(context)
-            return dit
         }
 
         func prepare(height: Int, width: Int) throws -> [Functions.Specialization] {
@@ -98,10 +103,12 @@ package enum AnimaRender {
 
     /// **The text**: Qwen3-0.6B's `last_hidden_state` `[Lq, 1024]`, then the conditioner over it (`AnimaConditioner`,
     /// its rotary tables `AnimaConditioner.rotaryTables`); the context `[max(Lt, 512), 1024]`.
-    static func encode(qwenIds: [Int], t5Ids: [Int], encoder path: String, adapter: String) throws -> HostTensor {
+    static func encode(qwenIds: [Int], t5Ids: [Int], encoder path: String, adapter: String, ahead: Stage.Ahead? = nil) throws -> HostTensor {
         guard let hidden = try Qwen3Encoder(config: .anima, path: path).states(qwenIds)["hidden"] else {
             throw EngineError.internalFailure(component: "Qwen3-0.6B", detail: "no hidden states")
         }
+        // The conditioner, the last stage before the DiT: the DiT opens beside it.
+        ahead?.next()
         return try blocking { try await AnimaConditioner.context(source: hidden, t5Ids: t5Ids, path: adapter, budget: MemoryBudget.machineCeiling()).context }
     }
 

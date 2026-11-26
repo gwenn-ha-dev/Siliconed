@@ -313,7 +313,7 @@ extension Block {
         if traced { told(until: end) }
         guard let b = begun else { return }
         begun = nil
-        let cycle = Stages.Cycle(block: declaration.name, unit: b.unit, rows: b.rows, shareable: shareable / b.unit * b.unit,
+        let cycle = Stages.Cycle(block: declaration.name, stage: stage.plan.declaration.name, unit: b.unit, rows: b.rows, shareable: shareable / b.unit * b.unit,
                                  trying: b.trying, seconds: Double(end &- b.at) * 1e-9, end: end, moved: b.moved, climbed: b.climbed,
                                  calls: lastCalls, refused: b.refused, flops: flops)
         Stages.tell(.cycle(cycle))

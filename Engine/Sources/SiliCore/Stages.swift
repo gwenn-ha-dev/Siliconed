@@ -10,12 +10,15 @@ public enum Stages {
         /// A stage let go (`Stage.close`): its plan, the seconds it lived, the groups it kept (from the start and in
         /// flight).
         case closed(Stage.Plan, seconds: Double, kept: Int = 0)
-        /// A stage's reader kept one more group in flight (`Ring`): the groups the open stage holds now, those its plan
-        /// kept from the start included, and the bytes of weights it holds now (`Stage.Plan.weights` and the groups kept
-        /// since) — told as each is kept, for a reader of the stage while it lives.
-        case kept(Int, weights: Int)
+        /// A stage's reader kept one more group in flight (`Ring`): the stage (its declaration's name), the groups it
+        /// holds now, those its plan kept from the start included, and the bytes of weights it holds now
+        /// (`Stage.Plan.weights` and the groups kept since) — told as each is kept, for a reader of the stage while it lives.
+        case kept(stage: String, Int, weights: Int)
         /// The share of a stage's work the ANE computes, 0 to 1, as its client counts it (`computed`).
-        case neural(Double)
+        case neural(stage: String, Double)
+        /// **A stage's first call put on the stream** (its declaration's name), told once a run: a stage may open while
+        /// another runs (`Stage.beside`), and the work a reader ascribes it is what comes from its first call.
+        case calling(stage: String)
         /// Core AI begins to specialize a function its cache does not hold (`Functions.load`), and has done so, in
         /// `seconds`: a compilation, told whether a stage is open or not.
         case compiling
@@ -59,7 +62,8 @@ public enum Stages {
     /// calls executed (`flops`), and the rates that gives (`rates`); when it ended (`end`, `DispatchTime` nanoseconds), for a
     /// client that lays the cycles on its own clock.
     public struct Cycle: Sendable, Equatable {
-        public let block: String
+        /// The block, and the stage it runs on (its declaration's name: two stages may be open, `Stage.beside`).
+        public let block: String, stage: String
         public let unit, rows, shareable: Int
         public let trying: Bool
         public let seconds: Double
@@ -144,7 +148,7 @@ public enum Stages {
         for o in lock.withLock({ observers.sorted { $0.key < $1.key }.map(\.value) }) { o(e) }
     }
 
-    /// **The share of the open stage's work the ANE computes** (its rows over the stage's): the
-    /// client's to say, once it runs a share — the engine counts no unit of its work.
-    public static func computed(neuralEngine share: Double) { tell(.neural(share)) }
+    /// **The share of `stage`'s work the ANE computes** (its rows over the stage's): the client's to say, once it runs
+    /// a share — the engine counts no unit of its work.
+    public static func computed(stage: String, neuralEngine share: Double) { tell(.neural(stage: stage, share)) }
 }

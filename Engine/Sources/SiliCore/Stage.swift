@@ -77,8 +77,18 @@ public final class Stage: @unchecked Sendable {
     let lock = NSLock()
     /// The footprint before the stage allocated (as its `footprint` reads it: a test's own).
     public let before: Int
-    /// The process's before the stage allocated: where it comes back to once the stage is let go (`rested`).
-    private let rest = Memory.footprint()
+    /// The process's before the stage allocated: where it comes back to once the stage is let go (`rested`) — opened
+    /// beside another, where the process came back to before that one.
+    let rest: Int
+    /// Under `lock`: **beside another stage** (`beside`): the stage that runs while another opens beside it, and the one
+    /// opened beside it until the first is closed, read nothing and decide nothing in flight; `frozenShare`, the share
+    /// read as it froze (what its reserve counts to, `keep`). The stages opened beside it, thawed at its close; whether
+    /// its close began, and ended.
+    var frozen = false, frozenShare: Int?
+    var besides: [WeakStage] = []
+    var closing = false, closed = false
+    /// Its close, as a wait for it reads it (`awaitClose`).
+    let life = Life()
     /// **Its floor holds what the stages before it let go** (`Opening.trailing`): a reading short by what left meanwhile,
     /// it keeps no first one (`keep`).
     let trailing: Bool
@@ -108,9 +118,14 @@ public final class Stage: @unchecked Sendable {
         readingExtent = plan.declaration.extent
         reserve = measured.reserves?[key]
         before = footprint()
+        rest = min(Memory.footprint(), opening.beside?.running.stage?.rest ?? .max)
+        frozen = opening.beside != nil
         loads = 1
         defer { lock.withLock { loads -= 1 } }
         opened(key)
+        live(true)
+        // An opening ahead waits for the next stage the process opens (`Ahead.next`), one opened ahead never.
+        if Self.ahead == nil { Ahead.fire(self) }
         Stages.tell(.opened(plan))
         let d = plan.declaration
         // The trace's pieces of the opening, each to its end; nothing read while it is off.
@@ -121,7 +136,8 @@ public final class Stage: @unchecked Sendable {
         stream = SerialStream(commandQueue: queue)
         listen(stream)
         let arena = try Arena(device, bytes: plan.heap + plan.apart, apart: plan.apart)
-        self.arena = arena
+        // Under the lock: a stage opening beside reads it (`peak`).
+        lock.withLock { self.arena = arena }
         for t in d.tensors {
             let key = switch t.place {
             case .heap: arena.take(t.bytes)
@@ -133,71 +149,102 @@ public final class Stage: @unchecked Sendable {
             memset(arena.pointer(key), 0, t.size)
         }
         piece("arena")
-        let surfaces = d.surfaces, sizes = plan.sizes
-        // The staging: one, the reader's, the residents read through it before the reader starts.
-        let staging = sizes.staging
-        let stagingKey = staging > 0 ? arena.take(staging) : nil
-        self.staging = stagingKey
-        for (file, entries) in try Self.byFile(d.residents, files) {
-            let placed = Weights.place(try Weights.layout(entries, in: file), in: arena, surfaces: surfaces)
-            try Weights.read(entries, from: file, into: placed, arena: arena, staging: arena.pointer(stagingKey!))
-            residents.merge(placed) { $1 }
+        // The functions loaded while the residents and the kept groups are read: Core AI loads them, and `aned` the ANE's,
+        // while the reader converts on the cores — one after the other until then, 0.08 to 0.71 s of residents and 0.22
+        // to 0.46 s of loading at a warm 30-block transformer's opening (26/11/2026, the M1 Pro, the trace).
+        let declared = d.functions.sorted(by: { $0.key < $1.key })
+        let loading = Task { () async throws -> Loaded in
+            var l = Loaded()
+            for (name, f) in declared {
+                try Task.checkCancellation()
+                let one = try await Functions.loaded(try Functions.asset(f.asset, f.build), unit: f.unit)
+                l.functions[name] = one.function
+                l.compiled = l.compiled || one.compiled
+            }
+            return l
         }
-        piece("residents")
-        // The kept groups' places, the ring's slots.
-        var groupFile: [String: Int] = [:]
-        for (g, entries) in d.groups {
-            let f = try Self.file(of: entries, g, files)
-            groupFile[g] = files.firstIndex { $0 === f }!
-        }
-        var layouts: [String: [Weights.Slot]] = [:]
-        for (g, entries) in d.groups { layouts[g] = try Weights.layout(entries, in: files[groupFile[g]!]) }
-        var bound: [String: [String: Placed]] = [:]
-        for g in plan.kept { bound[g] = Weights.place(layouts[g]!, in: arena, surfaces: surfaces) }
-        var slots: [[String: Placed]] = []
-        if plan.depth > 0, let s = d.slot { slots = (0..<plan.depth).map { _ in Weights.place(layouts[s]!, in: arena, surfaces: surfaces) } }
-        if !plan.kept.isEmpty || !slots.isEmpty {
-            let uncached = try files.map { try $0.reopened(uncached: true) }
-            let groups = d.groups, fileOf = groupFile, laid = layouts
-            // Past the signal, a group of the cycle that rides the ring may be kept: in a heap of its own, or its own
-            // surfaces (`Arena.grow`).
-            let keeps = slots.isEmpty ? [] : Set(d.cycle.filter { !plan.kept.contains($0) && sizes.rides($0) })
-            let slotBytes = slots.isEmpty ? 0 : sizes.slot
-            ring = Ring(slots: slots, once: d.once, cycle: d.cycle, bound: bound, keeps: keeps, place: { [weak self] g in
-                defer { self?.delivered(sizes.groups[g]!) }
-                let heap = surfaces ? 0 : try arena.grow(bytes: sizes.groups[g]!)
-                self?.lock.withLock { self?.keptInFlight += sizes.groups[g]! }
-                return Weights.place(laid[g]!, in: arena, heap: heap, surfaces: surfaces)
-            }, keep: { [weak self] g, unwritten in
-                self?.keeps(sizes.groups[g]!, pending: unwritten * slotBytes, allocated: arena.allocated) ?? false
-            }, kept: { [weak self, fromStart = plan.kept.count, weights = plan.weights] n in
-                Stages.tell(.kept(fromStart + n, weights: weights + (self?.lock.withLock { self?.keptInFlight } ?? 0)))
-            }, fill: { g, place in
-                try Weights.read(groups[g]!, from: uncached[fileOf[g]!], into: place, arena: arena, staging: arena.pointer(stagingKey!))
-            })
+        do {
+            let surfaces = d.surfaces, sizes = plan.sizes
+            // The staging: one, the reader's, the residents read through it before the reader starts.
+            let staging = sizes.staging
+            let stagingKey = staging > 0 ? arena.take(staging) : nil
+            self.staging = stagingKey
+            for (file, entries) in try Self.byFile(d.residents, files) {
+                let placed = Weights.place(try Weights.layout(entries, in: file), in: arena, surfaces: surfaces)
+                try Weights.read(entries, from: file, into: placed, arena: arena, staging: arena.pointer(stagingKey!))
+                residents.merge(placed) { $1 }
+            }
+            piece("residents")
+            // The kept groups' places, the ring's slots.
+            var groupFile: [String: Int] = [:]
+            for (g, entries) in d.groups {
+                let f = try Self.file(of: entries, g, files)
+                groupFile[g] = files.firstIndex { $0 === f }!
+            }
+            var layouts: [String: [Weights.Slot]] = [:]
+            for (g, entries) in d.groups { layouts[g] = try Weights.layout(entries, in: files[groupFile[g]!]) }
+            var bound: [String: [String: Placed]] = [:]
+            for g in plan.kept { bound[g] = Weights.place(layouts[g]!, in: arena, surfaces: surfaces) }
+            var slots: [[String: Placed]] = []
+            if plan.depth > 0, let s = d.slot { slots = (0..<plan.depth).map { _ in Weights.place(layouts[s]!, in: arena, surfaces: surfaces) } }
+            if !plan.kept.isEmpty || !slots.isEmpty {
+                let uncached = try files.map { try $0.reopened(uncached: true) }
+                let groups = d.groups, fileOf = groupFile, laid = layouts
+                // Past the signal, a group of the cycle that rides the ring may be kept: in a heap of its own, or its own
+                // surfaces (`Arena.grow`).
+                let keeps = slots.isEmpty ? [] : Set(d.cycle.filter { !plan.kept.contains($0) && sizes.rides($0) })
+                let slotBytes = slots.isEmpty ? 0 : sizes.slot
+                ring = Ring(slots: slots, once: d.once, cycle: d.cycle, bound: bound, keeps: keeps, place: { [weak self] g in
+                    defer { self?.delivered(sizes.groups[g]!) }
+                    let heap = surfaces ? 0 : try arena.grow(bytes: sizes.groups[g]!)
+                    self?.lock.withLock { self?.keptInFlight += sizes.groups[g]! }
+                    return Weights.place(laid[g]!, in: arena, heap: heap, surfaces: surfaces)
+                }, keep: { [weak self] g, unwritten in
+                    self?.keeps(sizes.groups[g]!, pending: unwritten * slotBytes, allocated: arena.allocated) ?? false
+                }, kept: { [weak self, fromStart = plan.kept.count, weights = plan.weights, name = plan.declaration.name] n in
+                    Stages.tell(.kept(stage: name, fromStart + n, weights: weights + (self?.lock.withLock { self?.keptInFlight } ?? 0)))
+                }, fill: { g, place in
+                    try Weights.read(groups[g]!, from: uncached[fileOf[g]!], into: place, arena: arena, staging: arena.pointer(stagingKey!))
+                })
+            }
+        } catch {
+            loading.cancel()
+            _ = try? await loading.value
+            throw error
         }
         piece("ring")
         let floor = plan.floor
         watch = FootprintWatch { [weak arena] in footprint() - floor - (arena?.allocated ?? 0) }
-        for (name, f) in d.functions.sorted(by: { $0.key < $1.key }) {
-            let l = try await Functions.loaded(try Functions.asset(f.asset, f.build), unit: f.unit)
-            functions[name] = l.function
-            compiled = compiled || l.compiled
-        }
+        let loaded = try await loading.value
+        functions = loaded.functions
+        compiled = loaded.compiled
         watch?.reset()
         lock.withLock { ready = true }
         piece("functions")
+        // Opened beside a stage that runs: thawed at its close, or now where it closed meanwhile.
+        opening.beside?.adopt(self)
         if traced {
-            // From its planning: the plan (its forms judged, twice where what trails was weighed), the wait for what
-            // the stages before let go, then the pieces above.
+            // From its planning: the plan (its forms judged, twice where what trails was weighed), the waits for the
+            // stage to open beside and for the one it could not go beside (`planned`), beside one or not, the wait for
+            // what the stages before let go, then the pieces above.
             var from = began
-            let planning = opening.start.map { [Stages.Piece(name: "plan", seconds: Double(began &- $0) / 1e9 - opening.waited)]
+            let waits = opening.ahead + opening.after + opening.waited
+            let planning = opening.start.map { [Stages.Piece(name: "plan", seconds: Double(began &- $0) / 1e9 - waits)]
+                + (opening.ahead > 0 ? [Stages.Piece(name: "ahead", seconds: opening.ahead)] : [])
+                + (opening.after > 0 ? [Stages.Piece(name: "after", seconds: opening.after)] : [])
+                + (opening.beside != nil ? [Stages.Piece(name: "beside", seconds: 0)] : [])
                 + (opening.waited > 0 ? [Stages.Piece(name: "footprint back", seconds: opening.waited)] : []) } ?? []
             Stages.tell(.traced(.opening(stage: d.name, start: opening.start ?? began, pieces: planning + pieces.map { name, end in
                 defer { from = end }
                 return Stages.Piece(name: name, seconds: Double(end &- from) / 1e9)
             })))
         }
+    }
+
+    /// A stage's functions as its opening loaded them, by the declaration's names, and whether any compiled.
+    private struct Loaded: @unchecked Sendable {
+        var functions: [String: InferenceFunction] = [:]
+        var compiled = false
     }
 
     /// **Functions loaded in flight** (`body`: a client's taller calls, another share of the ANE): nothing read or kept
@@ -216,10 +263,12 @@ public final class Stage: @unchecked Sendable {
         ring?.stop()
         watch?.stop()
         opened(nil)
+        live(false)
         let closed = lock.withLock { settled != nil }
         if !closed && lock.withLock({ ready }) { keep() }
         if !closed { Self.rested(on: rest) }
         listen(nil)
+        if !closed { ended() }
     }
 
     /// **What this stage read, kept on this Mac**, at its largest: the share read since its key, the reading of the
@@ -232,7 +281,8 @@ public final class Stage: @unchecked Sendable {
     /// was called since its opening or its last climb keeps nothing (`called`).
     public func keep() {
         guard called() else { return }
-        let (share, _, _) = read()
+        // Frozen (`beside`), the share as it froze: past it, the footprint holds the stage beside.
+        let share = lock.withLock { frozenShare } ?? read().share
         let (keyed, readingKey, extent, first, climbed) = lock.withLock { (self.keyed, self.readingKey, self.readingExtent, self.first, self.climbed != nil) }
         Self.keep(reading: keyed, under: readingKey, extent: extent, budget: plan.budget, first: !trailing)
         if let first, !climbed {
@@ -349,9 +399,11 @@ public final class Stage: @unchecked Sendable {
         if let done { return done }
         let start = DispatchTime.now().uptimeNanoseconds
         let kept = self.kept.count
+        lock.withLock { closing = true }
         ring?.stop()
         ring = nil
         opened(nil)
+        live(false)
         keep()
         listen(nil)
         watch?.stop()
@@ -370,6 +422,7 @@ public final class Stage: @unchecked Sendable {
         }
         Stages.tell(.closed(plan, seconds: Functions.seconds(since: began), kept: kept))
         lock.lock(); self.settled = settled; lock.unlock()
+        ended()
         return settled
     }
 }

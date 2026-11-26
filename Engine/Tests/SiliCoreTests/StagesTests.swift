@@ -8,14 +8,14 @@ import Testing
     @Test func everyObserverHearsUntilCancelled() {
         final class Heard: @unchecked Sendable { var lock = NSLock(); var n = 0; func add() { lock.withLock { n += 1 } } }
         let a = Heard(), b = Heard()
-        @Sendable func mine(_ e: Stages.Event) -> Bool { if case .neural(0.5) = e { true } else { false } }
+        @Sendable func mine(_ e: Stages.Event) -> Bool { if case .neural("observed", 0.5) = e { true } else { false } }
         let first = Stages.observe { if mine($0) { a.add() } }
         var second: Stages.Observation? = Stages.observe { if mine($0) { b.add() } }
-        Stages.computed(neuralEngine: 0.5)
+        Stages.computed(stage: "observed", neuralEngine: 0.5)
         second = nil
-        Stages.computed(neuralEngine: 0.5)
+        Stages.computed(stage: "observed", neuralEngine: 0.5)
         first.cancel()
-        Stages.computed(neuralEngine: 0.5)
+        Stages.computed(stage: "observed", neuralEngine: 0.5)
         #expect(a.n == 2 && b.n == 1 && second == nil)
     }
 }

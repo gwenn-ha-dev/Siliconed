@@ -17,8 +17,8 @@ import SiliCore
 ///     timestep under DPM++ and UniPC (`Solver.integerTimestep`), never `1 − σ`.
 ///   - **The reference's decoder reads the final latent in bf16** (`latents.to(vae.dtype)`) and scales it there, in
 ///     bf16; here the latent goes in f32 and is scaled in f32 in the decoder's head (`FluxVAE`).
-///   - **The three sessions are planned one after the other**, each under B, and let go before the next: a plan holds
-///     its weights; three at once would count three models.
+///   - **The three sessions are each planned under B**, a session opened beside the one before it only where B holds
+///     both at their peaks (`RenderLoop`, `Stage.beside`): a plan holds its weights.
 ///
 /// An image to start from is encoded once, before the DiT's session comes (`FluxVAEEncoder`), and mixed with each
 /// seed's noise at the first step run.
@@ -41,22 +41,29 @@ package enum ZImageRender {
             return promptTokens
         }
 
-        mutating func encode() throws -> Bool {
+        mutating func encode(ahead: Stage.Ahead?) throws -> Bool {
             let (ids, map) = (ids, inputs.text.map)
             var key = RenderCache.Key("ZImageRender.encode")
             try key.file(map)
             key.integers(ids)
-            let (caps, cached) = try RenderCache.conditioning(key, of: inputs.model) { try ZImageRender.encode(ids, map: map) }
+            let (caps, cached) = try RenderCache.conditioning(key, of: inputs.model) {
+                // Its one stage, the DiT opening beside it.
+                ahead?.next()
+                return try ZImageRender.encode(ids, map: map)
+            }
             self.caps = caps
             return cached
         }
 
-        func image() throws -> Latent? { try inputs.image { try FluxVAEEncoder.latent(of: $0, path: $1.path) } }
+        func image(ahead: Stage.Ahead?) throws -> Latent? { try inputs.image(ahead: ahead) { try FluxVAEEncoder.latent(of: $0, path: $1.path) } }
 
         func denoiser(height: Int, width: Int) throws -> any RenderDenoiser {
-            let dit = try Denoiser(map: inputs.denoising.map, loras: inputs.loras, latentHeight: height, latentWidth: width, capLength: ids.count)
+            try Denoiser(map: inputs.denoising.map, loras: inputs.loras, latentHeight: height, latentWidth: width, capLength: ids.count)
+        }
+
+        func give(_ dit: any RenderDenoiser) throws {
+            guard let dit = dit as? Denoiser else { preconditionFailure("Z-Image's DiT") }
             dit.caps = caps
-            return dit
         }
 
         func prepare(height: Int, width: Int) throws -> [Functions.Specialization] {

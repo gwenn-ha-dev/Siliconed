@@ -4,9 +4,10 @@ import SiliCore
 /// **A family's part of a render**: what differs from one family to the other — its text, its image stage, its DiT
 /// and the time it is told, what its decoder reads and gives. Everything else is `RenderLoop`'s, the same for all.
 ///
-/// The stages are called in this order, each once a batch: `tokens`, `encode`, `image` (when `encodes`), `denoiser`,
-/// then `decoderInput` and `picture` once an image. What one stage makes for a later one (ids, a conditioning, an
-/// edit's references) the family keeps.
+/// The stages are called in this order, each once a batch: `tokens`, `encode`, `image` (when `encodes`), `give`, then
+/// `decoderInput` and `picture` once an image; `denoiser` from the tokens on, on a thread of its own, beside the text
+/// where the family opens its DiT ahead (`opensAhead`), after it otherwise. What one stage makes for a later one (ids, a
+/// conditioning, an edit's references) the family keeps.
 package protocol RenderParts {
     associatedtype Decoder: LatentDecoder
     /// The family's part of `request` on `model`, as admitted: what it refuses before any computation (a module of
@@ -16,12 +17,21 @@ package protocol RenderParts {
     var encodes: Bool { get }
     /// The prompt tokenized: the tokens the render reports.
     mutating func tokens() throws -> Int
-    /// The text encoded, or read from `RenderCache`: whether it was.
-    mutating func encode() throws -> Bool
+    /// **The text encoded, or read from `RenderCache`**: whether it was. `ahead`: the DiT opening beside the family's
+    /// last stage before it (`Stage.Ahead`) — the family says it comes (`next`) right before that stage, the last it
+    /// opens before the DiT; nil where the image stage comes after the text, or the DiT does not open ahead.
+    mutating func encode(ahead: Stage.Ahead?) throws -> Bool
     /// The image stage (`encodes`): the latent to start from, or nil when what it encodes goes to the DiT instead.
-    mutating func image() throws -> Latent?
-    /// The DiT for the batch, opened under B and given what it reads once (the text, an edit's references).
+    /// `ahead`, as `encode`'s: the family says it comes right before its last stage (its last reference's encoder).
+    mutating func image(ahead: Stage.Ahead?) throws -> Latent?
+    /// **The DiT for the batch, opened under B from what the tokens say** — its shapes, its LoRAs —, the text not read
+    /// yet (`give`): on a thread of its own, beside the family's last stage before it where B holds both (`opensAhead`).
     func denoiser(height: Int, width: Int) throws -> any RenderDenoiser
+    /// **What the DiT reads once, given once the text is encoded** and the image stage done: the text, an edit's references.
+    func give(_ dit: any RenderDenoiser) throws
+    /// Whether its DiT opens from the tokens alone (`denoiser`), beside the text: not where the text is fused into it
+    /// before it opens (Krea 2's fusion holds its stage before the DiT's).
+    var opensAhead: Bool { get }
     /// **What its stages would specialize**, after `tokens`: the text, the image stage (`encodes`) and the DiT, each at
     /// the shapes the render opens it (`SiliCore`'s `prepare`), nothing allocated, nothing computed.
     func prepare(height: Int, width: Int) throws -> [Functions.Specialization]
@@ -34,6 +44,7 @@ package protocol RenderParts {
 }
 
 extension RenderParts {
+    package var opensAhead: Bool { true }
     package func decoderInput(_ latent: [Float]) -> [Float] { latent }
     package func picture(_ decoded: [Float]) -> [Float] { decoded }
 }
@@ -62,14 +73,15 @@ package struct RenderInputs<Text: TextModule, Denoising: DenoisingModule, Encodi
     }
 
     /// The image stage: the latent of the image to start from as `encode` gives it (the image, its encoder's module),
-    /// nil without one.
-    package func image(_ encode: (ImageRGB, Encoding) throws -> [Float]) throws -> Latent? {
+    /// nil without one. Its encoder is the one stage before the DiT: `ahead` comes right before it.
+    package func image(ahead: Stage.Ahead?, _ encode: (ImageRGB, Encoding) throws -> [Float]) throws -> Latent? {
         guard let start else { return nil }
+        ahead?.next()
         return Latent(space: denoising.space, height: admitted.height, width: admitted.width, values: try encode(start.image, start.encoding))
     }
 }
 
-/// **A family's DiT as the loop runs it**: let go when the loop drops it, before the decoder comes.
+/// **A family's DiT as the loop runs it**: let go when the loop drops it, behind the decoder (`Leaving`).
 package protocol RenderDenoiser: AnyObject {
     /// The derivative the solver walks for `latent` at the told σ: the family's time (the solver's integer timestep
     /// at `first`, or its own), its sign.
@@ -85,7 +97,9 @@ package protocol RenderDenoiser: AnyObject {
 ///
 /// **The sampler stays on the CPU, between two runs**: the four solvers, Detail's told σ, the previews and the
 /// cancellation read the latent at every step, and a step is a few vector operations on the latent's floats against
-/// seconds of evaluation. **The sessions come one after the other**, each planned under B and let go before the next.
+/// seconds of evaluation. **A session opens beside the one before it where B holds both** (`Stage.beside`): the DiT
+/// beside the family's last stage before it, the decoder beside the DiT's last evaluation, the DiT let go behind it;
+/// after it otherwise, as alone.
 package enum RenderLoop {
     /// **A family's render** (`FamilyTraits.render`): its part made of the request (`RenderParts.init`), then `run`.
     package static func render<Parts: RenderParts & SendableMetatype>(
@@ -122,7 +136,9 @@ package enum RenderLoop {
         // A decoding taken again (`keeping`): the latents its DiT left, decoded alone.
         if let kept = keeping.flatMap(KeptLatents.read) {
             let decoder = try Parts.Decoder.admit(path: parts.decoderPath, latentHeight: height, latentWidth: width, budget: MemoryBudget.machineCeiling())
-            return try decode(parts, kept, decoder, request, admitted, seeds: seeds, model: model, cancellation: cancellation, emit: emit)
+            return try decode(parts, kept, request, admitted, seeds: seeds, model: model, cancellation: cancellation, emit: emit) {
+                try DecoderSession<Parts.Decoder>(decoder)
+            }
         }
         emit(.start(Engine.Plan(denoising: plan, seeds: seeds, stages: parts.encodes ? [.text, .image, .denoising, .decoding] : [.text, .denoising, .decoding])))
 
@@ -134,31 +150,47 @@ package enum RenderLoop {
         let tokens = try parts.tokens()
         timings.tokenizer = Date().timeIntervalSince(textStart)
         try cancellation.check()
-        let cached = try parts.encode()
-        timings.text = Date().timeIntervalSince(textStart)
-        timings.encoder = timings.text - timings.tokenizer
+        // The DiT opened from the tokens on, on a thread of its own: its functions built and named while the decoder is
+        // judged, its memory beside the family's last stage before it where B holds both (`Stage.Ahead`), after it
+        // otherwise. A render that fails meanwhile stops it and waits for it: nothing of it outlives the render.
+        let ahead = Stage.Ahead()
+        let opening = parts.opensAhead ? Beside<any RenderDenoiser>(ahead) { [p = UncheckedSendable(parts)] in
+            try p.value.denoiser(height: height, width: width)
+        } : nil
+        var decoding: Beside<DecoderSession<Parts.Decoder>>?
+        defer {
+            ahead.end(cancelled: true)
+            opening?.join()
+            decoding?.join()
+        }
+        // The decoder judged before the DiT, over the floor the DiT will give back — the DiT holds nothing yet, it builds
+        // its functions: refused now, not after its minutes; what it judged opened beside the DiT's last step.
+        let decoder = try Parts.Decoder.admit(path: parts.decoderPath, latentHeight: height, latentWidth: width, budget: MemoryBudget.machineCeiling())
+        let encoderStart = Date()
+        let cached = try parts.encode(ahead: opening != nil && !parts.encodes ? ahead : nil)
+        timings.encoder = Date().timeIntervalSince(encoderStart)
+        timings.text = timings.tokenizer + timings.encoder
         emit(.text(tokens: tokens, tokenizer: timings.tokenizer, encoder: timings.encoder, cached: cached))
 
-        // ── the image stage, once: its encoder's session let go before the DiT's comes ──
+        // ── the image stage, once: the DiT opens beside it, as beside the text without one ──
         var origin: Latent?
         if parts.encodes {
             try cancellation.check()
             emit(.stage(.image, image: 0))
             let encodingStart = Date()
-            origin = try parts.image()
+            origin = try parts.image(ahead: opening != nil ? ahead : nil)
             timings.encoding = Date().timeIntervalSince(encodingStart)
             emit(.encoding(seconds: timings.encoding))
         }
+        // No stage comes now: a DiT still waiting for one opens alone.
+        ahead.end()
 
         // ── the denoising, image by image, one DiT session for the batch ──
-        // Announced before its DiT is planned: the plan's seconds are the denoising's, not the text's.
         try cancellation.check()
         emit(.stage(.denoising, image: 0))
         let ditStart = Date()
-        // The decoder judged before the DiT, over the floor the DiT will give back: refused now, not after its minutes;
-        // what it judged opened after it, its functions built once.
-        let decoder = try Parts.Decoder.admit(path: parts.decoderPath, latentHeight: height, latentWidth: width, budget: MemoryBudget.machineCeiling())
-        var dit: (any RenderDenoiser)? = try parts.denoiser(height: height, width: width)
+        var dit: (any RenderDenoiser)? = try opening?.get() ?? parts.denoiser(height: height, width: width)
+        try parts.give(dit!)
         let schedule = denoising.sigmas(steps: steps)
         let told = request.detail.modelSigmas(schedule, start: start, bell: denoising.detailBell,
                                               scale: Detail.scale(width: request.width, height: request.height))
@@ -177,6 +209,13 @@ package enum RenderLoop {
             var done = 0
             for step in start..<(schedule.count - 1) {
                 try cancellation.check()
+                // The decoder opened beside the batch's last evaluation, where B holds both (`Stage.Ahead.open`) — not
+                // for a batch already lost: no image waits for it, and the last latent is not finite.
+                if n == seeds.count - 1 && step == schedule.count - 2 && (!pending.isEmpty || FiniteImage.isFinite(latent)) {
+                    let beside = Stage.Ahead()
+                    beside.open()
+                    decoding = Beside(beside) { try DecoderSession<Parts.Decoder>(decoder) }
+                }
                 let stepStart = Date()
                 dit!.expect(evaluations: plan.evaluations - done + (seeds.count - n - 1) * plan.evaluations)
                 let derivative = try dit!.derivative(latent, sigma: told[step], solver: request.solver, first: step == start)
@@ -204,12 +243,19 @@ package enum RenderLoop {
             guard FiniteImage.isFinite(latent) else { emit(.unusable(image: n, stage: .denoising)); continue }
             pending.append(KeptLatents.Image(index: n, latent: latent, timings: timings, elapsed: Date().timeIntervalSince(imageStart)))
         }
-        // The DiT leaves before the decoder comes (`DecoderSession`).
+        // The DiT let go on a thread of its own while the decoder takes the latents (0.13 to 0.32 s, 26/11/2026, the M1
+        // Pro): a decoder opened beside it calls beside its close, one opened after it waits for it.
+        let leaving = Leaving(dit)
         dit = nil
+        leaving.go()
         guard !pending.isEmpty else { throw EngineError.nonFiniteImage(stage: .denoising) }
         let kept = KeptLatents(tokens: tokens, images: pending)
         if let keeping { try kept.write(to: keeping) }
-        return try decode(parts, kept, decoder, request, admitted, seeds: seeds, model: model, cancellation: cancellation, emit: emit)
+        let session = decoding
+        decoding = nil
+        return try decode(parts, kept, request, admitted, seeds: seeds, model: model, cancellation: cancellation, emit: emit) {
+            try session?.get() ?? DecoderSession<Parts.Decoder>(decoder)
+        }
     }
 
     /// **Where the worker's render keeps its latents between its DiT and its decoder** (`RenderOrder.keeping`), the
@@ -221,10 +267,11 @@ package enum RenderLoop {
 
     /// **The decoding, image by image, one decoder session**: the latents of `kept`, those its file still holds when
     /// taken again (`keeping`), by the decoder `judged` (`LatentDecoder.admit`).
-    private static func decode<Parts: RenderParts>(_ parts: Parts, _ kept: KeptLatents, _ judged: Parts.Decoder.Admitted,
+    private static func decode<Parts: RenderParts>(_ parts: Parts, _ kept: KeptLatents,
                                                    _ request: Request, _ admitted: Admission,
                                                    seeds: [UInt64], model: Model, cancellation: Cancellation?,
-                                                   emit: (Engine.Event) -> Void) throws -> [Engine.Render] {
+                                                   emit: (Engine.Event) -> Void,
+                                                   session: () throws -> DecoderSession<Parts.Decoder>) throws -> [Engine.Render] {
         let denoising = model.chain.denoising, space = denoising.space, plan = admitted.plan
         let (height, width, steps, tokens) = (admitted.height, admitted.width, admitted.steps, kept.tokens)
         var left = kept
@@ -238,7 +285,7 @@ package enum RenderLoop {
         try cancellation.check()
         emit(.stage(.decoding, image: first.index))
         var decodingStart = Date()
-        let decoder = try DecoderSession<Parts.Decoder>(judged)
+        let decoder = try session()
         if let warning = decoder.warning { emit(.warning(warning)) }
         var renders: [Engine.Render] = []
         for (k, image) in pending.enumerated() {
@@ -268,4 +315,37 @@ package enum RenderLoop {
         if renders.isEmpty && kept.handed == 0 { throw EngineError.nonFiniteImage(stage: .decoding) }
         return renders
     }
+}
+
+/// **A piece of the render opened on a thread of its own** (`RenderLoop`): the DiT beside the text, the decoder beside the
+/// DiT's last evaluation, each under the opening ahead its thread binds (`Stage.ahead`). Its result taken once (`get`),
+/// or waited for and let go (`join`, a render that fails meanwhile).
+final class Beside<T>: @unchecked Sendable {
+    private let done = DispatchSemaphore(value: 0)
+    private var result: Result<T, Error>?
+
+    init(_ ahead: Stage.Ahead, _ body: @escaping @Sendable () throws -> T) {
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
+            result = Result { try Stage.$ahead.withValue(ahead) { try body() } }
+            done.signal()
+        }
+    }
+
+    func get() throws -> T {
+        done.wait(); done.signal()
+        defer { result = nil }
+        return try result!.get()
+    }
+
+    func join() {
+        done.wait(); done.signal()
+        result = nil
+    }
+}
+
+/// **The DiT let go on a thread of its own** (`go`): what holds it last, so that its close runs there.
+private final class Leaving: @unchecked Sendable {
+    private var held: (any RenderDenoiser)?
+    init(_ dit: (any RenderDenoiser)?) { held = dit }
+    func go() { DispatchQueue.global(qos: .userInitiated).async { [self] in held = nil } }
 }

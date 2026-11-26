@@ -37,23 +37,30 @@ package enum MossImageRender {
             return promptTokens
         }
 
-        mutating func encode() throws -> Bool {
+        mutating func encode(ahead: Stage.Ahead?) throws -> Bool {
             let (ids, map) = (ids, inputs.text.map)
             var key = RenderCache.Key("MossImageRender.encode")
             try key.file(map)
             key.integers(ids)
-            let (caps, cached) = try RenderCache.conditioning(key, of: inputs.model) { try MossImageRender.encode(ids, map: map) }
+            let (caps, cached) = try RenderCache.conditioning(key, of: inputs.model) {
+                // Its one stage, the DiT opening beside it.
+                ahead?.next()
+                return try MossImageRender.encode(ids, map: map)
+            }
             self.caps = caps
             return cached
         }
 
-        func image() throws -> Latent? { try inputs.image { try Flux2VAEEncoder.latent(of: $0, path: $1.path) } }
+        func image(ahead: Stage.Ahead?) throws -> Latent? { try inputs.image(ahead: ahead) { try Flux2VAEEncoder.latent(of: $0, path: $1.path) } }
 
         func denoiser(height: Int, width: Int) throws -> any RenderDenoiser {
-            let dit = try Denoiser(map: inputs.denoising.map, loras: try MossImageRender.recipe(inputs.denoising.turbo, then: inputs.loras),
-                                   latentHeight: height, latentWidth: width, textLength: ids.count)
+            try Denoiser(map: inputs.denoising.map, loras: try MossImageRender.recipe(inputs.denoising.turbo, then: inputs.loras),
+                         latentHeight: height, latentWidth: width, textLength: ids.count)
+        }
+
+        func give(_ dit: any RenderDenoiser) throws {
+            guard let dit = dit as? Denoiser else { preconditionFailure("MOSS-Image's DiT") }
             dit.text = caps
-            return dit
         }
 
         func prepare(height: Int, width: Int) throws -> [Functions.Specialization] {

@@ -104,15 +104,20 @@ extension Engine {
 
 /// **The engine's stages as they told them** (`SiliCore.Stages`), from the watch's start to its stop: each one's plan
 /// (P, its floor, B, its ring), the footprint at its most while it lived, its seconds, the swap-outs meanwhile, and the
-/// Neural Engine's share its client said. Each is the render's stage under way when it opened (`begin`): the family
-/// announces a stage (`Event.stage`), then opens its engine stages — no family names its stages to the app (rule 2).
+/// Neural Engine's share its client said. Each is the render's stage under way at its first call (`begin`,
+/// `Stages.Event.calling`), and until then at its opening: the family announces a stage (`Event.stage`), then calls its
+/// engine stages — opened before, beside the one that runs (`Stage.beside`: the DiT during the text, the decoder during
+/// the DiT's last evaluation), or then — no family names its stages to the app (rule 2). What a stage tells is told
+/// under its name: two may be open.
 /// The footprint's peak is read on a thread of its own (`FootprintWatch`), from a stage's opening to its close (from
 /// the first's, when they overlap).
 package final class StageWatch: @unchecked Sendable {
     package struct Entry: Sendable, Equatable {
         package let name: String
-        /// The render's stage under way when it opened; `nil` outside a render.
-        package let stage: Engine.Stage?
+        /// The render's stage under way at its first call, until then at its opening; `nil` outside a render.
+        package var stage: Engine.Stage?
+        /// Whether it made a call (`Stages.Event.calling`): its stage is the one under way then.
+        package var called = false
         package let p, floor, budget, ring: Int
         /// The groups of weights its declaration has.
         package var groups = 0
@@ -249,15 +254,19 @@ package final class StageWatch: @unchecked Sendable {
                 if !entries.contains(where: \.open) { tick(false) }
                 leveled()
             }
-        case .kept(let n, let weights):
+        case .kept(let stage, let n, let weights):
             lock.withLock {
-                if let i = entries.lastIndex(where: \.open) { entries[i].kept = max(entries[i].kept, n); entries[i].weights = weights }
+                if let i = entry(stage) { entries[i].kept = max(entries[i].kept, n); entries[i].weights = weights }
                 leveled()
             }
-        case .neural(let share):
-            lock.withLock { if let i = entries.lastIndex(where: \.open) ?? entries.indices.last { entries[i].neuralEngine = share } }
+        case .neural(let stage, let share):
+            lock.withLock { if let i = entry(stage) { entries[i].neuralEngine = share } }
+        case .calling(let stage):
+            lock.withLock {
+                if let i = entry(stage), !entries[i].called { (entries[i].called, entries[i].stage) = (true, order.last ?? entries[i].stage) }
+            }
         case .cycle(let c):
-            lock.withLock { if let i = entries.lastIndex(where: \.open) ?? entries.indices.last { entries[i].cycles.append(c) } }
+            lock.withLock { if let i = entry(c.stage) { entries[i].cycles.append(c) } }
         case .work(let w):
             lock.withLock { if let i = entry(w.stage) { entries[i].works.append(w) } }
         case .traced(let t):

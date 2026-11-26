@@ -192,7 +192,10 @@ public final class BandStage: @unchecked Sendable {
             let left = try Run.encode(functions[call.function]!, stream, inputs: inputs, outputs: outputs)
             precondition(left.isEmpty, "\(call.function.key): outputs no view holds, \(left.keys.sorted())")
             let at = DispatchTime.now().uptimeNanoseconds
-            if first == nil { first = at }
+            if first == nil {
+                first = at
+                Stages.tell(.calling(stage: stage.plan.declaration.name))
+            }
             flops += sig.flops
             flight.append(stream.done())
             if traced {

@@ -46,6 +46,10 @@ extension Stage {
         public var start: UInt64?
         public var waited = 0.0
         public var trailing = false
+        /// Opened beside a stage that runs (`beside`); the seconds it waited for that stage to open (`Ahead`), and for the
+        /// close of the one it could not go beside.
+        public var beside: Pairing?
+        public var ahead = 0.0, after = 0.0
         public init() {}
     }
 
@@ -56,6 +60,25 @@ extension Stage {
     public static func planned<T>(measured: ThisMac = .current, _ plan: (_ floor: Int) throws -> (T, Plan)) throws -> (value: T, plan: Plan, opening: Opening) {
         var opening = Opening()
         opening.start = DispatchTime.now().uptimeNanoseconds
+        // Opened ahead (`Ahead`): beside the stage the client said, where B holds them both (`beside`); else after it.
+        if let ahead = Self.ahead {
+            let t = DispatchTime.now().uptimeNanoseconds
+            let said = try ahead.wait()
+            opening.ahead = Functions.seconds(since: t)
+            switch said {
+            case .stage(let w):
+                if let running = w.stage, let b = running.beside(measured: measured, plan) {
+                    opening.beside = Pairing(running)
+                    opening.trailing = true
+                    return (b.value, b.plan, opening)
+                }
+                opening.after = awaitClose([w])
+            case .after(let all):
+                opening.after = awaitClose(all)
+            case .alone:
+                break
+            }
+        }
         let now = Memory.floor()
         guard let rest = restLock.withLock({ resting }), now > rest + margin else {
             restLock.withLock { resting = nil }

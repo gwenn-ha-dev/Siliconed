@@ -373,12 +373,16 @@ package struct HostTensor: Sendable, Equatable {
 /// the engine's preparation) to a synchronous caller — the render queue, an installation, the command line.
 /// The calling thread blocks on a semaphore: **never call it from Swift's cooperative pool** (a `Task`), whose few
 /// threads the task it waits for may need; an `async` caller goes through `offThePool`.
+///
+/// **The opening ahead goes with it** (`Stage.ahead`): a detached task inherits no task-local value, and a DiT opened
+/// beside the text opens its stages through here.
 package func blocking<T>(_ body: @escaping () async throws -> T) throws -> T {
     let box = BlockingOutcome<T>()
     let done = DispatchSemaphore(value: 0)
     let work = UncheckedSendable(body)
+    let ahead = Stage.ahead
     Task.detached {
-        do { box.result = .success(try await work.value()) } catch { box.result = .failure(error) }
+        do { box.result = .success(try await Stage.$ahead.withValue(ahead) { try await work.value() }) } catch { box.result = .failure(error) }
         done.signal()
     }
     done.wait()
@@ -390,8 +394,11 @@ private final class BlockingOutcome<T>: @unchecked Sendable { var result: Result
 /// **Synchronous work that blocks (`blocking`), for an `async` caller**: run on a thread of Dispatch's, outside the
 /// cooperative pool, the caller suspended meanwhile.
 package func offThePool<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
-    try await withCheckedThrowingContinuation { continuation in
-        DispatchQueue.global(qos: .userInitiated).async { continuation.resume(with: Result { try work() }) }
+    let ahead = Stage.ahead
+    return try await withCheckedThrowingContinuation { continuation in
+        DispatchQueue.global(qos: .userInitiated).async {
+            continuation.resume(with: Result { try Stage.$ahead.withValue(ahead) { try work() } })
+        }
     }
 }
 

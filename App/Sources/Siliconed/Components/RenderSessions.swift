@@ -30,8 +30,8 @@ extension LatentDecoder {
     package var narrowed: Bool { false }
 }
 
-/// **The decoder of a render**, opened once for a batch. A render lets its DiT go before it opens this one: each stage
-/// is held alone under B, never two models at once.
+/// **The decoder of a render**, opened once for a batch: beside the DiT's last evaluation where B holds both at their
+/// peaks (`Stage.beside`), after the DiT's close otherwise.
 package final class DecoderSession<Decoder: LatentDecoder> {
     private let decoder: UncheckedSendable<Decoder>
 

@@ -15,7 +15,7 @@ extension RemoteControl {
     }
 
     static func traceJSON(_ h: Engine.Held) -> [String: Any] {
-        var o: [String: Any] = ["stage": stageName(h.stage)]
+        var o: [String: Any] = ["stage": stageName(h.stage), "compiled_s": Response.number(h.compilation, 3)]
         o["work"] = h.work.map { w -> [String: Any] in
             ["tflops": Response.number(w.tflops, 3), "seconds": Response.number(w.seconds, 4),
              "end": w.end.map { Response.number($0, 4) } ?? NSNull(), "ane_fraction": Response.number(w.aneFraction, 3)]

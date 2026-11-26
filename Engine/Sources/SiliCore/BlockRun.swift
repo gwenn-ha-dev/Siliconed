@@ -25,7 +25,7 @@ extension Block {
         precondition(left.isEmpty, "\(f): outputs no view holds, \(left.keys.sorted())")
         let end = traced ? Stages.End() : nil
         let timing = Timing(before: last, encoded: DispatchTime.now().uptimeNanoseconds, done: stage.stream.done(end), end: end, after: streamEnd)
-        if firstCall == nil { firstCall = timing.encoded }
+        if firstCall == nil { began(timing.encoded) }
         marks[f] = timing.done
         last = timing.done
         if traced { streamEnd = end }
@@ -87,7 +87,7 @@ extension Block {
             await settled()
             let io = views(f, start: row, group: g, pass: nil, step: nil, call: bind, neural: true, written: &written)
             let start = DispatchTime.now().uptimeNanoseconds
-            if firstCall == nil { firstCall = start }
+            if firstCall == nil { began(start) }
             try await Run.neural(functions[f]!, inputs: io.inputs, outputs: io.outputs)
             let end = DispatchTime.now().uptimeNanoseconds
             lastEnd = max(lastEnd, end)

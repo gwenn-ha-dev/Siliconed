@@ -76,6 +76,12 @@ extension Block {
         for i in 0..<out.count { out[i] = value(base, r.type, i) * (factor.map { value($0, ft!, i / r.width) } ?? 1) }
     }
 
+    /// **Its first call**, at `at`: the span of its work starts there, and its stage says it runs (`Stages.Event.calling`).
+    func began(_ at: UInt64) {
+        firstCall = at
+        Stages.tell(.calling(stage: stage.plan.declaration.name))
+    }
+
     /// Everything let go, and the footprint waited for (`Stage.close`): the functions the block loaded itself first.
     @discardableResult
     public func close() -> Stage.Settled {

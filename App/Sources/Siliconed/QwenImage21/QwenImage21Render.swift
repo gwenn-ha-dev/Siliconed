@@ -24,7 +24,8 @@ import SiliCore
 ///     `(t / 1000)` in bf16, `t = σ · 1000` itself a bf16 value (`QwenImage21Transformer.modelTime`).
 ///   - **The noise is drawn `(1, 1, 64, h, w)`**, planar, and packed by a plain flatten: no 2 × 2.
 ///   - **The decoder gives RGBA**; the picture is its RGB, uncomposited (the oracle's `convert("RGB")`).
-///   - **Three sessions, one after the other**, each planned under B and let go before the next.
+///   - **Three sessions, each planned under B**, one opened beside the one before it only where B holds both at their
+///     peaks (`RenderLoop`).
 ///
 ///   - **In an edit the DiT's sequence is the encoder's**: the text rows where they were, each reference's latent
 ///     tokens at its picture's slots (four a slot, row-major), the target last; the encoder's own rows at the slots
@@ -73,7 +74,7 @@ package enum QwenImage21Render {
             return identified.prompt
         }
 
-        mutating func encode() throws -> Bool {
+        mutating func encode(ahead: Stage.Ahead?) throws -> Bool {
             let (ids, rows, dropped, map) = (ids, self.rows, self.dropped, text.map)
             let slots = Array(rows.dropFirst(dropped))
             let pictures = try references.map { try Qwen3VLImages.pixels(QwenImage21References.rgb8($0)) }
@@ -86,24 +87,34 @@ package enum QwenImage21Render {
                 key.floats(picture.values)
             }
             let (states, cached) = try RenderCache.conditioning(key, of: model) {
-                try QwenImage21Render.spoken(QwenImage21Render.encode(ids, dropped: dropped, pictures: pictures, slots: rows, map: map), slots: slots)
+                // Without pictures its one stage, the DiT opening beside it (with them the references' stage comes last).
+                ahead?.next()
+                return try QwenImage21Render.spoken(QwenImage21Render.encode(ids, dropped: dropped, pictures: pictures, slots: rows, map: map), slots: slots)
             }
             (self.slots, self.states) = (slots, states)
             return cached
         }
 
         /// Each reference's latent, its tokens row-major, kept for the DiT's sequence.
-        mutating func image() throws -> Latent? {
+        mutating func image(ahead: Stage.Ahead?) throws -> Latent? {
             guard let encoding else { return nil }
-            for reference in references { referenceTokens += try QwenImage21Render.tokens(planes: QwenImage21Render.latent(of: reference, path: encoding.path)) }
+            for (i, reference) in references.enumerated() {
+                // The last reference's encoder, the last stage before the DiT: the DiT opens beside it.
+                if i == references.count - 1 { ahead?.next() }
+                referenceTokens += try QwenImage21Render.tokens(planes: QwenImage21Render.latent(of: reference, path: encoding.path))
+            }
             return nil
         }
 
         func denoiser(height: Int, width: Int) throws -> any RenderDenoiser {
-            guard let states else { preconditionFailure("the text before the DiT") }
-            let sequence = try QwenImage21DiT.Sequence(slots: slots, references: grids, height: height, width: width)
-            return try Denoiser(map: denoising.map, loras: loras, sequence: sequence, text: states,
-                                references: referenceTokens.isEmpty ? nil : HostTensor([sequence.referenceRows, denoising.space.channels], floats: referenceTokens))
+            let sequence = try QwenImage21DiT.Sequence(slots: Array(rows.dropFirst(dropped)), references: grids, height: height, width: width)
+            return try Denoiser(map: denoising.map, loras: loras, sequence: sequence)
+        }
+
+        func give(_ dit: any RenderDenoiser) throws {
+            guard let states, let dit = dit as? Denoiser else { preconditionFailure("the text before Qwen-Image-2.1's DiT") }
+            try dit.prompt(text: states, references: referenceTokens.isEmpty ? nil
+                           : HostTensor([dit.loop.g.sequence.referenceRows, denoising.space.channels], floats: referenceTokens))
         }
 
         /// An edit's vision tower is not prepared: it compiles as it loads, as any function the cache does not hold.
@@ -203,15 +214,17 @@ package enum QwenImage21Render {
     package final class Denoiser {
         let loop: QwenImage21Loop
 
-        /// `text`: the encoder's text rows, in order (`spoken`); `references`: `[R, 64]`, each reference's tokens.
-        package init(map path: String, loras: LoRAStack = .none, sequence: QwenImage21DiT.Sequence, text: HostTensor, references: HostTensor?) throws {
-            let (text, references) = (text.floats, references?.floats ?? [])
+        package init(map path: String, loras: LoRAStack = .none, sequence: QwenImage21DiT.Sequence) throws {
             nonisolated(unsafe) let loras = loras
-            loop = try blocking {
-                let loop = try await QwenImage21Loop.open(map: path, sequence: sequence, loras: loras)
-                try await loop.prompt(text: text, references: references)
-                return UncheckedSendable(loop)
-            }.value
+            loop = try blocking { UncheckedSendable(try await QwenImage21Loop.open(map: path, sequence: sequence, loras: loras)) }.value
+        }
+
+        /// **What it reads once**: `text`, the encoder's text rows, in order (`spoken`); `references`: `[R, 64]`, each
+        /// reference's tokens.
+        package func prompt(text: HostTensor, references: HostTensor?) throws {
+            let (text, references) = (text.floats, references?.floats ?? [])
+            nonisolated(unsafe) let loop = loop
+            try blocking { try await loop.prompt(text: text, references: references) }
         }
 
         /// What the DiT is: its arithmetic and its plan under B.
