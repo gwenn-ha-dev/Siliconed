@@ -32,9 +32,9 @@ English · [Français](README.fr.md)
   <img src="https://img.shields.io/badge/languages-7-lightgrey" alt="7 languages">
 </p>
 
-![A Krea 2 Turbo photo — a laughing young Welsh woman in a black winter wetsuit wading out of the sea at Rhossili, a yellow surfboard under her arm — and its 1930s railway poster edit by Qwen-Image-2.1, under a sliding curtain](docs/images/curtain.gif)
+![A Krea 2 Turbo photo — a laughing young Welsh woman in a black winter wetsuit wading out of the sea at Rhossili, a yellow surfboard under her arm — and its cut-paper collage edit by Qwen-Image-2.1 in bright flat colours, the board turned coral red, RHOSSILI set in the sky, under a sliding curtain](docs/images/curtain.gif)
 
-*A photo from Krea 2 Turbo, repainted as a 1930s railway poster by Qwen-Image-2.1 with one sentence, compared under the curtain: nothing moved but the style. The name is ours, set on top. Edition 0.30 · Rhossili.*
+*A photo from Krea 2 Turbo, repainted as a cut-paper collage by Qwen-Image-2.1 with one prompt, compared under the curtain: nothing moved but the style. The name is ours, set on top. Edition 0.30 · Rhossili.*
 
 ## Core AI does the heavy lifting
 

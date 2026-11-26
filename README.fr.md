@@ -32,9 +32,9 @@
   <img src="https://img.shields.io/badge/langues-7-lightgrey" alt="7 langues">
 </p>
 
-![Une photo de Krea 2 Turbo — une jeune Galloise qui rit, en combinaison d'hiver noire, sort de la mer à Rhossili, une planche de surf jaune sous le bras — et sa retouche en affiche ferroviaire des années 1930 par Qwen-Image-2.1, sous un rideau qui glisse](docs/images/curtain.gif)
+![Une photo de Krea 2 Turbo — une jeune Galloise qui rit, en combinaison d'hiver noire, sort de la mer à Rhossili, une planche de surf jaune sous le bras — et sa retouche en collage de papiers découpés aux couleurs vives par Qwen-Image-2.1, la planche devenue corail, RHOSSILI posé dans le ciel, sous un rideau qui glisse](docs/images/curtain.gif)
 
-*Une photo de Krea 2 Turbo, repeinte en affiche ferroviaire des années 1930 par Qwen-Image-2.1 en une phrase, comparée sous le rideau : rien n'a bougé que le style. Le nom est de nous, posé par-dessus. Édition 0.30 · Rhossili.*
+*Une photo de Krea 2 Turbo, repeinte en collage de papiers découpés par Qwen-Image-2.1 en un seul prompt, comparée sous le rideau : rien n'a bougé que le style. Le nom est de nous, posé par-dessus. Édition 0.30 · Rhossili.*
 
 ## Core AI porte le plus lourd
 
