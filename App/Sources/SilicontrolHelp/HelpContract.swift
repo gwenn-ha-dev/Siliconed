@@ -477,8 +477,8 @@ extension RemoteControlHelp {
           {"ok": true, "debug_live": true,
            "stages": [{"stage": "text", "work": [{"tflops": 2.1, "seconds": 0.42, "end": 1.03, "ane_fraction": 0}],
                        "engine_stages": [{"name": "…", "opened": 0.31, "closed": 1.10,
-                                          "opening": [{"name": "arena", "seconds": 0.01}, …],
-                                          "closing": [{"name": "let go", "seconds": 0.02}, {"name": "footprint back", "seconds": 0.35}],
+                                          "opening": [{"name": "plan", "seconds": 0.04}, {"name": "arena", "seconds": 0.01}, …],
+                                          "closing": [{"name": "let go", "seconds": 0.02}],
                                           "runs": [{…occupancy…}]}]},
                       {"stage": "denoising", "work": […],
                        "cycles": [{"index": 1, "ane_rows": 2560, "rows": 4096, "seconds": 8.39, "end": 9.8, "tflops": 6.1,
@@ -500,10 +500,10 @@ extension RemoteControlHelp {
                          layer, between two calls of one stretch, outside before its first call and after its last —;
                          each step's calls on each unit: "ane", "beside" (the GPU past the Neural Engine's rows),
                          "alone" (the GPU's own steps), "edge"; "unread", the calls whose end was not read.
-        engine_stages  : under Debug Live, each engine stage's opening (arena, residents, ring, functions) and close (let
-                         go, then the wait for the memory to come back), in seconds, from "opened" and "closed" on the
-                         render's clock; its "runs", its calls outside the DiT's steps (a text encoder's layers, a
-                         decoder's bands).
+        engine_stages  : under Debug Live, each engine stage's opening (its plan, the wait for the memory the stages
+                         before let go where it waited, arena, residents, ring, functions) and close (let go), in
+                         seconds, from "opened" and "closed" on the render's clock; its "runs", its calls outside the
+                         DiT's steps (a text encoder's layers, a decoder's bands).
 
         Seconds on the render's clock, from its start (the Machine window's). Debug Live (help set) is read as a render
         is asked: turned on during one, it records from the next. What it records stays in memory, the last render's.
@@ -516,8 +516,8 @@ extension RemoteControlHelp {
           {"ok": true, "debug_live": true,
            "stages": [{"stage": "text", "work": [{"tflops": 2.1, "seconds": 0.42, "end": 1.03, "ane_fraction": 0}],
                        "engine_stages": [{"name": "…", "opened": 0.31, "closed": 1.10,
-                                          "opening": [{"name": "arena", "seconds": 0.01}, …],
-                                          "closing": [{"name": "let go", "seconds": 0.02}, {"name": "footprint back", "seconds": 0.35}],
+                                          "opening": [{"name": "plan", "seconds": 0.04}, {"name": "arena", "seconds": 0.01}, …],
+                                          "closing": [{"name": "let go", "seconds": 0.02}],
                                           "runs": [{…occupancy…}]}]},
                       {"stage": "denoising", "work": […],
                        "cycles": [{"index": 1, "ane_rows": 2560, "rows": 4096, "seconds": 8.39, "end": 9.8, "tflops": 6.1,
@@ -540,10 +540,10 @@ extension RemoteControlHelp {
                          son premier appel et après son dernier — ; les appels de chaque étape sur chaque unité : "ane",
                          "beside" (le GPU après les rangées du Neural Engine), "alone" (les étapes du GPU seul), "edge" ;
                          "unread", les appels dont la fin n'a pas été lue.
-        engine_stages  : sous Debug live, l'ouverture de chaque étage du moteur (arène, résidents, anneau, fonctions) et sa
-                         fermeture (tout lâcher, puis l'attente du retour de la mémoire), en secondes, depuis "opened" et
-                         "closed" sur l'horloge du rendu ; ses "runs", ses appels hors des pas du DiT (les couches d'un
-                         encodeur de texte, les bandes d'un décodeur).
+        engine_stages  : sous Debug live, l'ouverture de chaque étage du moteur (son plan, l'attente de la mémoire lâchée
+                         par les étages d'avant là où il a attendu, arène, résidents, anneau, fonctions) et sa fermeture
+                         (tout lâcher), en secondes, depuis "opened" et "closed" sur l'horloge du rendu ; ses "runs", ses
+                         appels hors des pas du DiT (les couches d'un encodeur de texte, les bandes d'un décodeur).
 
         Secondes sur l'horloge du rendu, depuis son début (celle de la fenêtre Machine). Debug live (help set) se lit quand
         un rendu est demandé : allumé pendant l'un, il enregistre à partir du suivant. Ce qu'il enregistre reste en mémoire,

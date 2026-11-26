@@ -16,8 +16,8 @@ import Testing
 /// - **the process's first call of Core AI**: 9.1 MiB before it, 31.1 after it and its let-go, 35 to 39 after any number
 ///   of functions since — the runtime's own, paid once (`Functions.witness`, `Bench`), so it lies in every floor;
 /// - **what Core AI keeps of a function let go, ~36 MiB, for 1 to 2 s** (still held at 1.0 s, gone at 2.0, for every
-///   function): `close` stops waiting within `Stage.margin`, so a stage opened at once counts it in its floor — P the
-///   higher by it, never the lower (`settledCoreAI`).
+///   function): `Stage.settle` stops waiting within `Stage.margin`, so a stage opened at once counts it in its floor —
+///   P the higher by it, never the lower (`settledCoreAI`).
 extension Runs {
     @Test(.enabled(if: metalEnabled))
     func aStageLetGoLeavesNothing() async throws {
@@ -47,7 +47,8 @@ extension Runs {
             let settled = autoreleasepool { () -> Stage.Settled in
                 let p = stage.pointer("big")
                 for i in stride(from: 0, to: big, by: Arena.page) { p.storeBytes(of: UInt8(truncatingIfNeeded: i), toByteOffset: i, as: UInt8.self) }
-                return stage.close()
+                stage.close()
+                return Stage.settle()
             }
             print("let go \(round): floor \(Memory.mib(stage.plan.floor)), P \(Memory.mib(stage.plan.p)), \(settled.line), lingering \(Memory.mib(Arena.lingering))")
             #expect(settled.within, "round \(round): \(settled.line)")

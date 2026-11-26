@@ -90,6 +90,15 @@ extension Stage {
         public var weights: Int { sizes.residents + kept.reduce(0) { $0 + sizes.groups[$1]! } + depth * sizes.slot }
         /// P = floor + arena: what the stage allocates; Core AI's share is read in flight (`signal`, `estimates`).
         public var p: Int { floor + arena }
+        /// **The same socle on `floor`**: refused (`OverBudget`, by how much it passes B) where P and the margin pass B.
+        func on(floor: Int) throws -> Plan {
+            let p = Plan(declaration: declaration, kept: kept, depth: depth, heap: heap, apart: apart, floor: floor, budget: budget, sizes: sizes)
+            if p.p + margin <= budget { return p }
+            let why = depth == 0 ? "every group kept" : kept.isEmpty ? "a ring of \(depth)" : "a ring of \(depth) and \(kept.count) groups the ring cannot hold"
+            throw OverBudget(needed: p.p + margin, budget: budget,
+                             description: "\(declaration.name): at its finest (\(why)) P = \(Memory.mib(p.p)) + \(Memory.mib(margin)) passes B = "
+                                 + "\(Memory.mib(budget)) by \(Memory.mib(p.p + margin - budget))")
+        }
         /// P's terms, as a sentence.
         public var line: String {
             "\(declaration.name): P = floor \(Memory.mib(floor)) + arena \(Memory.mib(arena)) = \(Memory.mib(p)) under B = \(Memory.mib(budget))"
@@ -112,23 +121,21 @@ extension Stage {
     /// first call, and a share measured apart was off by 0.3 to 3 GiB a stage (19/11). A socle over B: `OverBudget`, by
     /// how much it passes B. A client with several forms plans each and chooses among those that hold (`choose`).
     public static func plan(_ d: Declaration, files: [SafeTensors], budget: Int, floor: Int, depth: Int = 2) throws -> Plan {
+        try socle(d, files: files, budget: budget, depth: depth).on(floor: floor)
+    }
+
+    /// **The socle of `d` under `budget`, on no floor yet**: what does not change with the footprint, planned once and
+    /// judged on a floor by `Plan.on` (`planned` judges it on two).
+    static func socle(_ d: Declaration, files: [SafeTensors], budget: Int, depth: Int = 2) throws -> Plan {
         precondition(depth >= 1, "a ring of a slot at least")
         let sizes = try Sizes(d, files: files)
-        func plan(_ kept: [String], _ depth: Int) -> Plan {
-            let (heap, apart) = sizes.arena(kept: kept, depth: depth)
-            return Plan(declaration: d, kept: kept, depth: depth, heap: heap, apart: apart,
-                        floor: floor, budget: budget, sizes: sizes)
-        }
         let order = sizes.order
         // The groups that cannot ride the ring are kept whatever it costs; where none rides, every group is, and there is
         // no ring.
         let bound = order.filter { !sizes.rides($0) }
-        let socle = bound.count == order.count ? plan(order, 0) : plan(bound, depth)
-        if socle.p + margin <= budget { return socle }
-        let why = socle.depth == 0 ? "every group kept" : bound.isEmpty ? "a ring of \(depth)" : "a ring of \(depth) and \(bound.count) groups the ring cannot hold"
-        throw OverBudget(needed: socle.p + margin, budget: budget,
-                         description: "\(d.name): at its finest (\(why)) P = \(Memory.mib(socle.p)) + \(Memory.mib(margin)) passes B = "
-                             + "\(Memory.mib(budget)) by \(Memory.mib(socle.p + margin - budget))")
+        let (kept, ring) = bound.count == order.count ? (order, 0) : (bound, depth)
+        let (heap, apart) = sizes.arena(kept: kept, depth: ring)
+        return Plan(declaration: d, kept: kept, depth: ring, heap: heap, apart: apart, floor: 0, budget: budget, sizes: sizes)
     }
 
     /// A declaration's sizes, from its files' headers alone.
@@ -224,21 +231,29 @@ extension Stage {
     /// refused too); never read, opened, the fuse behind.
     public static func open(_ device: MTLDevice, _ declaration: Declaration, files: [SafeTensors], budget: Int, depth: Int = 2,
                             measured: ThisMac = .current) async throws -> Stage {
-        let p = try chosen(declaration, files: files, budget: budget, depth: depth, measured: measured)
-        return try await Stage(device, plan: p, files: files, measured: measured)
+        let choice = try chosen(declaration, files: files, budget: budget, depth: depth, measured: measured)
+        let p = try planned(measured: measured) { floor in try ((), choice(floor)) }
+        return try await Stage(device, plan: p.plan, files: files, measured: measured, opening: p.opening)
     }
 
     /// **What `open` would specialize**, its assets written: the same plan and choice, from the files' headers, nothing
-    /// allocated or read (`specializations`).
+    /// allocated or read (`specializations`), on the floor the process comes back to (`restingFloor`).
     public static func prepare(_ declaration: Declaration, files: [SafeTensors], budget: Int, depth: Int = 2,
                                measured: ThisMac = .current) throws -> [Functions.Specialization] {
-        try specializations(chosen(declaration, files: files, budget: budget, depth: depth, measured: measured).declaration.functions.values)
+        let choice = try chosen(declaration, files: files, budget: budget, depth: depth, measured: measured)
+        return try specializations(choice(restingFloor()).declaration.functions.values)
     }
 
-    private static func chosen(_ declaration: Declaration, files: [SafeTensors], budget: Int, depth: Int, measured: ThisMac) throws -> Plan {
-        let p = try plan(declaration, files: files, budget: budget, floor: Memory.floor(), depth: depth)
-        _ = try choose([p], estimates(extents: [(key(p.declaration), p.declaration.extent)], measured: measured, budget: p.budget))
-        return p
+    /// The plan `open` takes on a floor, refused where its socle or the share its functions were read at passes B.
+    private static func chosen(_ declaration: Declaration, files: [SafeTensors], budget: Int, depth: Int,
+                               measured: ThisMac) throws -> (Int) throws -> Plan {
+        let socle = try socle(declaration, files: files, budget: budget, depth: depth)
+        let estimates = estimates(extents: [(key(declaration), declaration.extent)], measured: measured, budget: budget)
+        return { floor in
+            let p = try socle.on(floor: floor)
+            _ = try choose([p], estimates)
+            return p
+        }
     }
 
     /// **`functions` as a stage loads them, to specialize before it opens** (`Functions.specialize`): each asset written,

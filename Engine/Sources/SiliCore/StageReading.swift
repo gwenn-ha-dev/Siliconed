@@ -118,7 +118,7 @@ extension Stage {
         }
         guard let old else { return false }
         // The old key's reading, if its functions were called; the new key's needs calls of its own (`called`).
-        if called(again: true) { Self.keep(reading: old.reading, under: old.key, extent: old.extent, budget: plan.budget) }
+        if called(again: true) { Self.keep(reading: old.reading, under: old.key, extent: old.extent, budget: plan.budget, first: !trailing) }
         opened(key)
         return true
     }
@@ -128,9 +128,10 @@ extension Stage {
 
     /// A reading kept at its largest, of a stage run under `budget` (`ThisMac.keep`: a mark −1 of this engine that holds
     /// under it kept as it is, another's or one taken under a smaller B replaced), and what its functions held beside it
-    /// (`ThisMac.extents`).
-    static func keep(reading share: Int, under key: String, extent: Extent? = nil, budget: Int) {
+    /// (`ThisMac.extents`). `first` false (a stage planned on what trails, `Opening.trailing`): only over a reading kept.
+    static func keep(reading share: Int, under key: String, extent: Extent? = nil, budget: Int, first: Bool = true) {
         try? ThisMac.update { m in
+            guard first || m.reading(key, budget: budget) != nil else { return }
             m.keep(reading: share, under: key, budget: budget)
             if let extent { m.extents = (m.extents ?? [:]).merging([key: extent]) { $1 } }
         }

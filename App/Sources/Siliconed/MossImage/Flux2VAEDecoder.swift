@@ -33,13 +33,15 @@ package final class Flux2VAEDecoder: LatentDecoder {
 
     private init(_ pass: FluxVAEPass, narrowed: Bool) { (self.pass, self.narrowed) = (pass, narrowed) }
 
-    package static func open(path: String, latentHeight: Int, latentWidth: Int, budget: Int) async throws -> Flux2VAEDecoder {
-        let (pass, narrowed) = try await vae.open(.decode, path: path, height: latentHeight, width: latentWidth, budget: budget)
+    package static func open(_ candidates: FluxVAE.Candidates) async throws -> Flux2VAEDecoder {
+        let (pass, narrowed) = try await vae.open(candidates)
         return Flux2VAEDecoder(pass, narrowed: narrowed)
     }
 
-    package static func admit(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws {
-        try vae.admit(.decode, path: path, height: latentHeight, width: latentWidth, budget: budget)
+    package static func admit(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> FluxVAE.Candidates {
+        let c = try vae.candidates(.decode, path: path, height: latentHeight, width: latentWidth, budget: budget)
+        try vae.admit(c)
+        return c
     }
 
     package static func prepare(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> [Functions.Specialization] {

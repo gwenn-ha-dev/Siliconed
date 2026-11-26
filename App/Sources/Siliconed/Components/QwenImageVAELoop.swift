@@ -139,7 +139,7 @@ package protocol BandedDecoder: LatentDecoder {
 
 /// **A Wan VAE's run**: the stage of the first of its plans (by bands from the tallest) whose P holds under B — its
 /// arena allocated, its weights read, its functions loaded — then its calls one after the other.
-final class QwenImageVAERun {
+package final class QwenImageVAERun {
     typealias Plan = QwenImageVAE.Plan
 
     let plan: Plan
@@ -148,39 +148,34 @@ final class QwenImageVAERun {
 
     private init(_ plan: Plan, _ bands: BandStage) { (self.plan, self.bands) = (plan, bands) }
 
-    /// **What a run opens and `admit` judges, written once**: the network's plan for each band's size
-    /// (`QwenImageVAE.positions`, from the tallest), from the VAE `file` — so that what a render judges before its DiT
-    /// is what it opens after.
-    struct Plans {
-        let network: String
-        let file: SafeTensors
+    /// **What a run opens and `admit` judges, built once**: the network's plan for each band's size
+    /// (`QwenImageVAE.positions`, from the tallest), from the VAE `file`, under `budget`, their functions built and named
+    /// (`BandStage.candidates`) — so that what a render judges before its DiT is what it opens after, not built again.
+    package struct Plans: @unchecked Sendable {
         let plans: [Plan]
+        let candidates: BandStage.Candidates
         /// `plan` writes the network's plan for a band's size.
-        init(_ network: String, file: SafeTensors, plan: (Int) -> Plan) {
-            (self.network, self.file, plans) = (network, file, QwenImageVAE.positions.map(plan))
+        init(_ network: String, file: SafeTensors, budget: Int, plan: (Int) -> Plan) throws {
+            let plans = QwenImageVAE.positions.map(plan)
+            self.plans = plans
+            candidates = try BandStage.candidates(network, prefix: network, candidates: QwenImageVAE.positions, files: [file],
+                                                  residents: plans[0].residents(file), budget: budget) {
+                plans[QwenImageVAE.positions.firstIndex(of: $0)!].bands
+            }
         }
-        var residents: [Weights.Entry] { plans[0].residents(file) }
-        func bands(_ positions: Int) -> Bands { plans[QwenImageVAE.positions.firstIndex(of: positions)!].bands }
     }
 
-    /// **The run of the first of `plans` that holds under `budget`** (`BandStage.open`).
-    static func open(_ plans: Plans, budget: Int) async throws -> QwenImageVAERun {
-        let stage = try await BandStage.open(plans.network, prefix: plans.network, candidates: QwenImageVAE.positions, files: [plans.file],
-                                             residents: plans.residents, budget: budget, plan: plans.bands)
+    /// **The run of the first of `plans` that holds under B** (`BandStage.open`).
+    static func open(_ plans: Plans) async throws -> QwenImageVAERun {
+        let stage = try await BandStage.open(plans.candidates)
         return QwenImageVAERun(plans.plans[stage.candidate], stage)
     }
 
-    /// Whether `open` would hold under `budget`, nothing allocated (`BandStage.admit`).
-    static func admit(_ plans: Plans, budget: Int) throws {
-        try BandStage.admit(plans.network, prefix: plans.network, candidates: QwenImageVAE.positions, files: [plans.file],
-                            residents: plans.residents, budget: budget, plan: plans.bands)
-    }
+    /// Whether `open` would hold, nothing allocated (`BandStage.admit`).
+    static func admit(_ plans: Plans) throws { try BandStage.admit(plans.candidates) }
 
     /// What `open` would specialize, nothing allocated (`BandStage.prepare`).
-    static func prepare(_ plans: Plans, budget: Int) throws -> [Functions.Specialization] {
-        try BandStage.prepare(plans.network, prefix: plans.network, candidates: QwenImageVAE.positions, files: [plans.file],
-                              residents: plans.residents, budget: budget, plan: plans.bands)
-    }
+    static func prepare(_ plans: Plans) throws -> [Functions.Specialization] { try BandStage.prepare(plans.candidates) }
 
     /// What the run is given — the latent `[c, h, w]` f32, the picture `[c, H, W]` in [−1, 1] (f16 under factors of 1,
     /// its largest 1) — run, and what it gives back, `[C, H, W]` f32.

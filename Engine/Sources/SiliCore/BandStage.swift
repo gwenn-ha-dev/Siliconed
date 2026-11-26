@@ -31,57 +31,29 @@ public final class BandStage: @unchecked Sendable {
         }
     }
 
-    /// **The stage of the first of `candidates` whose socle and estimate hold under `budget`** (`plan` writes the plan of
-    /// a band's positions, the tallest first), its residents read from `files`: the functions built at each plan's shapes
-    /// and named by their bytes (`prefix-<hash>`), what Core AI will hold under each estimated from this Mac's readings
-    /// (`Stage.estimates(extents:)`: its own, or a bound from a reading of the same functions at another height or
-    /// size); none holding, the soberest on paper where nothing of its kin was read or only bands that hold more bound
-    /// it, refused where a reading of bands that hold no more predicts it past B — a size larger than any read, refused
-    /// before the computation `admit` judges for (`Stage.choose`). A stage's reading is kept at its close, once its
-    /// functions were called: the next stage of its kin climbs on it.
-    public static func open(_ name: String, prefix: String, candidates: [Int], files: [SafeTensors], residents: [Weights.Entry], budget: Int,
-                            plan: (Int) -> Bands) async throws -> BandStage {
-        guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
-        let c = try choice(name, prefix: prefix, candidates: candidates, files: files, residents: residents, budget: budget, floor: Memory.floor(), plan: plan)
-        let stage = try await Stage(device, plan: c.plan, files: files)
-        return BandStage(c.bands, stage, candidate: c.rank, narrowed: c.narrowed,
-                         signatures: c.assets.mapValues { Block.Signature(c.modules[$0]!) }, assets: c.assets)
+    /// **A stage of bands' candidates, built once** (`candidates`): the plan of each band's positions (the tallest first),
+    /// its functions built at its shapes and named by their bytes (`prefix-<hash>`), its socle from the files' headers —
+    /// what `admit` judges before the computation whose result the stage reads and `open` opens after it, judged on the
+    /// floor each meets. Built once, not at each (26/11/2026, the M1 Pro: a stage's four candidates built and named
+    /// before the transformer before it, then again after it, 0.34 to 0.40 s the second time, the trace's gap before
+    /// the stage).
+    public struct Candidates: @unchecked Sendable {
+        public let name: String
+        let files: [SafeTensors]
+        let plans: [Bands]
+        let socles: [Stage.Plan]
+        let named: [[Bands.Shaped: String]]
+        let modules: [String: Aicode.Module]
     }
 
-    /// **What `open` would specialize**, its assets written: the candidates the same code plans from the files' headers,
-    /// nothing allocated or read (`Stage.specializations`). Every one that holds, not the one taken alone: with nothing of
-    /// its kin read on this Mac `open` takes the finest (`Stage.choose`), once read a taller one; and it opens later on a
-    /// higher floor — a candidate refused here is refused there (25/11/2026, the M1 Pro, a stage of 4 candidates: opened at
-    /// the finest the first time, prepared, at the tallest the next, never prepared, and compiled it).
-    public static func prepare(_ name: String, prefix: String, candidates: [Int], files: [SafeTensors], residents: [Weights.Entry], budget: Int,
-                               plan: (Int) -> Bands) throws -> [Functions.Specialization] {
-        let c = try choice(name, prefix: prefix, candidates: candidates, files: files, residents: residents, budget: budget, floor: Memory.floor(), plan: plan)
-        return try Stage.specializations(c.holding.flatMap(\.declaration.functions.values))
-    }
-
-    /// **Whether a stage `open` would open holds under `budget` over `floor`**, nothing allocated: the candidate it would
-    /// take, or `OverBudget` with the number — what a client judges before the computation whose result the stage reads
-    /// (refused after it, that computation's minutes were paid for nothing). `floor`: the footprint the
-    /// stage will open over, the one now when the stages before it will have given back what they took.
-    @discardableResult
-    public static func admit(_ name: String, prefix: String, candidates: [Int], files: [SafeTensors], residents: [Weights.Entry], budget: Int,
-                             floor: Int = Memory.floor(), plan: (Int) -> Bands) throws -> Int {
-        try choice(name, prefix: prefix, candidates: candidates, files: files, residents: residents, budget: budget, floor: floor, plan: plan).rank
-    }
-
-    private struct Choice {
-        let rank: Int, bands: Bands, plan: Stage.Plan, narrowed: Bool
-        let assets: [Bands.Shaped: String], modules: [String: Aicode.Module]
-        /// The plan of every candidate that holds, the chosen among them.
-        let holding: [Stage.Plan]
-    }
-
-    /// The candidate `open` takes and `admit` judges, its plan and its functions.
-    private static func choice(_ name: String, prefix: String, candidates: [Int], files: [SafeTensors], residents: [Weights.Entry], budget: Int,
-                               floor: Int, plan: (Int) -> Bands) throws -> Choice {
+    /// **The candidates of a stage of bands** (`plan` writes the plan of a band's positions), under `budget`, their
+    /// residents read from `files`. A socle that cannot be planned for another reason than B (a tensor the file lacks)
+    /// goes up as it is.
+    public static func candidates(_ name: String, prefix: String, candidates: [Int], files: [SafeTensors], residents: [Weights.Entry],
+                                  budget: Int, plan: (Int) -> Bands) throws -> Candidates {
         let plans = candidates.map(plan)
         var modules: [String: Aicode.Module] = [:]
-        var declarations: [Stage.Declaration] = [], named: [[Bands.Shaped: String]] = []
+        var socles: [Stage.Plan] = [], named: [[Bands.Shaped: String]] = []
         for p in plans {
             var d = Stage.Declaration("\(name), bands of \(p.positions) positions")
             d.tensors = p.slabs.enumerated().map { Stage.Tensor("slab\($0.offset)", bytes: $0.element) }
@@ -97,23 +69,82 @@ public final class BandStage: @unchecked Sendable {
                 nonisolated(unsafe) let m = module
                 d.functions[asset] = Stage.Function(asset, unit: .gpu) { m }
             }
-            declarations.append(d)
+            socles.append(try Stage.socle(d, files: files, budget: budget))
             named.append(assets)
         }
-        // A socle over B leaves the shorter bands to try (`Stage.plan` refuses with `OverBudget`); none holds, the
-        // finest's number. Any other error (a tensor the file lacks) is not a band too tall: it goes up as it is.
+        return Candidates(name: name, files: files, plans: plans, socles: socles, named: named, modules: modules)
+    }
+
+    /// **The stage of the first of the candidates whose socle and estimate hold under B** on the footprint it opens on
+    /// (`Stage.planned`), its residents read: what Core AI will hold under each estimated from this Mac's readings
+    /// (`Stage.estimates(extents:)`: its own, or a bound from a reading of the same functions at another height or
+    /// size); none holding, the soberest on paper where nothing of its kin was read or only bands that hold more bound
+    /// it, refused where a reading of bands that hold no more predicts it past B — a size larger than any read, refused
+    /// before the computation `admit` judges for (`Stage.choose`). A stage's reading is kept at its close, once its
+    /// functions were called: the next stage of its kin climbs on it.
+    public static func open(_ c: Candidates) async throws -> BandStage {
+        guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
+        let began = DispatchTime.now().uptimeNanoseconds
+        var p = try Stage.planned { floor in
+            let choice = try choice(c, floor: floor)
+            return (choice, choice.plan)
+        }
+        // The trace's plan from the judgment on (the candidates were built before: `candidates`).
+        p.opening.start = began
+        let stage = try await Stage(device, plan: p.plan, files: c.files, measured: .current, opening: p.opening)
+        let chosen = p.value
+        return BandStage(chosen.bands, stage, candidate: chosen.rank, narrowed: chosen.narrowed,
+                         signatures: chosen.assets.mapValues { Block.Signature(c.modules[$0]!) }, assets: chosen.assets)
+    }
+
+    /// The stage of `candidates` built (`candidates`) and opened (`open`): what a stage opened at once takes.
+    public static func open(_ name: String, prefix: String, candidates: [Int], files: [SafeTensors], residents: [Weights.Entry], budget: Int,
+                            plan: (Int) -> Bands) async throws -> BandStage {
+        try await open(Self.candidates(name, prefix: prefix, candidates: candidates, files: files, residents: residents, budget: budget, plan: plan))
+    }
+
+    /// **What `open` would specialize**, its assets written: every candidate that holds on the floor the process comes
+    /// back to (`Stage.restingFloor`), nothing allocated or read (`Stage.specializations`). Every one that holds, not
+    /// the one taken alone: with nothing of its kin read on this Mac `open` takes the finest (`Stage.choose`), once read a
+    /// taller one; and it opens later on a higher floor — a candidate refused here is refused there (25/11/2026, the M1
+    /// Pro, a stage of 4 candidates: opened at the finest the first time, prepared, at the tallest the next, never
+    /// prepared, and compiled it).
+    public static func prepare(_ c: Candidates) throws -> [Functions.Specialization] {
+        try Stage.specializations(choice(c, floor: Stage.restingFloor()).holding.flatMap(\.declaration.functions.values))
+    }
+
+    /// **Whether `open` would hold over `floor`**, nothing allocated: the candidate it would take, or `OverBudget` with
+    /// the number — what a client judges before the computation whose result the stage reads (refused after it, that
+    /// computation's minutes were paid for nothing). `floor`: the footprint the stage will open over — where the process
+    /// comes back to once the stages before it gave back what they took (`Stage.restingFloor`).
+    @discardableResult
+    public static func admit(_ c: Candidates, floor: Int = Stage.restingFloor()) throws -> Int {
+        try choice(c, floor: floor).rank
+    }
+
+    private struct Choice {
+        let rank: Int, bands: Bands, plan: Stage.Plan, narrowed: Bool
+        let assets: [Bands.Shaped: String]
+        /// The plan of every candidate that holds, the chosen among them.
+        let holding: [Stage.Plan]
+    }
+
+    /// The candidate `open` takes and `admit` judges on `floor`, its plan and its functions.
+    private static func choice(_ c: Candidates, floor: Int) throws -> Choice {
+        // A socle over B leaves the shorter bands to try (`Plan.on` refuses with `OverBudget`); none holds, the finest's
+        // number.
         var holding: [(rank: Int, plan: Stage.Plan)] = [], refusal: OverBudget?
-        for (rank, d) in declarations.enumerated() {
-            do { holding.append((rank, try Stage.plan(d, files: files, budget: budget, floor: floor))) }
+        for (rank, socle) in c.socles.enumerated() {
+            do { holding.append((rank, try socle.on(floor: floor))) }
             catch let o as OverBudget { refusal = o }
         }
-        guard !holding.isEmpty else { throw refusal! }
+        guard let budget = holding.first?.plan.budget else { throw refusal! }
         let estimates = Stage.estimates(extents: holding.map { (Stage.key($0.plan.declaration), $0.plan.declaration.extent!) }, budget: budget)
         // Every form fused: `OverBudget` too, the finest's P its number (`Stage.choose`).
         let chosen = holding[try Stage.choose(holding.map(\.plan), estimates)].rank
-        let unread = holding.count == declarations.count && estimates.allSatisfy { $0 == .unknown }
-        return Choice(rank: chosen, bands: plans[chosen], plan: holding.first { $0.rank == chosen }!.plan, narrowed: chosen > 0 && !unread,
-                      assets: named[chosen], modules: modules, holding: holding.map(\.plan))
+        let unread = holding.count == c.socles.count && estimates.allSatisfy { $0 == .unknown }
+        return Choice(rank: chosen, bands: c.plans[chosen], plan: holding.first { $0.rank == chosen }!.plan, narrowed: chosen > 0 && !unread,
+                      assets: c.named[chosen], holding: holding.map(\.plan))
     }
 
     private func view(_ s: Bands.Spot) -> View {

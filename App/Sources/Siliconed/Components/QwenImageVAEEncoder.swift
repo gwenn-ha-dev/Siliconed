@@ -68,14 +68,17 @@ package enum QwenImageVAEEncoder {
     /// `path` under the machine's B, let go. `image` is `[3, H, W]` in [−1, 1].
     /// **What `mean` would specialize** for a picture `height × width`, nothing allocated (`BandStage.prepare`).
     package static func prepare(height: Int, width: Int, path: String) throws -> [Functions.Specialization] {
-        try QwenImageVAERun.prepare(.init("qwen-image-vae-encoder", file: try SafeTensors(path)) { plan(height: height, width: width, positions: $0) },
-                                    budget: MemoryBudget.machineCeiling())
+        try QwenImageVAERun.prepare(.init("qwen-image-vae-encoder", file: try SafeTensors(path), budget: MemoryBudget.machineCeiling()) {
+            plan(height: height, width: width, positions: $0)
+        })
     }
 
     package static func mean(of image: [Float], height: Int, width: Int, path: String) throws -> [Float] {
-        let file = try SafeTensors(path), budget = MemoryBudget.machineCeiling()
+        let plans = try QwenImageVAERun.Plans("qwen-image-vae-encoder", file: try SafeTensors(path), budget: MemoryBudget.machineCeiling()) {
+            plan(height: height, width: width, positions: $0)
+        }
         return try blocking {
-            let run = try await QwenImageVAERun.open(.init("qwen-image-vae-encoder", file: file) { plan(height: height, width: width, positions: $0) }, budget: budget)
+            let run = try await QwenImageVAERun.open(plans)
             defer { run.stage.close() }
             return try await run.run(image)
         }

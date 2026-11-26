@@ -238,6 +238,50 @@ import Testing
         #expect(ThisMac.current.reading("called, climbed") == nil)
     }
 
+    /// **A stage planned on what the stages before it let go keeps no first reading** (`Stage.Opening.trailing`): read
+    /// while what trails leaves, it would come out short by as much; over a reading kept, at its largest.
+    @Test func aStageOnWhatTrailsKeepsNoFirstReading() async throws {
+        guard let device = MTLCreateSystemDefaultDevice() else { return }
+        var d = StagePlans.declaration("on what trails")
+        d.functions = [:]
+        d.inFlight = 5
+        let plan = try Stage.plan(d, files: [StagePlans.file], budget: 1 << 40, floor: StagePlans.floor, depth: 2)
+        var opening = Stage.Opening()
+        opening.trailing = true
+        func run(share: Int) async throws {
+            let footprint = StageSignals.Footprint()
+            let stage = try await Stage(device, plan: plan, files: [StagePlans.file], measured: ThisMac(), opening: opening) { footprint.bytes }
+            let allocated = stage.arena.allocated
+            footprint.lock.withLock { (footprint.arena, footprint.start, footprint.base) = (stage.arena, allocated, StagePlans.floor + allocated + share) }
+            Stage.call(on: stage.stream)
+            stage.close()
+        }
+        try await run(share: 10 << 20)
+        #expect(ThisMac.current.reading(Stage.key(d)) == nil)
+        try ThisMac.update { $0.readings = ($0.readings ?? [:]).merging([Stage.key(d): 8 << 20]) { $1 } }
+        try await run(share: 10 << 20)
+        #expect(ThisMac.current.reading(Stage.key(d)) == 10 << 20)
+        try await run(share: 6 << 20)
+        #expect(ThisMac.current.reading(Stage.key(d)) == 10 << 20)
+    }
+
+    /// **What a stage planned on what trails waits for** (`Stage.waits`): nothing where it takes the same functions as
+    /// on the rest and these were read on this Mac; else the wait — another form on the rest, never read, fused.
+    @Test func aStageOnWhatTrailsWaitsOnlyWhereItChangesSomething() throws {
+        var d = StagePlans.declaration("waits")
+        d.functions = [:]
+        let socle = try Stage.socle(d, files: [StagePlans.file], budget: 1 << 40)
+        let (now, rested) = (try socle.on(floor: StagePlans.floor + (300 << 20)), try socle.on(floor: StagePlans.floor))
+        let other = try Stage.plan(StagePlans.declaration("taller"), files: [StagePlans.file], budget: 1 << 40, floor: StagePlans.floor)
+        var read = ThisMac(), fused = ThisMac()
+        read.readings = [Stage.key(d): 10 << 20]
+        (fused.readings, fused.fusedBy) = ([Stage.key(d): -1], [Stage.key(d): ThisMac.engine])
+        #expect(!Stage.waits(now: now, rested: rested, measured: read))
+        #expect(Stage.waits(now: now, rested: other, measured: read))
+        #expect(Stage.waits(now: now, rested: rested, measured: ThisMac()))
+        #expect(Stage.waits(now: now, rested: rested, measured: fused))
+    }
+
     @Test func whatThisMacMeasuredIsKeptBySystem() throws {
         try ThisMac.update { $0.capacities = ["codes": .init(ratio: 0.37)]; $0.readings = ["stage f": 42] }
         #expect(ThisMac.current.capacities?["codes"] == ThisMac.Capacity(ratio: 0.37))

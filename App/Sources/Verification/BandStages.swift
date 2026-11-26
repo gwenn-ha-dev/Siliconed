@@ -130,8 +130,9 @@ enum BandStages {
             let (input, vae) = (values, try path())
 
             var start = Date()
+            let admitted = try Decoder.admit(path: vae, latentHeight: h, latentWidth: w, budget: machine)
             let (whole, preferred, wholeP) = try blocking { () async throws -> ([Float], Int, Int) in
-                let run = try await Decoder.open(path: vae, latentHeight: h, latentWidth: w, budget: machine)
+                let run = try await Decoder.open(admitted)
                 defer { run.stage.close() }
                 return (try await run.pixels(input), run.positions, run.stage.plan.p)
             }
@@ -141,8 +142,9 @@ enum BandStages {
             let watch = FootprintWatch()
             watch.reset()
             start = Date()
+            let small = try Decoder.admit(path: vae, latentHeight: h, latentWidth: w, budget: budget)
             let (banded, positions, p) = try blocking { () async throws -> ([Float], Int, SiliCore.Stage.Plan) in
-                let run = try await Decoder.open(path: vae, latentHeight: h, latentWidth: w, budget: budget)
+                let run = try await Decoder.open(small)
                 defer { run.stage.close() }
                 return (try await run.pixels(input), run.positions, run.stage.plan)
             }

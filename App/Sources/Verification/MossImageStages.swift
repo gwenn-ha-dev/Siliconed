@@ -162,8 +162,9 @@ package enum MossImageStages {
         let (h, w) = (entry.shape[1], entry.shape[2])
         let path = try Library.processWide.component(.mossImage, "vae.safetensors")
         let names = Flux2VAEDecoder.tapNames
+        let admitted = try Flux2VAEDecoder.admit(path: path, latentHeight: h, latentWidth: w, budget: MemoryBudget.machineCeiling())
         let (image, taps) = try blocking {
-            let decoder = try await Flux2VAEDecoder.open(path: path, latentHeight: h, latentWidth: w, budget: MemoryBudget.machineCeiling())
+            let decoder = try await Flux2VAEDecoder.open(admitted)
             return try await decoder.pixels(Array(latent), taps: Set(names))
         }
         for name in names {

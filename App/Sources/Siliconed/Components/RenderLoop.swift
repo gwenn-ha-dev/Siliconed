@@ -121,7 +121,8 @@ package enum RenderLoop {
         let totalStart = Date()
         // A decoding taken again (`keeping`): the latents its DiT left, decoded alone.
         if let kept = keeping.flatMap(KeptLatents.read) {
-            return try decode(parts, kept, request, admitted, seeds: seeds, model: model, cancellation: cancellation, emit: emit)
+            let decoder = try Parts.Decoder.admit(path: parts.decoderPath, latentHeight: height, latentWidth: width, budget: MemoryBudget.machineCeiling())
+            return try decode(parts, kept, decoder, request, admitted, seeds: seeds, model: model, cancellation: cancellation, emit: emit)
         }
         emit(.start(Engine.Plan(denoising: plan, seeds: seeds, stages: parts.encodes ? [.text, .image, .denoising, .decoding] : [.text, .denoising, .decoding])))
 
@@ -154,8 +155,9 @@ package enum RenderLoop {
         try cancellation.check()
         emit(.stage(.denoising, image: 0))
         let ditStart = Date()
-        // The decoder judged before the DiT, over the floor the DiT will give back: refused now, not after its minutes.
-        try Parts.Decoder.admit(path: parts.decoderPath, latentHeight: height, latentWidth: width, budget: MemoryBudget.machineCeiling())
+        // The decoder judged before the DiT, over the floor the DiT will give back: refused now, not after its minutes;
+        // what it judged opened after it, its functions built once.
+        let decoder = try Parts.Decoder.admit(path: parts.decoderPath, latentHeight: height, latentWidth: width, budget: MemoryBudget.machineCeiling())
         var dit: (any RenderDenoiser)? = try parts.denoiser(height: height, width: width)
         let schedule = denoising.sigmas(steps: steps)
         let told = request.detail.modelSigmas(schedule, start: start, bell: denoising.detailBell,
@@ -207,7 +209,7 @@ package enum RenderLoop {
         guard !pending.isEmpty else { throw EngineError.nonFiniteImage(stage: .denoising) }
         let kept = KeptLatents(tokens: tokens, images: pending)
         if let keeping { try kept.write(to: keeping) }
-        return try decode(parts, kept, request, admitted, seeds: seeds, model: model, cancellation: cancellation, emit: emit)
+        return try decode(parts, kept, decoder, request, admitted, seeds: seeds, model: model, cancellation: cancellation, emit: emit)
     }
 
     /// **Where the worker's render keeps its latents between its DiT and its decoder** (`RenderOrder.keeping`), the
@@ -218,8 +220,9 @@ package enum RenderLoop {
     nonisolated(unsafe) package static var keeping: URL?
 
     /// **The decoding, image by image, one decoder session**: the latents of `kept`, those its file still holds when
-    /// taken again (`keeping`).
-    private static func decode<Parts: RenderParts>(_ parts: Parts, _ kept: KeptLatents, _ request: Request, _ admitted: Admission,
+    /// taken again (`keeping`), by the decoder `judged` (`LatentDecoder.admit`).
+    private static func decode<Parts: RenderParts>(_ parts: Parts, _ kept: KeptLatents, _ judged: Parts.Decoder.Admitted,
+                                                   _ request: Request, _ admitted: Admission,
                                                    seeds: [UInt64], model: Model, cancellation: Cancellation?,
                                                    emit: (Engine.Event) -> Void) throws -> [Engine.Render] {
         let denoising = model.chain.denoising, space = denoising.space, plan = admitted.plan
@@ -235,7 +238,7 @@ package enum RenderLoop {
         try cancellation.check()
         emit(.stage(.decoding, image: first.index))
         var decodingStart = Date()
-        let decoder = try DecoderSession<Parts.Decoder>(path: parts.decoderPath, latentHeight: height, latentWidth: width)
+        let decoder = try DecoderSession<Parts.Decoder>(judged)
         if let warning = decoder.warning { emit(.warning(warning)) }
         var renders: [Engine.Render] = []
         for (k, image) in pending.enumerated() {

@@ -8,11 +8,15 @@ import SiliCore
 /// `QwenImageVAEDecoder`, …). It is opened once for a batch — its plan drawn from B, its arena taken,
 /// its functions loaded — then run for each latent.
 package protocol LatentDecoder {
-    /// The decoder of latents `[C, latentHeight, latentWidth]` of the VAE at `path`, under `budget` (bytes).
-    static func open(path: String, latentHeight: Int, latentWidth: Int, budget: Int) async throws -> Self
-    /// **Whether `open` would hold under `budget`**, judged now, nothing allocated (`BandStage.admit`): `OverBudget`
-    /// otherwise. A render asks it before its DiT, over the floor its DiT will give back.
-    static func admit(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws
+    /// **What `admit` judged and `open` opens**: the decoder's candidates, their functions built and named once
+    /// (`BandStage.candidates`).
+    associatedtype Admitted: Sendable
+    /// The decoder `admit` judged, opened.
+    static func open(_ admitted: Admitted) async throws -> Self
+    /// **Whether the decoder of latents `[C, latentHeight, latentWidth]` of the VAE at `path` holds under `budget`**
+    /// (bytes), judged now, nothing allocated (`BandStage.admit`): `OverBudget` otherwise; what `open` opens. A render
+    /// asks it before its DiT, over the floor its DiT will give back, and opens what it judged after it.
+    static func admit(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> Admitted
     /// **What `open` would specialize** under `budget`, its assets written, nothing allocated (`BandStage.prepare`).
     static func prepare(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> [Functions.Specialization]
     /// Whether B made its plan cut finer than the one it prefers (`bandDecodingNotice`).
@@ -31,12 +35,14 @@ extension LatentDecoder {
 package final class DecoderSession<Decoder: LatentDecoder> {
     private let decoder: UncheckedSendable<Decoder>
 
-    /// Under the machine's B.
-    package init(path: String, latentHeight: Int, latentWidth: Int) throws {
-        let budget = MemoryBudget.machineCeiling()
-        decoder = UncheckedSendable(try blocking {
-            try await Decoder.open(path: path, latentHeight: latentHeight, latentWidth: latentWidth, budget: budget)
-        })
+    /// What `admit` judged, opened.
+    package init(_ admitted: Decoder.Admitted) throws {
+        decoder = UncheckedSendable(try blocking { try await Decoder.open(admitted) })
+    }
+
+    /// Judged under the machine's B (`admit`), then opened.
+    package convenience init(path: String, latentHeight: Int, latentWidth: Int) throws {
+        try self.init(try Decoder.admit(path: path, latentHeight: latentHeight, latentWidth: latentWidth, budget: MemoryBudget.machineCeiling()))
     }
 
     /// What the render says of the decoding's cut: `bandDecodingNotice` when B made it finer than the decoder prefers.

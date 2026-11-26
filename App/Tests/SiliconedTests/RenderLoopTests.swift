@@ -188,12 +188,15 @@ private final class LoopDiT: RenderDenoiser {
 
 private struct LoopDecoder: LatentDecoder {
     let pixels: Int
-    static func open(path: String, latentHeight: Int, latentWidth: Int, budget: Int) async throws -> LoopDecoder {
+    static func open(_ admitted: Int) async throws -> LoopDecoder {
         RenderLoopTests.script.decoderOpened += 1
-        let factor = LatentSpace.flux.factor
-        return LoopDecoder(pixels: 3 * factor * latentHeight * factor * latentWidth)
+        return LoopDecoder(pixels: admitted)
     }
-    static func admit(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws {}
+    /// What it judged: the pixels it will give.
+    static func admit(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> Int {
+        let factor = LatentSpace.flux.factor
+        return 3 * factor * latentHeight * factor * latentWidth
+    }
     static func prepare(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws -> [Functions.Specialization] {
         RenderLoopTests.script.prepared.append("decoder \(latentHeight)×\(latentWidth)")
         return [Functions.Specialization(URL(fileURLWithPath: "/decoder"), unit: .gpu)]

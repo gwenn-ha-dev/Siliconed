@@ -79,7 +79,8 @@ extension Runs {
         }
         let peak = watch.peak, kept = stage.kept
         watch.stop()
-        let settled = stage.close()
+        stage.close()
+        let settled = Stage.settle()
 
         // The same function on each group's weights read apart, the same input.
         let entries: [Weights.Entry] = [("w", "a", .codes)]

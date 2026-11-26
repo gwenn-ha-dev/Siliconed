@@ -146,22 +146,35 @@ extension FluxVAE {
     /// (`BandStage.narrowed`).
     package func open(_ direction: FluxVAEPlan.Direction, path: String, height: Int, width: Int, budget: Int,
                       positions: Int? = nil) async throws -> (pass: FluxVAEPass, narrowed: Bool) {
-        let s = try staged(direction, path: path, height: height, width: width, candidates: positions.map { [$0] } ?? Self.candidates)
-        let stage = try await BandStage.open(s.name, prefix: s.prefix, candidates: s.candidates, files: [s.file], residents: s.residents,
-                                             budget: budget, plan: s.bands)
-        return (FluxVAEPass(s.plans[stage.candidate], stage), stage.narrowed)
+        try await open(candidates(direction, path: path, height: height, width: width, budget: budget, positions: positions))
     }
 
-    /// Whether `open` would hold under `budget`, nothing allocated (`BandStage.admit`).
-    package func admit(_ direction: FluxVAEPlan.Direction, path: String, height: Int, width: Int, budget: Int) throws {
-        let s = try staged(direction, path: path, height: height, width: width, candidates: Self.candidates)
-        try BandStage.admit(s.name, prefix: s.prefix, candidates: s.candidates, files: [s.file], residents: s.residents, budget: budget, plan: s.bands)
+    /// The pass of `c`, built once (`candidates`): what a render judged before its DiT (`admit`), opened after it.
+    package func open(_ c: Candidates) async throws -> (pass: FluxVAEPass, narrowed: Bool) {
+        let stage = try await BandStage.open(c.bands)
+        return (FluxVAEPass(c.staged.plans[stage.candidate], stage), stage.narrowed)
     }
+
+    /// Whether `open` would hold, nothing allocated (`BandStage.admit`).
+    package func admit(_ c: Candidates) throws { try BandStage.admit(c.bands) }
 
     /// What `open` would specialize, nothing allocated (`BandStage.prepare`).
     package func prepare(_ direction: FluxVAEPlan.Direction, path: String, height: Int, width: Int, budget: Int) throws -> [Functions.Specialization] {
-        let s = try staged(direction, path: path, height: height, width: width, candidates: Self.candidates)
-        return try BandStage.prepare(s.name, prefix: s.prefix, candidates: s.candidates, files: [s.file], residents: s.residents, budget: budget, plan: s.bands)
+        try BandStage.prepare(candidates(direction, path: path, height: height, width: width, budget: budget).bands)
+    }
+
+    /// **A pass's candidates under `budget`, built once** (`BandStage.candidates`): its plans among the bands
+    /// (`positions`: that one alone), their functions built and named — what `admit` judges and `open` opens.
+    package struct Candidates: @unchecked Sendable {
+        fileprivate let staged: Staged
+        let bands: BandStage.Candidates
+    }
+
+    package func candidates(_ direction: FluxVAEPlan.Direction, path: String, height: Int, width: Int, budget: Int,
+                            positions: Int? = nil) throws -> Candidates {
+        let s = try staged(direction, path: path, height: height, width: width, candidates: positions.map { [$0] } ?? Self.candidates)
+        return Candidates(staged: s, bands: try BandStage.candidates(s.name, prefix: s.prefix, candidates: s.candidates, files: [s.file],
+                                                                     residents: s.residents, budget: budget, plan: s.bands))
     }
 
     /// **What `open` opens and `admit` judges, written once**: the stage's name, its plans among `candidates`, its
@@ -173,7 +186,7 @@ extension FluxVAE {
         return Staged(name: "\(name) \(side) \(height)x\(width)", prefix: "\(name)-\(side)", file: file, candidates: candidates, plans: plans)
     }
 
-    private struct Staged {
+    fileprivate struct Staged {
         let name, prefix: String
         let file: SafeTensors
         let candidates: [Int]

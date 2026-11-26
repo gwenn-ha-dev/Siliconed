@@ -32,8 +32,15 @@ extension Block {
         let began = DispatchTime.now().uptimeNanoseconds
         let o = try opening(d, files: files, budget: budget, share: share, measured: measured)
         let named = Functions.seconds(since: began)
-        let stage = try await Stage(device, plan: o.plans[o.height], files: files, measured: measured)
-        let block = Block(d, stage: stage, heights: o.heights, height: o.height, unit: o.unit, total: o.total, units: o.units, share: share,
+        var p = try Stage.planned(measured: measured) { floor in
+            let j = try o.judged(on: floor, measured: measured)
+            return (j, j.plans[j.height])
+        }
+        // The trace's plan from the functions built and named on.
+        p.opening.start = began
+        let (heights, height) = (p.value.heights, p.value.height)
+        let stage = try await Stage(device, plan: p.plan, files: files, measured: measured, opening: p.opening)
+        let block = Block(d, stage: stage, heights: heights, height: height, unit: o.unit, total: o.total, units: o.units, share: share,
                           key: o.key, arithmetic: o.arithmetic,
                           // κ unknown on this Mac for its arithmetic: the share of none visited, to measure it.
                           zero: o.inFlight && o.units > 0 && measured.capacities?[o.arithmetic]?.alone == nil,
@@ -52,13 +59,14 @@ extension Block {
     /// a block of 4096 rows, the ANE on, prepared at 2048 rows a call, climbed to a call a pass and compiled it, 1.06 s).
     /// In flight, at every height, the GPU's functions also at the shares a move takes first — the two beside the start
     /// and the share of none (`zero`). A share met later is specialized as it loads, as any function the cache does not
-    /// hold.
+    /// hold. On the floor the process comes back to (`Stage.restingFloor`).
     public static func prepare(_ d: Declaration, files: [SafeTensors], budget: Int, share: Share,
                                measured: ThisMac = .current) throws -> [Functions.Specialization] {
         let o = try opening(d, files: files, budget: budget, share: share, measured: measured)
-        var functions = o.plans.flatMap { Array($0.declaration.functions.values) }
+        let j = try o.judged(on: Stage.restingFloor(), measured: measured)
+        var functions = j.plans.flatMap { Array($0.declaration.functions.values) }
         if o.inFlight && o.units > 0 {
-            for cut in o.heights.map(\.cut) {
+            for cut in j.heights.map(\.cut) {
                 for n in [0, o.units - 1, o.units + 1] where n == 0 || (n >= 1 && n < o.total) {
                     for (_, spec) in steps(d, d.used, neural: n * o.unit, unit: o.unit, cut: cut) {
                         nonisolated(unsafe) let m = try module(spec)
@@ -71,15 +79,35 @@ extension Block {
     }
 
     /// **`open`'s choices, before anything is allocated**: the unit and the share, the functions built and named, every
-    /// height planned and the one taken (`Stage.choose`); the edges' and the ANE's assets written.
+    /// height's socle (the floor apart: `judged`); the edges' and the ANE's assets written.
     private struct Opening {
         let forms: [String: Form], groups: [String: Group]
         let key: String, arithmetic: String
         let unit: Int, units: Int, total: Int, inFlight: Bool
-        let heights: [Height], plans: [Stage.Plan], height: Int
+        /// Every height, the tallest first, and its socle — or why it has none (a tensor its files lack).
+        let socles: [(height: Height, socle: Result<Stage.Plan, Error>)]
+        let budget: Int
         let signatures: [String: Signature]
         let copies: Set<String>, neuralRows: Set<String>
         let resolver: Resolver
+
+        /// **The heights that hold on `floor`, their plans and the one taken** (`Stage.choose`): the first whose estimate
+        /// — its reading, or a bound from its kin's at another height or size (`Stage.estimates`) — holds under B, the
+        /// soberest where nothing of its kin was read on this Mac. None holds: the last refusal.
+        func judged(on floor: Int, measured: ThisMac) throws -> (heights: [Height], plans: [Stage.Plan], height: Int) {
+            var heights: [Height] = [], plans: [Stage.Plan] = [], refusal: Error? = nil
+            for (height, socle) in socles {
+                do {
+                    plans.append(try socle.get().on(floor: floor))
+                    heights.append(height)
+                } catch {
+                    refusal = error
+                }
+            }
+            guard !plans.isEmpty else { throw refusal! }
+            let estimates = Stage.estimates(extents: heights.map { ($0.key, $0.extent) }, measured: measured, budget: budget)
+            return (heights, plans, try Stage.choose(plans, estimates))
+        }
     }
 
     private static func opening(_ d: Declaration, files: [SafeTensors], budget: Int, share: Share, measured: ThisMac) throws -> Opening {
@@ -139,12 +167,10 @@ extension Block {
         })
 
         // Every height, the tallest first, its functions built and named (not written: the stage writes what it loads),
-        // its plan the same socle, what its functions hold beside (`extent`): the first whose estimate — its reading, or
-        // a bound from its kin's at another height or size (`Stage.estimates`) — holds under B taken (`Stage.choose`),
-        // the soberest where nothing of its kin was read on this Mac.
+        // its socle, what its functions hold beside (`extent`); judged on a floor by `judged`.
         let longest = d.passes.map { ($0.rows.count + 63) / 64 * 64 }.max() ?? 0
         let cuts: [Int?] = [nil] + [4096, 2048, 1024].filter { d.cuts && $0 < longest }
-        var heights: [Height] = [], plans: [Stage.Plan] = [], refusal: Error? = nil
+        var socles: [(height: Height, socle: Result<Stage.Plan, Error>)] = []
         for cut in cuts {
             let now = steps(d, used, neural: units * unit, unit: unit, cut: cut)
             for (name, spec) in now where assets[name] == nil {
@@ -162,19 +188,12 @@ extension Block {
                 s.functions[name] = Stage.Function(assets[name]!, unit: m.unit) { module }
             }
             s.extent = try extent(s.functions, inFlight: s.inFlight)
-            do {
-                plans.append(try Stage.plan(s, files: files, budget: budget, floor: Memory.floor()))
-                heights.append(Height(cut: cut, key: Stage.key(s), extent: s.extent!))
-            } catch {
-                refusal = error
-            }
+            let socle = Result { try Stage.socle(s, files: files, budget: budget) }
+            socles.append((Height(cut: cut, key: Stage.key(s), extent: s.extent!), socle))
         }
-        guard !plans.isEmpty else { throw refusal! }
-        let estimates = Stage.estimates(extents: heights.map { ($0.key, $0.extent) }, measured: measured, budget: budget)
-        let height = try Stage.choose(plans, estimates)
         signatures = modules.mapValues { Signature($0.module) }
         return Opening(forms: forms, groups: groups, key: key, arithmetic: arithmetic, unit: unit, units: units, total: total,
-                       inFlight: inFlight, heights: heights, plans: plans, height: height, signatures: signatures,
+                       inFlight: inFlight, socles: socles, budget: budget, signatures: signatures,
                        copies: copies, neuralRows: neuralRows, resolver: resolver)
     }
 

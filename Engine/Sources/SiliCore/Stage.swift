@@ -16,8 +16,8 @@ import Metal
 ///                   read ahead in the loop's order, the others through the slots), the functions loaded; views by
 ///                   name, groups acquired and released in the loop's order; past the loop's signal (`signal`), the
 ///                   cycle's groups kept in flight while what Core AI is read to hold leaves room under B; `close` lets
-///                   everything go, waits for the footprint and keeps what this stage's functions were read to hold,
-///                   if called
+///                   everything go and keeps what this stage's functions were read to hold, if called; the next stage
+///                   waits for the footprint only where it changes its plan (`planned`)
 ///
 /// The engine knows tensors, groups, functions and bytes; what they compute is the client's.
 public final class Stage: @unchecked Sendable {
@@ -75,8 +75,15 @@ public final class Stage: @unchecked Sendable {
     /// Its stream's identity, which a call on it marks (`called`).
     var streamID: ObjectIdentifier?
     let lock = NSLock()
-    /// The footprint before the stage allocated: what `close` waits for.
+    /// The footprint before the stage allocated (as its `footprint` reads it: a test's own).
     public let before: Int
+    /// The process's before the stage allocated: where it comes back to once the stage is let go (`rested`).
+    private let rest = Memory.footprint()
+    /// **Its floor holds what the stages before it let go** (`Opening.trailing`): a reading short by what left meanwhile,
+    /// it keeps no first one (`keep`).
+    let trailing: Bool
+    /// How it was opened (`planned`): its planning's start and its wait, for the trace.
+    private let opening: Opening
     /// When it began allocating (`Stages`).
     private let began = DispatchTime.now().uptimeNanoseconds
     /// **Whether it records what it does** (`Stages.tracing`, read once here): its opening and close piece by piece, its
@@ -86,13 +93,16 @@ public final class Stage: @unchecked Sendable {
     /// **The stage of `plan`**: the arena allocated (its tensors zeroed), the residents read, the groups kept from the
     /// start placed and read ahead in the loop's order by the ring's reader (which reads the others into its slots), the
     /// functions loaded while it reads. `files`: the plan's, opened again past the system's
-    /// cache for the reader. `measured`: where the reserve is read (`ThisMac.reserves`).
-    public init(_ device: MTLDevice, plan: Plan, files: [SafeTensors], measured: ThisMac = .current,
+    /// cache for the reader. `measured`: where the reserve is read (`ThisMac.reserves`). `opening`: how its plan was
+    /// taken (`planned`).
+    public init(_ device: MTLDevice, plan: Plan, files: [SafeTensors], measured: ThisMac = .current, opening: Opening = Opening(),
                 footprint: @escaping @Sendable () -> Int = Memory.footprint) async throws {
         self.plan = plan
         self.device = device
         self.footprint = footprint
         self.measured = measured
+        self.opening = opening
+        trailing = opening.trailing
         key = Self.key(plan.declaration)
         readingKey = key
         readingExtent = plan.declaration.extent
@@ -178,8 +188,12 @@ public final class Stage: @unchecked Sendable {
         lock.withLock { ready = true }
         piece("functions")
         if traced {
+            // From its planning: the plan (its forms judged, twice where what trails was weighed), the wait for what
+            // the stages before let go, then the pieces above.
             var from = began
-            Stages.tell(.traced(.opening(stage: d.name, start: began, pieces: pieces.map { name, end in
+            let planning = opening.start.map { [Stages.Piece(name: "plan", seconds: Double(began &- $0) / 1e9 - opening.waited)]
+                + (opening.waited > 0 ? [Stages.Piece(name: "footprint back", seconds: opening.waited)] : []) } ?? []
+            Stages.tell(.traced(.opening(stage: d.name, start: opening.start ?? began, pieces: planning + pieces.map { name, end in
                 defer { from = end }
                 return Stages.Piece(name: name, seconds: Double(end &- from) / 1e9)
             })))
@@ -202,7 +216,9 @@ public final class Stage: @unchecked Sendable {
         ring?.stop()
         watch?.stop()
         opened(nil)
-        if lock.withLock({ settled == nil && ready }) { keep() }
+        let closed = lock.withLock { settled != nil }
+        if !closed && lock.withLock({ ready }) { keep() }
+        if !closed { Self.rested(on: rest) }
         listen(nil)
     }
 
@@ -218,10 +234,14 @@ public final class Stage: @unchecked Sendable {
         guard called() else { return }
         let (share, _, _) = read()
         let (keyed, readingKey, extent, first, climbed) = lock.withLock { (self.keyed, self.readingKey, self.readingExtent, self.first, self.climbed != nil) }
-        Self.keep(reading: keyed, under: readingKey, extent: extent, budget: plan.budget)
+        Self.keep(reading: keyed, under: readingKey, extent: extent, budget: plan.budget, first: !trailing)
         if let first, !climbed {
-            let reading = max(share - first, 0), key = readingKey
-            try? ThisMac.update { $0.reserves = ($0.reserves ?? [:]).merging([key: reading]) { max($0, $1) } }
+            let reading = max(share - first, 0), key = readingKey, trailing = trailing
+            // A growth read while what trails left comes out short by it: over one kept, at its largest, it does nothing.
+            try? ThisMac.update { m in
+                guard !trailing || m.reserves?[key] != nil else { return }
+                m.reserves = (m.reserves ?? [:]).merging([key: reading]) { max($0, $1) }
+            }
         }
     }
 
@@ -303,8 +323,9 @@ public final class Stage: @unchecked Sendable {
     /// The groups kept so far, from the start or past the signal, in the order read.
     public var kept: [String] { ring?.keptGroups ?? plan.kept }
 
-    /// What a stage let go left: the footprint against what it was before the stage allocated, the seconds waited, the
-    /// arenas still alive and their heaps still held.
+    /// What a stage let go left (`close`, at once), or what the stages let go left once waited for (`settle`): the
+    /// footprint against where the process comes back to, the seconds waited, the arenas still alive and their heaps
+    /// still held.
     public struct Settled: Sendable {
         public let footprint, before: Int
         public let seconds: Double
@@ -315,14 +336,12 @@ public final class Stage: @unchecked Sendable {
         }
     }
 
-    /// **Everything let go** — the reader stopped, the arena, then the functions, the queue and the stream — then the
-    /// wait until the footprint is back within 64 MiB of what it was before the stage, 2 s at most (measured 18/11 on the
-    /// M1 Pro, a run's stages each let go: the heap leaves within 0.05 to 0.5 s, then 100 to 160 MiB of Core AI's or
-    /// Metal's 1 to 2 s after; a function holds its last call's buffers until it is let go, `Arena.take(apart:)`).
-    /// **The arena before the functions that read it**: a heap let go after them stays billed to the process 12 to 36 s,
-    /// before them 0.06 s (14–15/11 on the M1 Pro, the graphics ledger; the int8 trial's arena likewise). Past the wait it
-    /// would lie in the next stage's floor, and leave while that stage reads Core AI's share, its reading short by as
-    /// much. On the M5 Pro either order leaves within the wait (21/11/2026).
+    /// **Everything let go** — the reader stopped, the arena, then the functions, the queue and the stream —, no wait:
+    /// the process comes back to the footprint before the stage (`rested`), and the next stage waits for it only where
+    /// that changes its plan or its reading (`planned`). A function holds its last call's buffers until it is let go
+    /// (`Arena.take(apart:)`). **The arena before the functions that read it**: a heap let go after them stays billed to
+    /// the process 12 to 36 s, before them 0.06 s (14–15/11 on the M1 Pro, the graphics ledger; the int8 trial's arena
+    /// likewise). On the M5 Pro either order leaves within 2 s (21/11/2026).
     @discardableResult
     public func close() -> Settled {
         // Closed again (its owner's `deinit`): what the first close waited for, not a second wait.
@@ -343,13 +362,11 @@ public final class Stage: @unchecked Sendable {
         stream = nil
         queue = nil
         let t = DispatchTime.now().uptimeNanoseconds
-        var f = Memory.footprint()
-        while f > before + Stage.margin && Functions.seconds(since: t) < 2 { usleep(2000); f = Memory.footprint() }
-        let settled = Settled(footprint: f, before: before, seconds: Functions.seconds(since: t), alive: Arena.alive, held: Arena.lingering)
+        Self.rested(on: rest)
+        let settled = Settled(footprint: Memory.footprint(), before: before, seconds: 0, alive: Arena.alive, held: Arena.lingering)
         if traced {
             Stages.tell(.traced(.closing(stage: plan.declaration.name, start: start,
-                                         pieces: [Stages.Piece(name: "let go", seconds: Double(t &- start) / 1e9),
-                                                  Stages.Piece(name: "footprint back", seconds: settled.seconds)])))
+                                         pieces: [Stages.Piece(name: "let go", seconds: Double(t &- start) / 1e9)])))
         }
         Stages.tell(.closed(plan, seconds: Functions.seconds(since: began), kept: kept))
         lock.lock(); self.settled = settled; lock.unlock()
